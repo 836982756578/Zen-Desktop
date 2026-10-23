@@ -12748,8 +12748,10 @@ namespace ModernAutoHideIcons
     public class StationDutyItem
     {
         public int Order { get; set; }
+        public int GroupId { get; set; }
         public string DisplayName { get; set; }
         public string ZoneKey { get; set; }
+        public string MatchAliases { get; set; }
         public string CoveredStations { get; set; }
 
         // Sabah Personeli (07:00 - 16:00)
@@ -13014,21 +13016,109 @@ namespace ModernAutoHideIcons
         public static readonly string[] StationList = new string[]
         {
             "Üsküdar",
-            "Fıstıkağacı / Bağlarbaşı",
+            "Fıstıkağacı",
+            "Bağlarbaşı",
             "Altunizade",
-            "Kısıklı / Bulgurlu",
-            "Ümraniye / Çarşı",
-            "Yamanevler / Çakmak",
-            "Ihlamurkuyu / Altınşehir / Lise",
+            "Kısıklı",
+            "Bulgurlu",
+            "Ümraniye",
+            "Çarşı",
+            "Yamanevler",
+            "Çakmak",
+            "Ihlamurkuyu",
+            "Altınşehir",
+            "İmam Hatip Lisesi",
             "Dudullu",
-            "Çekmeköy / Necip Fazıl",
-            "Sarıgazi / Meclis",
+            "Necip Fazıl",
+            "Çekmeköy",
+            "Meclis",
+            "Sarıgazi",
             "Şehir Hastanesi",
-            "Samandıra / Sancaktepe",
+            "Sancaktepe",
+            "Samandıra Merkez",
             "Veysel Karani",
             "Hasanpaşa",
             "Sultanbeyli"
         };
+
+        public static readonly int[] StationGroupIds = new int[]
+        {
+            0,  // 01 Üsküdar
+            1,  // 02 Fıstıkağacı
+            1,  // 03 Bağlarbaşı
+            2,  // 04 Altunizade
+            3,  // 05 Kısıklı
+            3,  // 06 Bulgurlu
+            4,  // 07 Ümraniye
+            4,  // 08 Çarşı
+            5,  // 09 Yamanevler
+            5,  // 10 Çakmak
+            6,  // 11 Ihlamurkuyu
+            6,  // 12 Altınşehir
+            6,  // 13 İmam Hatip Lisesi
+            7,  // 14 Dudullu
+            8,  // 15 Necip Fazıl
+            8,  // 16 Çekmeköy
+            9,  // 17 Meclis
+            9,  // 18 Sarıgazi
+            10, // 19 Şehir Hastanesi
+            11, // 20 Sancaktepe
+            11, // 21 Samandıra Merkez
+            12, // 22 Veysel Karani
+            13, // 23 Hasanpaşa
+            14  // 24 Sultanbeyli
+        };
+
+        public static readonly string[] StationMatchAliases = new string[]
+        {
+            "USKUDAR",
+            "FISTIKAGACI",
+            "BAGLARBASI",
+            "ALTUNIZADE",
+            "KISIKLI",
+            "BULGURLU",
+            "UMRANIYE",
+            "CARSI",
+            "YAMANEVLER",
+            "CAKMAK",
+            "IHLAMURKUYU",
+            "ALTINSEHIR",
+            "IMAMHATIPLISESI|LISE",
+            "DUDULLU",
+            "NECIPFAZIL",
+            "CEKMEKOY",
+            "MECLIS",
+            "SARIGAZI",
+            "SEHIRHASTANESI",
+            "SANCAKTEPE",
+            "SAMANDIRAMERKEZ|SAMANDIRA",
+            "VEYSELKARANI",
+            "HASANPASA",
+            "SULTANBEYLI"
+        };
+
+        public static System.Windows.Media.Color GetStationGroupColor(int groupId)
+        {
+            switch (groupId)
+            {
+                case 0:  return System.Windows.Media.Color.FromRgb(14, 165, 233);  // Gökyüzü Mavisi (Üsküdar)
+                case 1:  return System.Windows.Media.Color.FromRgb(245, 158, 11);  // Kehribar / Turuncu (Fıstıkağacı - Bağlarbaşı)
+                case 2:  return System.Windows.Media.Color.FromRgb(16, 185, 129);  // Zümrüt Yeşili (Altunizade)
+                case 3:  return System.Windows.Media.Color.FromRgb(168, 85, 247);  // Mor / Eflatun (Kısıklı - Bulgurlu)
+                case 4:  return System.Windows.Media.Color.FromRgb(244, 63, 94);   // Gül / Mercan (Ümraniye - Çarşı)
+                case 5:  return System.Windows.Media.Color.FromRgb(6, 182, 212);   // Turkuaz (Yamanevler - Çakmak)
+                case 6:  return System.Windows.Media.Color.FromRgb(99, 102, 241);  // İndigo / Çivit (Ihlamurkuyu - Altınşehir - İmam Hatip Lisesi)
+                case 7:  return System.Windows.Media.Color.FromRgb(234, 179, 8);   // Altın Sarısı (Dudullu)
+                case 8:  return System.Windows.Media.Color.FromRgb(249, 115, 22);  // Koyu Turuncu (Necip Fazıl - Çekmeköy)
+                case 9:  return System.Windows.Media.Color.FromRgb(20, 184, 166);  // Su Yeşili / Mint (Meclis - Sarıgazi)
+                case 10: return System.Windows.Media.Color.FromRgb(217, 70, 239);  // Fuşya / Macenta (Şehir Hastanesi)
+                case 11: return System.Windows.Media.Color.FromRgb(132, 204, 22);  // Fıstık Yeşili (Sancaktepe - Samandıra Merkez)
+                case 12: return System.Windows.Media.Color.FromRgb(239, 68, 68);   // Kırmızı (Veysel Karani)
+                case 13: return System.Windows.Media.Color.FromRgb(59, 130, 246);  // Kraliyet Mavisi (Hasanpaşa)
+                case 14: return System.Windows.Media.Color.FromRgb(139, 92, 246);  // Menekşe (Sultanbeyli)
+                default: return System.Windows.Media.Color.FromRgb(100, 116, 139); // Gri (Depo vb.)
+            }
+        }
 
         public static string NormalizeStationKey(string text)
         {
@@ -13856,26 +13946,21 @@ namespace ModernAutoHideIcons
 
             if (dayCol <= 0 || dayCol > cCount) return res;
 
-            // Standart 15 İstasyon Bölgesini Hat Sırasına Göre Başlat
+            // Standart 24 İstasyonu Hat Sırasına Göre Başlat
             for (int i = 0; i < StationList.Length; i++)
             {
                 string sName = StationList[i];
                 var item = new StationDutyItem
                 {
                     Order = i + 1,
+                    GroupId = (i < StationGroupIds.Length) ? StationGroupIds[i] : i,
                     DisplayName = sName,
-                    ZoneKey = NormalizeStationKey(sName)
+                    ZoneKey = NormalizeStationKey(sName),
+                    MatchAliases = (i < StationMatchAliases.Length) ? StationMatchAliases[i] : NormalizeStationKey(sName)
                 };
-
-                if (sName.Contains("/"))
-                {
-                    item.CoveredStations = sName.Replace("/", " & ") + " İstasyonları";
-                }
 
                 res.Stations.Add(item);
             }
-
-            StationDutyItem depoItem = null;
 
             for (int r = 2; r <= rCount; r++)
             {
@@ -13907,81 +13992,48 @@ namespace ModernAutoHideIcons
                 if (string.IsNullOrEmpty(code)) continue;
 
                 string stKey = NormalizeStationKey(stRaw);
+                if (stKey.Contains("DEPO")) continue;
 
-                // DEPO Kontrolü
-                if (stKey.Contains("DEPO"))
+                // Çoklu istasyon hücrelerini ('/', '-', ',', '&') parçala ve eşleşen tüm istasyonları bul
+                string[] rawParts = stRaw.Split(new char[] { '/', '-', ',', '&' }, StringSplitOptions.RemoveEmptyEntries);
+                var matchedStations = new List<StationDutyItem>();
+
+                foreach (string part in rawParts)
                 {
-                    if (depoItem == null)
-                    {
-                        depoItem = new StationDutyItem
-                        {
-                            Order = res.Stations.Count + 1,
-                            DisplayName = "Depo Sahası",
-                            ZoneKey = "DEPO",
-                            CoveredStations = "Depo ve Atölye Sahası"
-                        };
-                    }
-                    if (code == "N" || code == "NS" || code == "S" || code == "FS" || code.StartsWith("S") || code.StartsWith("FS"))
-                    {
-                        if (string.IsNullOrEmpty(depoItem.MorningName) || depoItem.MorningIsLeave)
-                        {
-                            depoItem.MorningName = name;
-                            depoItem.MorningRole = role;
-                            depoItem.MorningCode = code;
-                            depoItem.MorningIsOvertime = code.StartsWith("F");
-                            depoItem.MorningIsLeave = false;
-                        }
-                        else
-                        {
-                            depoItem.MorningName = depoItem.MorningName + " / " + name;
-                            if (code.StartsWith("F")) depoItem.MorningIsOvertime = true;
-                        }
-                    }
-                    else if (code == "A" || code == "FA" || code.StartsWith("A") || code.StartsWith("FA"))
-                    {
-                        if (string.IsNullOrEmpty(depoItem.EveningName) || depoItem.EveningIsLeave)
-                        {
-                            depoItem.EveningName = name;
-                            depoItem.EveningRole = role;
-                            depoItem.EveningCode = code;
-                            depoItem.EveningIsOvertime = code.StartsWith("F");
-                            depoItem.EveningIsLeave = false;
-                        }
-                        else
-                        {
-                            depoItem.EveningName = depoItem.EveningName + " / " + name;
-                            if (code.StartsWith("F")) depoItem.EveningIsOvertime = true;
-                        }
-                    }
-                    else if (string.IsNullOrEmpty(depoItem.MorningName) && (code == "Yİ" || code == "R" || code == "Üİ"))
-                    {
-                        depoItem.MorningName = name;
-                        depoItem.MorningRole = role;
-                        depoItem.MorningCode = code;
-                        depoItem.MorningIsLeave = true;
-                    }
-                    continue;
-                }
+                    string partKey = NormalizeStationKey(part);
+                    if (string.IsNullOrEmpty(partKey)) continue;
 
-                // İstasyon listesiyle eşleştir
-                StationDutyItem matched = null;
-                foreach (var item in res.Stations)
-                {
-                    if (item.ZoneKey == stKey || item.ZoneKey.Contains(stKey) || stKey.Contains(item.ZoneKey))
+                    bool exactFound = false;
+                    foreach (var item in res.Stations)
                     {
-                        matched = item;
-                        break;
+                        string[] aliases = (item.MatchAliases ?? item.ZoneKey).Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (string al in aliases)
+                        {
+                            if (al == partKey)
+                            {
+                                if (!matchedStations.Contains(item)) matchedStations.Add(item);
+                                exactFound = true;
+                            }
+                        }
                     }
 
-                    string p1 = stKey.Split(new char[] { '/' }, StringSplitOptions.RemoveEmptyEntries)[0].Trim();
-                    if (!string.IsNullOrEmpty(p1) && (item.ZoneKey.StartsWith(p1) || p1.StartsWith(item.ZoneKey)))
+                    if (!exactFound)
                     {
-                        matched = item;
-                        break;
+                        foreach (var item in res.Stations)
+                        {
+                            string[] aliases = (item.MatchAliases ?? item.ZoneKey).Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+                            foreach (string al in aliases)
+                            {
+                                if (al.Contains(partKey) || partKey.Contains(al))
+                                {
+                                    if (!matchedStations.Contains(item)) matchedStations.Add(item);
+                                }
+                            }
+                        }
                     }
                 }
 
-                if (matched != null)
+                if (matchedStations.Count > 0)
                 {
                     // KULLANICI KURALI:
                     // S veya FS ise Sabah nöbetinde (07:00 - 16:00) göster
@@ -13989,52 +14041,50 @@ namespace ModernAutoHideIcons
                     bool isMorning = (code == "S" || code == "FS" || code == "N" || code == "NS" || code.StartsWith("S") || code.StartsWith("FS"));
                     bool isEvening = (code == "A" || code == "FA" || code.StartsWith("A") || code.StartsWith("FA"));
 
-                    if (isMorning)
+                    foreach (var matched in matchedStations)
                     {
-                        if (string.IsNullOrEmpty(matched.MorningName) || matched.MorningIsLeave)
+                        if (isMorning)
                         {
-                            matched.MorningName = name;
-                            matched.MorningRole = role;
-                            matched.MorningCode = code;
-                            matched.MorningIsOvertime = code.StartsWith("F");
-                            matched.MorningIsLeave = false;
-                        }
-                        else
-                        {
-                            matched.MorningName = matched.MorningName + " / " + name;
-                            if (code.StartsWith("F"))
+                            if (string.IsNullOrEmpty(matched.MorningName) || matched.MorningIsLeave)
                             {
-                                matched.MorningIsOvertime = true;
+                                matched.MorningName = name;
+                                matched.MorningRole = role;
                                 matched.MorningCode = code;
+                                matched.MorningIsOvertime = code.StartsWith("F");
+                                matched.MorningIsLeave = false;
+                            }
+                            else if (!matched.MorningName.Contains(name))
+                            {
+                                matched.MorningName = matched.MorningName + " / " + name;
+                                if (code.StartsWith("F"))
+                                {
+                                    matched.MorningIsOvertime = true;
+                                    matched.MorningCode = code;
+                                }
                             }
                         }
-                    }
-                    else if (isEvening)
-                    {
-                        if (string.IsNullOrEmpty(matched.EveningName) || matched.EveningIsLeave)
+                        else if (isEvening)
                         {
-                            matched.EveningName = name;
-                            matched.EveningRole = role;
-                            matched.EveningCode = code;
-                            matched.EveningIsOvertime = code.StartsWith("F");
-                            matched.EveningIsLeave = false;
-                        }
-                        else
-                        {
-                            matched.EveningName = matched.EveningName + " / " + name;
-                            if (code.StartsWith("F"))
+                            if (string.IsNullOrEmpty(matched.EveningName) || matched.EveningIsLeave)
                             {
-                                matched.EveningIsOvertime = true;
+                                matched.EveningName = name;
+                                matched.EveningRole = role;
                                 matched.EveningCode = code;
+                                matched.EveningIsOvertime = code.StartsWith("F");
+                                matched.EveningIsLeave = false;
+                            }
+                            else if (!matched.EveningName.Contains(name))
+                            {
+                                matched.EveningName = matched.EveningName + " / " + name;
+                                if (code.StartsWith("F"))
+                                {
+                                    matched.EveningIsOvertime = true;
+                                    matched.EveningCode = code;
+                                }
                             }
                         }
                     }
                 }
-            }
-
-            if (depoItem != null && (!string.IsNullOrEmpty(depoItem.MorningName) || !string.IsNullOrEmpty(depoItem.EveningName)))
-            {
-                res.Stations.Add(depoItem);
             }
 
             return res;
@@ -16531,6 +16581,8 @@ namespace ModernAutoHideIcons
             };
             _listPanel.Children.Add(stHeader);
 
+            if (_scrollViewer != null) _scrollViewer.MaxHeight = 620;
+
             // İstasyon kartlarını listele
             foreach (var stItem in stResult.Stations)
             {
@@ -16539,7 +16591,7 @@ namespace ModernAutoHideIcons
 
             if (_txtFooterCount != null)
             {
-                _txtFooterCount.Text = string.Format("{0} İstasyon Bölgesi (Üsküdar ➔ Sultanbeyli)", stResult.Stations.Count);
+                _txtFooterCount.Text = string.Format("{0} İstasyon (Üsküdar ➔ Sultanbeyli)", stResult.Stations.Count);
             }
             if (_txtFooterSheet != null)
             {
@@ -16550,35 +16602,25 @@ namespace ModernAutoHideIcons
         private Border CreateStationCard(StationDutyItem item, int filterMode, string curShiftCode)
         {
             bool isLight = (_cfg.Theme == "light");
-            double op = _cfg.ShiftWidgetOpacity;
-            byte borderAlpha = (byte)Math.Min(255, (int)(op * (isLight ? 180 : 80)));
-
             System.Windows.Media.Color textPrimary, textSecondary, textMuted;
             WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
 
+            System.Windows.Media.Color grpColor = ShiftScheduleService.GetStationGroupColor(item.GroupId);
+
             var card = new Border
             {
-                CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(8, 5, 8, 5),
-                Margin = new Thickness(0, 2, 0, 3),
-                Background = new SolidColorBrush(isLight 
-                    ? System.Windows.Media.Color.FromArgb(140, 255, 255, 255) 
-                    : System.Windows.Media.Color.FromArgb(20, 255, 255, 255)),
-                BorderThickness = new Thickness(1),
-                BorderBrush = new SolidColorBrush(isLight
-                    ? System.Windows.Media.Color.FromArgb(borderAlpha, 215, 220, 230)
-                    : System.Windows.Media.Color.FromArgb(borderAlpha, 45, 50, 65))
+                CornerRadius = new CornerRadius(5),
+                Padding = new Thickness(6, 2, 7, 2),
+                Margin = new Thickness(0, 1, 0, 1),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 42 : 36), grpColor.R, grpColor.G, grpColor.B)),
+                BorderThickness = new Thickness(3, 1, 1, 1),
+                BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 175 : 145), grpColor.R, grpColor.G, grpColor.B))
             };
 
             var mainStack = new StackPanel { Orientation = Orientation.Vertical };
 
             bool showBoth = (filterMode == 3);
             string activeName = null;
-            string activeRole = null;
-            string activeCode = null;
-            bool activeIsLeave = false;
-            bool activeIsOvertime = false;
-            string shiftLabel = null;
 
             if (!showBoth)
             {
@@ -16586,20 +16628,10 @@ namespace ModernAutoHideIcons
                 if (useMorning)
                 {
                     activeName = item.MorningName;
-                    activeRole = item.MorningRole;
-                    activeCode = item.MorningCode;
-                    activeIsLeave = item.MorningIsLeave;
-                    activeIsOvertime = item.MorningIsOvertime;
-                    shiftLabel = "S (07-16)";
                 }
                 else
                 {
                     activeName = item.EveningName;
-                    activeRole = item.EveningRole;
-                    activeCode = item.EveningCode;
-                    activeIsLeave = item.EveningIsLeave;
-                    activeIsOvertime = item.EveningIsOvertime;
-                    shiftLabel = "A (16-24)";
                 }
             }
 
@@ -16608,24 +16640,24 @@ namespace ModernAutoHideIcons
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            // İstasyon sıra numarası (01, 02...)
+            // İstasyon sıra numarası (01..24) - Grup rengiyle uyumlu
             var idxBorder = new Border
             {
-                Width = 24,
-                Height = 24,
-                CornerRadius = new CornerRadius(12),
-                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 2, 132, 199)),
-                BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(2, 132, 199)),
+                Width = 19,
+                Height = 19,
+                CornerRadius = new CornerRadius(9.5),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 55 : 65), grpColor.R, grpColor.G, grpColor.B)),
+                BorderBrush = new SolidColorBrush(grpColor),
                 BorderThickness = new Thickness(1),
-                Margin = new Thickness(0, 0, 7, 0),
+                Margin = new Thickness(0, 0, 6, 0),
                 VerticalAlignment = VerticalAlignment.Center
             };
             idxBorder.Child = new TextBlock
             {
                 Text = item.Order.ToString("D2"),
-                FontSize = 10.5,
+                FontSize = 9.2,
                 FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(56, 189, 248)),
+                Foreground = new SolidColorBrush(isLight ? grpColor : System.Windows.Media.Colors.White),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -16637,12 +16669,12 @@ namespace ModernAutoHideIcons
             var stNameTxt = new TextBlock
             {
                 Text = item.DisplayName,
-                FontWeight = FontWeights.Bold,
+                FontWeight = FontWeights.SemiBold,
                 FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
-                FontSize = 12.5,
+                FontSize = 11.2,
                 Foreground = new SolidColorBrush(textPrimary),
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxWidth = 185
+                MaxWidth = 175
             };
             nameStack.Children.Add(stNameTxt);
 
@@ -16661,7 +16693,7 @@ namespace ModernAutoHideIcons
                     Text = dispStaffName,
                     FontWeight = FontWeights.SemiBold,
                     FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
-                    FontSize = 12.2,
+                    FontSize = 11.2,
                     Foreground = new SolidColorBrush(textPrimary),
                     HorizontalAlignment = HorizontalAlignment.Right,
                     TextTrimming = TextTrimming.CharacterEllipsis,
@@ -16679,20 +16711,20 @@ namespace ModernAutoHideIcons
                 Grid.SetColumnSpan(nameStack, 2);
                 mainStack.Children.Add(rowGrid);
 
-                var bothStack = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(31, 4, 0, 0) };
+                var bothStack = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(25, 2, 0, 0) };
 
                 // Sabah satırı
                 var mRow = new Grid();
                 mRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 string mText = string.Format("☀️ 07-16: {0}", !string.IsNullOrEmpty(item.MorningName) ? item.MorningName : "Boş");
-                mRow.Children.Add(new TextBlock { Text = mText, FontSize = 11.2, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
+                mRow.Children.Add(new TextBlock { Text = mText, FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
                 bothStack.Children.Add(mRow);
 
                 // Akşam satırı
-                var eRow = new Grid { Margin = new Thickness(0, 3, 0, 0) };
+                var eRow = new Grid { Margin = new Thickness(0, 1, 0, 0) };
                 eRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 string eText = string.Format("🌙 16-24: {0}", !string.IsNullOrEmpty(item.EveningName) ? item.EveningName : "Boş");
-                eRow.Children.Add(new TextBlock { Text = eText, FontSize = 11.2, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
+                eRow.Children.Add(new TextBlock { Text = eText, FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
                 bothStack.Children.Add(eRow);
 
                 mainStack.Children.Add(bothStack);
@@ -17226,7 +17258,7 @@ namespace ModernAutoHideIcons
             {
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                MaxHeight = 520,
+                MaxHeight = 640,
                 Content = _listPanel
             };
             rootStack.Children.Add(_scrollViewer);
@@ -17241,7 +17273,7 @@ namespace ModernAutoHideIcons
 
             _txtFooterCount = new TextBlock
             {
-                Text = "15 İstasyon Bölgesi (Üsküdar ➔ Sultanbeyli)",
+                Text = "24 İstasyon (Üsküdar ➔ Sultanbeyli)",
                 FontSize = 11.5,
                 FontWeight = FontWeights.SemiBold,
                 FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI")
@@ -17592,7 +17624,7 @@ namespace ModernAutoHideIcons
 
             if (_txtFooterCount != null)
             {
-                _txtFooterCount.Text = string.Format("{0} İstasyon Bölgesi (Üsküdar ➔ Sultanbeyli)", _currentResult.Stations.Count);
+                _txtFooterCount.Text = string.Format("{0} İstasyon (Üsküdar ➔ Sultanbeyli)", _currentResult.Stations.Count);
             }
             if (_txtFooterSheet != null)
             {
@@ -17603,35 +17635,25 @@ namespace ModernAutoHideIcons
         private Border CreateStationCard(StationDutyItem item, int filterMode, string curShiftCode)
         {
             bool isLight = (_cfg.Theme == "light");
-            double op = _cfg.StationWidgetOpacity;
-            byte borderAlpha = (byte)Math.Min(255, (int)(op * (isLight ? 180 : 80)));
-
             System.Windows.Media.Color textPrimary, textSecondary, textMuted;
             WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
 
+            System.Windows.Media.Color grpColor = ShiftScheduleService.GetStationGroupColor(item.GroupId);
+
             var card = new Border
             {
-                CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(8, 5, 8, 5),
-                Margin = new Thickness(0, 2, 0, 3),
-                Background = new SolidColorBrush(isLight 
-                    ? System.Windows.Media.Color.FromArgb(140, 255, 255, 255) 
-                    : System.Windows.Media.Color.FromArgb(20, 255, 255, 255)),
-                BorderThickness = new Thickness(1),
-                BorderBrush = new SolidColorBrush(isLight
-                    ? System.Windows.Media.Color.FromArgb(borderAlpha, 215, 220, 230)
-                    : System.Windows.Media.Color.FromArgb(borderAlpha, 45, 50, 65))
+                CornerRadius = new CornerRadius(5),
+                Padding = new Thickness(6, 2, 7, 2),
+                Margin = new Thickness(0, 1, 0, 1),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 42 : 36), grpColor.R, grpColor.G, grpColor.B)),
+                BorderThickness = new Thickness(3, 1, 1, 1),
+                BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 175 : 145), grpColor.R, grpColor.G, grpColor.B))
             };
 
             var mainStack = new StackPanel { Orientation = Orientation.Vertical };
 
             bool showBoth = (filterMode == 3);
             string activeName = null;
-            string activeRole = null;
-            string activeCode = null;
-            bool activeIsLeave = false;
-            bool activeIsOvertime = false;
-            string shiftLabel = null;
 
             if (!showBoth)
             {
@@ -17639,20 +17661,10 @@ namespace ModernAutoHideIcons
                 if (useMorning)
                 {
                     activeName = item.MorningName;
-                    activeRole = item.MorningRole;
-                    activeCode = item.MorningCode;
-                    activeIsLeave = item.MorningIsLeave;
-                    activeIsOvertime = item.MorningIsOvertime;
-                    shiftLabel = "S (07-16)";
                 }
                 else
                 {
                     activeName = item.EveningName;
-                    activeRole = item.EveningRole;
-                    activeCode = item.EveningCode;
-                    activeIsLeave = item.EveningIsLeave;
-                    activeIsOvertime = item.EveningIsOvertime;
-                    shiftLabel = "A (16-24)";
                 }
             }
 
@@ -17661,24 +17673,24 @@ namespace ModernAutoHideIcons
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            // İstasyon sıra numarası (01, 02...)
+            // İstasyon sıra numarası (01..24) - Grup rengiyle uyumlu
             var idxBorder = new Border
             {
-                Width = 24,
-                Height = 24,
-                CornerRadius = new CornerRadius(12),
-                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 2, 132, 199)),
-                BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(2, 132, 199)),
+                Width = 19,
+                Height = 19,
+                CornerRadius = new CornerRadius(9.5),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 55 : 65), grpColor.R, grpColor.G, grpColor.B)),
+                BorderBrush = new SolidColorBrush(grpColor),
                 BorderThickness = new Thickness(1),
-                Margin = new Thickness(0, 0, 7, 0),
+                Margin = new Thickness(0, 0, 6, 0),
                 VerticalAlignment = VerticalAlignment.Center
             };
             idxBorder.Child = new TextBlock
             {
                 Text = item.Order.ToString("D2"),
-                FontSize = 10.5,
+                FontSize = 9.2,
                 FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(56, 189, 248)),
+                Foreground = new SolidColorBrush(isLight ? grpColor : System.Windows.Media.Colors.White),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -17690,12 +17702,12 @@ namespace ModernAutoHideIcons
             var stNameTxt = new TextBlock
             {
                 Text = item.DisplayName,
-                FontWeight = FontWeights.Bold,
+                FontWeight = FontWeights.SemiBold,
                 FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
-                FontSize = 12.5,
+                FontSize = 11.2,
                 Foreground = new SolidColorBrush(textPrimary),
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxWidth = 185
+                MaxWidth = 175
             };
             nameStack.Children.Add(stNameTxt);
 
@@ -17714,7 +17726,7 @@ namespace ModernAutoHideIcons
                     Text = dispStaffName,
                     FontWeight = FontWeights.SemiBold,
                     FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
-                    FontSize = 12.2,
+                    FontSize = 11.2,
                     Foreground = new SolidColorBrush(textPrimary),
                     HorizontalAlignment = HorizontalAlignment.Right,
                     TextTrimming = TextTrimming.CharacterEllipsis,
@@ -17732,20 +17744,20 @@ namespace ModernAutoHideIcons
                 Grid.SetColumnSpan(nameStack, 2);
                 mainStack.Children.Add(rowGrid);
 
-                var bothStack = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(31, 4, 0, 0) };
+                var bothStack = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(25, 2, 0, 0) };
 
                 // Sabah satırı
                 var mRow = new Grid();
                 mRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 string mText = string.Format("☀️ 07-16: {0}", !string.IsNullOrEmpty(item.MorningName) ? item.MorningName : "Boş");
-                mRow.Children.Add(new TextBlock { Text = mText, FontSize = 11.2, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
+                mRow.Children.Add(new TextBlock { Text = mText, FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
                 bothStack.Children.Add(mRow);
 
                 // Akşam satırı
-                var eRow = new Grid { Margin = new Thickness(0, 3, 0, 0) };
+                var eRow = new Grid { Margin = new Thickness(0, 1, 0, 0) };
                 eRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 string eText = string.Format("🌙 16-24: {0}", !string.IsNullOrEmpty(item.EveningName) ? item.EveningName : "Boş");
-                eRow.Children.Add(new TextBlock { Text = eText, FontSize = 11.2, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
+                eRow.Children.Add(new TextBlock { Text = eText, FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
                 bothStack.Children.Add(eRow);
 
                 mainStack.Children.Add(bothStack);
