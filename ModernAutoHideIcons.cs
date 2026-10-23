@@ -85,6 +85,13 @@ namespace ModernAutoHideIcons
         public double ShiftWidgetY = -1;
         public double ShiftWidgetOpacity = 0.95;
         public double ShiftWidgetScale = 1.0; // Vardiya widget boyut olcegi (0.50 - 1.00, varsayilan 1.0 = %100 en buyuk boyut)
+        public bool ShowStationWidget = false; // M5 İstasyon Çizelgesi Widget'ı (Üsküdar - Sultanbeyli)
+        public bool StationOnlyWhenIconsHidden = false;
+        public bool LockStationWidgetPosition = true;
+        public double StationWidgetX = -1;
+        public double StationWidgetY = -1;
+        public double StationWidgetOpacity = 0.95;
+        public double StationWidgetScale = 0.85;
         public double InspirationWidgetScale = 1.0; // Gunun Sozleri / Ayet / Hadis widget boyut olcegi (0.50 - 1.00)
         public double HolidayWidgetScale = 1.0; // Resmi Tatil widget boyut olcegi (0.50 - 1.00)
         public double NotesWidgetScale = 1.0; // Notlar widget boyut olcegi (0.50 - 1.00)
@@ -365,6 +372,15 @@ namespace ModernAutoHideIcons
                     cfg.ShiftWidgetY = GetDouble(json, "ShiftWidgetY", -1);
                     cfg.ShiftWidgetOpacity = Math.Max(0.1, Math.Min(1.0, GetDouble(json, "ShiftWidgetOpacity", 0.95)));
                     cfg.ShiftWidgetScale = Math.Max(0.50, Math.Min(1.0, GetDouble(json, "ShiftWidgetScale", 1.0)));
+
+                    // İstasyon Çizelgesi Widget'ı (M5 Üsküdar - Sultanbeyli)
+                    cfg.ShowStationWidget = GetBool(json, "ShowStationWidget", false);
+                    cfg.StationOnlyWhenIconsHidden = GetBool(json, "StationOnlyWhenIconsHidden", false);
+                    cfg.LockStationWidgetPosition = GetBool(json, "LockStationWidgetPosition", true);
+                    cfg.StationWidgetX = GetDouble(json, "StationWidgetX", -1);
+                    cfg.StationWidgetY = GetDouble(json, "StationWidgetY", -1);
+                    cfg.StationWidgetOpacity = Math.Max(0.1, Math.Min(1.0, GetDouble(json, "StationWidgetOpacity", 0.95)));
+                    cfg.StationWidgetScale = Math.Max(0.50, Math.Min(1.0, GetDouble(json, "StationWidgetScale", 0.85)));
                     cfg.InspirationWidgetScale = Math.Max(0.50, Math.Min(1.0, GetDouble(json, "InspirationWidgetScale", 1.0)));
                     cfg.HolidayWidgetScale = Math.Max(0.50, Math.Min(1.0, GetDouble(json, "HolidayWidgetScale", 1.0)));
                     cfg.NotesWidgetScale = Math.Max(0.50, Math.Min(1.0, GetDouble(json, "NotesWidgetScale", 1.0)));
@@ -499,6 +515,13 @@ namespace ModernAutoHideIcons
                 sb.AppendLine("  \"ShiftWidgetY\": " + ShiftWidgetY.ToString(CultureInfo.InvariantCulture) + ",");
                 sb.AppendLine("  \"ShiftWidgetOpacity\": " + ShiftWidgetOpacity.ToString(CultureInfo.InvariantCulture) + ",");
                 sb.AppendLine("  \"ShiftWidgetScale\": " + ShiftWidgetScale.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"ShowStationWidget\": " + ShowStationWidget.ToString().ToLower() + ",");
+                sb.AppendLine("  \"StationOnlyWhenIconsHidden\": " + StationOnlyWhenIconsHidden.ToString().ToLower() + ",");
+                sb.AppendLine("  \"LockStationWidgetPosition\": " + LockStationWidgetPosition.ToString().ToLower() + ",");
+                sb.AppendLine("  \"StationWidgetX\": " + StationWidgetX.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"StationWidgetY\": " + StationWidgetY.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"StationWidgetOpacity\": " + StationWidgetOpacity.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"StationWidgetScale\": " + StationWidgetScale.ToString(CultureInfo.InvariantCulture) + ",");
                 sb.AppendLine("  \"InspirationWidgetScale\": " + InspirationWidgetScale.ToString(CultureInfo.InvariantCulture) + ",");
                 sb.AppendLine("  \"HolidayWidgetScale\": " + HolidayWidgetScale.ToString(CultureInfo.InvariantCulture) + ",");
                 sb.AppendLine("  \"NotesWidgetScale\": " + NotesWidgetScale.ToString(CultureInfo.InvariantCulture) + ",");
@@ -12722,6 +12745,49 @@ namespace ModernAutoHideIcons
     // ==========================================
     // VARDİYA & NÖBETÇİ PERSONEL MODELLERİ
     // ==========================================
+    public class StationDutyItem
+    {
+        public int Order { get; set; }
+        public string DisplayName { get; set; }
+        public string ZoneKey { get; set; }
+        public string CoveredStations { get; set; }
+
+        // Sabah Personeli (07:00 - 16:00)
+        public string MorningName { get; set; }
+        public string MorningRole { get; set; }
+        public string MorningCode { get; set; }
+        public bool MorningIsLeave { get; set; }
+        public bool MorningIsOvertime { get; set; }
+
+        // Akşam Personeli (16:00 - 24:00)
+        public string EveningName { get; set; }
+        public string EveningRole { get; set; }
+        public string EveningCode { get; set; }
+        public bool EveningIsLeave { get; set; }
+        public bool EveningIsOvertime { get; set; }
+
+        public List<string> ExtraStaff { get; set; }
+
+        public StationDutyItem()
+        {
+            ExtraStaff = new List<string>();
+        }
+    }
+
+    public class StationDayResult
+    {
+        public DateTime Date { get; set; }
+        public string FilePath { get; set; }
+        public string SheetName { get; set; }
+        public string ErrorMessage { get; set; }
+        public List<StationDutyItem> Stations { get; set; }
+
+        public StationDayResult()
+        {
+            Stations = new List<StationDutyItem>();
+        }
+    }
+
     public class ShiftPerson
     {
         public string Name { get; set; }
@@ -12743,6 +12809,7 @@ namespace ModernAutoHideIcons
         public List<ShiftPerson> Night { get; set; }
         public List<ShiftPerson> AllWorking { get; set; }
         public List<ShiftPerson> Supervisors { get; set; }
+        public StationDayResult StationResult { get; set; }
         public string ErrorMessage { get; set; }
 
         public ShiftDayResult()
@@ -12752,6 +12819,7 @@ namespace ModernAutoHideIcons
             Night = new List<ShiftPerson>();
             AllWorking = new List<ShiftPerson>();
             Supervisors = new List<ShiftPerson>();
+            StationResult = new StationDayResult();
         }
     }
 
@@ -12765,6 +12833,7 @@ namespace ModernAutoHideIcons
         public object[,] CellValues;
         public int NameCol = 3;
         public int RoleCol = 4;
+        public int StationCol = 5;
         public Dictionary<int, int> DayToColMap = new Dictionary<int, int>();
     }
 
@@ -12939,7 +13008,40 @@ namespace ModernAutoHideIcons
     {
         private static ShiftScheduleCache _kmCache = null;
         private static ShiftScheduleCache _supCache = null;
+        private static ShiftScheduleCache _stationCache = null;
         private static readonly object _syncLock = new object();
+
+        public static readonly string[] M5StationList = new string[]
+        {
+            "Üsküdar",
+            "Fıstıkağacı / Bağlarbaşı",
+            "Altunizade",
+            "Kısıklı / Bulgurlu",
+            "Ümraniye / Çarşı",
+            "Yamanevler / Çakmak",
+            "Ihlamurkuyu / Altınşehir / Lise",
+            "Dudullu",
+            "Çekmeköy / Necip Fazıl",
+            "Sarıgazi / Meclis",
+            "Şehir Hastanesi",
+            "Samandıra / Sancaktepe",
+            "Veysel Karani",
+            "Hasanpaşa",
+            "Sultanbeyli"
+        };
+
+        public static string NormalizeStationKey(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            string s = text.ToUpper(new CultureInfo("tr-TR")).Trim();
+            s = s.Replace("İ", "I").Replace("Ş", "S").Replace("Ğ", "G").Replace("Ü", "U").Replace("Ö", "O").Replace("Ç", "C");
+            var sb = new StringBuilder();
+            foreach (char c in s)
+            {
+                if (char.IsLetterOrDigit(c)) sb.Append(c);
+            }
+            return sb.ToString();
+        }
 
         private static readonly string[] MonthNames = new string[]
         {
@@ -13102,7 +13204,7 @@ namespace ModernAutoHideIcons
                     _kmCache.Month == targetDate.Month &&
                     _kmCache.FileLastWriteTime == kmLastWrite);
 
-                bool supValid = string.IsNullOrEmpty(supPath) || (!forceRefresh && _supCache != null &&
+                bool supValid = string.IsNullOrEmpty(supPath) || (!forceRefresh && _supCache != null && _stationCache != null &&
                     _supCache.FilePath == supPath &&
                     _supCache.Year == targetDate.Year &&
                     _supCache.Month == targetDate.Month &&
@@ -13112,6 +13214,7 @@ namespace ModernAutoHideIcons
                 {
                     if (_kmCache != null) PopulateKmFromCache(_kmCache, targetDate, result);
                     if (_supCache != null) PopulateSupervisorFromCache(_supCache, targetDate, result);
+                    if (_stationCache != null) result.StationResult = PopulateStationFromCache(_stationCache, targetDate);
                     result.FilePath = kmPath ?? supPath;
                     result.SheetName = (_kmCache != null && _supCache != null) ? "ÇİZELGE & VARDİYA AMİRLİĞİ" : (_supCache != null ? "VARDİYA AMİRLİĞİ" : "ÇİZELGE");
                     return result;
@@ -13340,6 +13443,92 @@ namespace ModernAutoHideIcons
                                 newCache.RoleCol = roleCol;
                                 _supCache = newCache;
                             }
+
+                            // 2.b İstasyon Çizelgesini Oku (Sheet: [Ay Adı] [Yıl], örn: "EKİM 2026")
+                            try
+                            {
+                                object stSheet = null;
+                                string stSheetName = "";
+                                string targetMonthName = MonthNames[targetDate.Month];
+                                string targetYearStr = targetDate.Year.ToString();
+
+                                for (int i = 1; i <= sheetCount; i++)
+                                {
+                                    object s = ComHelper.GetItem(sheets, "Item", i);
+                                    string sName = ((ComHelper.Get(s, "Name") ?? "").ToString()).Trim();
+                                    string upper = sName.ToUpper(new CultureInfo("tr-TR"));
+                                    if (upper.Contains(targetMonthName) && upper.Contains(targetYearStr))
+                                    {
+                                        stSheet = s;
+                                        stSheetName = sName;
+                                        break;
+                                    }
+                                }
+
+                                if (stSheet == null)
+                                {
+                                    for (int i = 1; i <= sheetCount; i++)
+                                    {
+                                        object s = ComHelper.GetItem(sheets, "Item", i);
+                                        string sName = ((ComHelper.Get(s, "Name") ?? "").ToString()).Trim();
+                                        string upper = sName.ToUpper(new CultureInfo("tr-TR"));
+                                        if (upper.Contains(targetMonthName) && !upper.Contains("AMİR") && !upper.Contains("AMIR"))
+                                        {
+                                            stSheet = s;
+                                            stSheetName = sName;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (stSheet == null && sheetCount >= 2)
+                                {
+                                    stSheet = ComHelper.GetItem(sheets, "Item", 2);
+                                    stSheetName = (ComHelper.Get(stSheet, "Name") ?? "").ToString();
+                                }
+
+                                if (stSheet != null)
+                                {
+                                    object stRange = ComHelper.GetItem(stSheet, "Range", "A4:AJ55");
+                                    object[,] stVals = ComHelper.Get(stRange, "Value2") as object[,];
+
+                                    if (stVals != null)
+                                    {
+                                        int stColCount = stVals.GetLength(1);
+                                        var newStCache = new ShiftScheduleCache
+                                        {
+                                            FilePath = supPath,
+                                            FileLastWriteTime = supLastWrite,
+                                            Year = targetDate.Year,
+                                            Month = targetDate.Month,
+                                            SheetName = stSheetName,
+                                            CellValues = stVals,
+                                            NameCol = 3,
+                                            RoleCol = 4,
+                                            StationCol = 5
+                                        };
+
+                                        int maxDaysInMonth = DateTime.DaysInMonth(targetDate.Year, targetDate.Month);
+                                        for (int c = 1; c <= stColCount; c++)
+                                        {
+                                            object hObj = stVals[1, c];
+                                            if (hObj == null) continue;
+                                            string hTxt = hObj.ToString().Trim().TrimEnd('.');
+                                            int dayNum;
+                                            if (int.TryParse(hTxt, out dayNum))
+                                            {
+                                                if (dayNum >= 1 && dayNum <= maxDaysInMonth)
+                                                {
+                                                    newStCache.DayToColMap[dayNum] = c;
+                                                }
+                                            }
+                                        }
+
+                                        _stationCache = newStCache;
+                                    }
+                                }
+                            }
+                            catch { }
                         }
                         catch { }
                         finally
@@ -13367,6 +13556,7 @@ namespace ModernAutoHideIcons
 
                 if (_kmCache != null) PopulateKmFromCache(_kmCache, targetDate, result);
                 if (_supCache != null) PopulateSupervisorFromCache(_supCache, targetDate, result);
+                if (_stationCache != null) result.StationResult = PopulateStationFromCache(_stationCache, targetDate);
 
                 result.FilePath = kmPath ?? supPath;
                 result.SheetName = (_kmCache != null && _supCache != null) ? "ÇİZELGE & VARDİYA AMİRLİĞİ" : (_supCache != null ? "VARDİYA AMİRLİĞİ" : "ÇİZELGE");
@@ -13638,6 +13828,284 @@ namespace ModernAutoHideIcons
             return active;
         }
 
+        public static StationDayResult PopulateStationFromCache(ShiftScheduleCache cache, DateTime targetDate)
+        {
+            var res = new StationDayResult
+            {
+                Date = targetDate,
+                FilePath = cache != null ? cache.FilePath : "",
+                SheetName = cache != null ? cache.SheetName : "EKİM 2026"
+            };
+
+            if (cache == null || cache.CellValues == null) return res;
+
+            object[,] vals = cache.CellValues;
+            int rCount = vals.GetLength(0);
+            int cCount = vals.GetLength(1);
+
+            int dayCol = -1;
+            if (cache.DayToColMap.ContainsKey(targetDate.Day))
+            {
+                dayCol = cache.DayToColMap[targetDate.Day];
+            }
+            else
+            {
+                dayCol = 5 + targetDate.Day;
+                if (dayCol > cCount) dayCol = cCount;
+            }
+
+            if (dayCol <= 0 || dayCol > cCount) return res;
+
+            // Standart 15 İstasyon Bölgesini M5 Hat Sırasına Göre Başlat
+            for (int i = 0; i < M5StationList.Length; i++)
+            {
+                string sName = M5StationList[i];
+                var item = new StationDutyItem
+                {
+                    Order = i + 1,
+                    DisplayName = sName,
+                    ZoneKey = NormalizeStationKey(sName)
+                };
+
+                if (sName.Contains("/"))
+                {
+                    item.CoveredStations = sName.Replace("/", " & ") + " İstasyonları";
+                }
+
+                res.Stations.Add(item);
+            }
+
+            StationDutyItem depoItem = null;
+
+            for (int r = 2; r <= rCount; r++)
+            {
+                object nameObj = (cache.NameCol <= cCount) ? vals[r, cache.NameCol] : null;
+                if (nameObj == null) continue;
+                string name = nameObj.ToString().Trim();
+                if (string.IsNullOrEmpty(name)) continue;
+
+                string upperName = name.ToUpper(new CultureInfo("tr-TR"));
+                if (upperName.Contains("YILLIK İZİN") || upperName.Contains("TOPLAM") ||
+                    upperName.Contains("GÜN") || upperName.Contains("S.NO") ||
+                    upperName.Contains("FAZLA MESAİ") || upperName.Contains("HAFTANIN"))
+                {
+                    continue;
+                }
+
+                int dummy;
+                if (int.TryParse(name, out dummy)) continue;
+
+                object roleObj = (cache.RoleCol <= cCount) ? vals[r, cache.RoleCol] : null;
+                string role = (roleObj != null) ? roleObj.ToString().Trim() : "İstasyon Sorumlusu";
+
+                object stObj = (cache.StationCol <= cCount) ? vals[r, cache.StationCol] : null;
+                string stRaw = (stObj != null) ? stObj.ToString().Trim() : "";
+                if (string.IsNullOrEmpty(stRaw)) continue;
+
+                object codeObj = (dayCol <= cCount) ? vals[r, dayCol] : null;
+                string code = (codeObj != null) ? codeObj.ToString().Trim().ToUpper(new CultureInfo("tr-TR")) : "";
+                if (string.IsNullOrEmpty(code)) continue;
+
+                string stKey = NormalizeStationKey(stRaw);
+
+                // DEPO Kontrolü
+                if (stKey.Contains("DEPO"))
+                {
+                    if (depoItem == null)
+                    {
+                        depoItem = new StationDutyItem
+                        {
+                            Order = res.Stations.Count + 1,
+                            DisplayName = "Depo Sahası",
+                            ZoneKey = "DEPO",
+                            CoveredStations = "M5 Depo ve Atölye Sahası"
+                        };
+                    }
+                    if (code == "N" || code == "S" || code == "FS" || code.StartsWith("S"))
+                    {
+                        depoItem.MorningName = name;
+                        depoItem.MorningRole = role;
+                        depoItem.MorningCode = code;
+                    }
+                    else if (code == "A" || code == "FA" || code.StartsWith("A"))
+                    {
+                        depoItem.EveningName = name;
+                        depoItem.EveningRole = role;
+                        depoItem.EveningCode = code;
+                    }
+                    else
+                    {
+                        depoItem.MorningName = name;
+                        depoItem.MorningRole = role;
+                        depoItem.MorningCode = code;
+                        depoItem.MorningIsLeave = true;
+                    }
+                    continue;
+                }
+
+                // İstasyon listesiyle eşleştir
+                StationDutyItem matched = null;
+                foreach (var item in res.Stations)
+                {
+                    if (item.ZoneKey == stKey || item.ZoneKey.Contains(stKey) || stKey.Contains(item.ZoneKey))
+                    {
+                        matched = item;
+                        break;
+                    }
+
+                    string p1 = stKey.Split(new char[] { '/' }, StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+                    if (!string.IsNullOrEmpty(p1) && (item.ZoneKey.StartsWith(p1) || p1.StartsWith(item.ZoneKey)))
+                    {
+                        matched = item;
+                        break;
+                    }
+                }
+
+                if (matched != null)
+                {
+                    bool isMorning = (code == "S" || code == "FS" || code.StartsWith("S"));
+                    bool isEvening = (code == "A" || code == "FA" || code.StartsWith("A"));
+                    bool isLeave = (code == "Yİ" || code == "R" || code == "Üİ" || code == "OFF" || code == "D" || code.Contains("İZİN") || code.Contains("RAPOR"));
+
+                    if (isMorning)
+                    {
+                        if (string.IsNullOrEmpty(matched.MorningName) || code == "S")
+                        {
+                            matched.MorningName = name;
+                            matched.MorningRole = role;
+                            matched.MorningCode = code;
+                            matched.MorningIsOvertime = code.StartsWith("F");
+                        }
+                        else
+                        {
+                            matched.ExtraStaff.Add(string.Format("{0} ({1})", name, code));
+                        }
+                    }
+                    else if (isEvening)
+                    {
+                        if (string.IsNullOrEmpty(matched.EveningName) || code == "A")
+                        {
+                            matched.EveningName = name;
+                            matched.EveningRole = role;
+                            matched.EveningCode = code;
+                            matched.EveningIsOvertime = code.StartsWith("F");
+                        }
+                        else
+                        {
+                            matched.ExtraStaff.Add(string.Format("{0} ({1})", name, code));
+                        }
+                    }
+                    else if (isLeave)
+                    {
+                        if (r >= 2 && r <= 16 && string.IsNullOrEmpty(matched.EveningName))
+                        {
+                            matched.EveningName = name;
+                            matched.EveningRole = role;
+                            matched.EveningCode = code;
+                            matched.EveningIsLeave = true;
+                        }
+                        else if (r >= 33 && r <= 48 && string.IsNullOrEmpty(matched.MorningName))
+                        {
+                            matched.MorningName = name;
+                            matched.MorningRole = role;
+                            matched.MorningCode = code;
+                            matched.MorningIsLeave = true;
+                        }
+                        else
+                        {
+                            matched.ExtraStaff.Add(string.Format("{0} ({1})", name, code));
+                        }
+                    }
+                }
+            }
+
+            if (depoItem != null && (!string.IsNullOrEmpty(depoItem.MorningName) || !string.IsNullOrEmpty(depoItem.EveningName)))
+            {
+                res.Stations.Add(depoItem);
+            }
+
+            return res;
+        }
+
+        public static StationDayResult GetStationSchedule(DateTime targetDate, string supFolder, bool forceRefresh)
+        {
+            lock (_syncLock)
+            {
+                var res = new StationDayResult { Date = targetDate };
+                if (string.IsNullOrEmpty(supFolder))
+                {
+                    res.ErrorMessage = "HEDEF_YOK";
+                    return res;
+                }
+
+                string supPath = FindScheduleFile(targetDate, ShellLinkHelper.ResolveShortcut(supFolder));
+                if (string.IsNullOrEmpty(supPath) || !File.Exists(supPath))
+                {
+                    res.ErrorMessage = string.Format("{0} {1} çizelge dosyası bulunamadı.", MonthNames[targetDate.Month], targetDate.Year);
+                    return res;
+                }
+
+                DateTime supLastWrite = File.GetLastWriteTime(supPath);
+                bool stationValid = (!forceRefresh && _stationCache != null &&
+                    _stationCache.FilePath == supPath &&
+                    _stationCache.Year == targetDate.Year &&
+                    _stationCache.Month == targetDate.Month &&
+                    _stationCache.FileLastWriteTime == supLastWrite);
+
+                if (stationValid)
+                {
+                    return PopulateStationFromCache(_stationCache, targetDate);
+                }
+
+                var dayRes = GetSchedule(targetDate, "", supFolder, forceRefresh);
+                if (dayRes != null && dayRes.StationResult != null && dayRes.StationResult.Stations.Count > 0)
+                {
+                    return dayRes.StationResult;
+                }
+
+                res.ErrorMessage = (dayRes != null && !string.IsNullOrEmpty(dayRes.ErrorMessage)) ? dayRes.ErrorMessage : "İstasyon çizelgesi okunamadı.";
+                return res;
+            }
+        }
+
+        public static void GetStationShiftContext(DateTime now,
+            out string curShiftName,
+            out string curShiftHours,
+            out string curShiftCode,
+            out string nextShiftName,
+            out string nextShiftHours,
+            out string nextShiftTime)
+        {
+            TimeSpan t = now.TimeOfDay;
+            if (t >= TimeSpan.FromHours(7) && t < TimeSpan.FromHours(16))
+            {
+                curShiftName = "Sabah Nöbeti";
+                curShiftHours = "07:00 - 16:00";
+                curShiftCode = "S";
+                nextShiftName = "Akşam Nöbeti";
+                nextShiftHours = "16:00 - 24:00";
+                nextShiftTime = "16:00";
+            }
+            else if (t >= TimeSpan.FromHours(16))
+            {
+                curShiftName = "Akşam Nöbeti";
+                curShiftHours = "16:00 - 24:00";
+                curShiftCode = "A";
+                nextShiftName = "Sabah Nöbeti";
+                nextShiftHours = "07:00 - 16:00";
+                nextShiftTime = "07:00";
+            }
+            else
+            {
+                curShiftName = "Gece Kapalı";
+                curShiftHours = "00:00 - 07:00";
+                curShiftCode = "G";
+                nextShiftName = "Sabah Nöbeti";
+                nextShiftHours = "07:00 - 16:00";
+                nextShiftTime = "07:00";
+            }
+        }
+
         public static void GetShiftContext(DateTime now, 
             out string curShiftName, 
             out string incShiftName, 
@@ -13706,9 +14174,11 @@ namespace ModernAutoHideIcons
     {
         private readonly Config _cfg;
         private DateTime _viewDate;
-        private int _selectedTab = 0; // 0: Mevcut, 1: Devralacak, 2: Sabah, 3: Aksam, 4: Gece
+        private int _selectedTab = 0; // 0: Mevcut, 1: Devralacak, 2: Sabah, 3: Aksam, 4: Gece, 5: İstasyon
+        private int _stationFilterMode = 0; // 0: Anlık, 1: Sabah, 2: Akşam, 3: Tümü
         private ShiftDayResult _currentResult = null;
         private bool _isLoading = false;
+        public Action OnOpenStationWidgetRequested;
 
         private Border _cardBorder;
         private Grid _headerGrid;
@@ -13743,8 +14213,8 @@ namespace ModernAutoHideIcons
         private Border _borderSupervisorCard;
         private TextBlock _txtSupervisorShift;
 
-        private Border[] _tabBorders = new Border[5];
-        private TextBlock[] _tabTexts = new TextBlock[5];
+        private Border[] _tabBorders = new Border[6];
+        private TextBlock[] _tabTexts = new TextBlock[6];
 
         private Border _noteDivider;
         private StackPanel _notesContainer;
@@ -14236,18 +14706,18 @@ namespace ModernAutoHideIcons
             _dateStrip.Child = dateGrid;
             rootStack.Children.Add(_dateStrip);
 
-            // 4. SEKME BUTONLARI (Mevcut, Devralacak, Sabah, Aksam, Gece)
+            // 4. SEKME BUTONLARI (Mevcut, Devralacak, Sabah, Aksam, Gece, İstasyon)
             var tabGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
-            for (int i = 0; i < 5; i++) tabGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            for (int i = 0; i < 6; i++) tabGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            string[] tabTitles = new string[] { "Mevcut", "Devralacak", "Sabah", "Akşam", "Gece" };
-            for (int i = 0; i < 5; i++)
+            string[] tabTitles = new string[] { "Mevcut", "Devir", "Sabah", "Akşam", "Gece", "🚉 İstasyon" };
+            for (int i = 0; i < 6; i++)
             {
                 int tabIdx = i;
                 var tText = new TextBlock
                 {
                     Text = tabTitles[i],
-                    FontSize = (i == 1) ? 10.5 : 11.2,
+                    FontSize = (i == 5) ? 10.5 : ((i == 1) ? 10.5 : 11.2),
                     FontWeight = FontWeights.SemiBold,
                     FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
                     HorizontalAlignment = HorizontalAlignment.Center,
@@ -14257,7 +14727,7 @@ namespace ModernAutoHideIcons
                 {
                     CornerRadius = new CornerRadius(8),
                     Padding = new Thickness(1, 6, 1, 6),
-                    Margin = new Thickness(i == 0 ? 0 : 2, 0, i == 4 ? 0 : 2, 0),
+                    Margin = new Thickness(i == 0 ? 0 : 2, 0, i == 5 ? 0 : 2, 0),
                     Cursor = Cursors.Hand,
                     Child = tText
                 };
@@ -14294,8 +14764,9 @@ namespace ModernAutoHideIcons
 
             _scrollViewer = new ScrollViewer
             {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                MaxHeight = 520,
                 Content = _listPanel
             };
             rootStack.Children.Add(_scrollViewer);
@@ -14822,7 +15293,7 @@ namespace ModernAutoHideIcons
             System.Windows.Media.Color textPrimary, textSecondary, textMuted;
             WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 6; i++)
             {
                 if (_tabBorders[i] == null || _tabTexts[i] == null) continue;
 
@@ -15362,6 +15833,12 @@ namespace ModernAutoHideIcons
                 return;
             }
 
+            if (_selectedTab == 5) // İSTASYON KADROSU
+            {
+                RenderStationListTab();
+                return;
+            }
+
             List<ShiftPerson> displayList = new List<ShiftPerson>();
             string commonHours = null;
 
@@ -15847,6 +16324,1639 @@ namespace ModernAutoHideIcons
                     Foreground = new SolidColorBrush(fg)
                 }
             };
+        }
+
+        private void RenderStationListTab()
+        {
+            bool isLight = (_cfg.Theme == "light");
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            if (_currentResult == null || _currentResult.StationResult == null || _currentResult.StationResult.Stations == null || _currentResult.StationResult.Stations.Count == 0)
+            {
+                if (string.IsNullOrEmpty(_cfg.SupervisorFolderPath))
+                {
+                    var noSupStack = new StackPanel
+                    {
+                        Orientation = Orientation.Vertical,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Margin = new Thickness(10, 16, 10, 16)
+                    };
+                    noSupStack.Children.Add(new TextBlock
+                    {
+                        Text = "Vardiya Amirliği & İstasyon Çizelgesi Seçilmedi",
+                        FontWeight = FontWeights.Bold,
+                        FontSize = 12,
+                        FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                        Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(30, 41, 59) : System.Windows.Media.Brushes.White.Color),
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Margin = new Thickness(0, 0, 0, 8)
+                    });
+                    var btnSupPick = new Border
+                    {
+                        CornerRadius = new CornerRadius(8),
+                        Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(0, 229, 255)),
+                        Padding = new Thickness(14, 7, 14, 7),
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Cursor = Cursors.Hand,
+                        Child = new TextBlock
+                        {
+                            Text = "📁 İstasyon Çizelgesini Seç...",
+                            FontSize = 11,
+                            FontWeight = FontWeights.SemiBold,
+                            Foreground = System.Windows.Media.Brushes.White
+                        }
+                    };
+                    btnSupPick.MouseLeftButtonUp += delegate
+                    {
+                        string chosen = ShellLinkHelper.PromptPickShortcutOrFile(_cfg.SupervisorFolderPath);
+                        if (string.IsNullOrEmpty(chosen)) chosen = ShellLinkHelper.PromptPickFolder(_cfg.SupervisorFolderPath);
+                        if (!string.IsNullOrEmpty(chosen))
+                        {
+                            _cfg.SupervisorFolderPath = chosen;
+                            _cfg.Save();
+                            LoadScheduleAsync(true);
+                        }
+                    };
+                    noSupStack.Children.Add(btnSupPick);
+                    _listPanel.Children.Add(noSupStack);
+                    return;
+                }
+
+                _listPanel.Children.Add(new TextBlock
+                {
+                    Text = "İstasyon çizelgesi bulunamadı veya henüz yüklenmedi.",
+                    FontSize = 12,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(100, 116, 139) : System.Windows.Media.Color.FromRgb(160, 174, 192)),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 20, 0, 20)
+                });
+                return;
+            }
+
+            var stResult = _currentResult.StationResult;
+            DateTime now = DateTime.Now;
+            string curShiftName, curShiftHours, curShiftCode, nextShiftName, nextShiftHours, nextShiftTime;
+            ShiftScheduleService.GetStationShiftContext(now, out curShiftName, out curShiftHours, out curShiftCode, out nextShiftName, out nextShiftHours, out nextShiftTime);
+
+            // Alt Filtre Butonları
+            var filterGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            for (int f = 0; f < 4; f++) filterGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            filterGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            string[] filterTitles = new string[] { "Anlık", "Sabah (07-16)", "Akşam (16-24)", "Tümü" };
+            for (int f = 0; f < 4; f++)
+            {
+                int fIdx = f;
+                bool isSel = (_stationFilterMode == f);
+                var fText = new TextBlock
+                {
+                    Text = filterTitles[f],
+                    FontSize = 10.5,
+                    FontWeight = isSel ? FontWeights.Bold : FontWeights.Normal,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    Foreground = isSel ? System.Windows.Media.Brushes.White : new SolidColorBrush(textSecondary),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                var fBorder = new Border
+                {
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(2, 4, 2, 4),
+                    Margin = new Thickness(f == 0 ? 0 : 2, 0, 2, 0),
+                    Cursor = Cursors.Hand,
+                    Background = isSel ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(2, 132, 199)) : System.Windows.Media.Brushes.Transparent,
+                    BorderBrush = isSel ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248)) : System.Windows.Media.Brushes.Transparent,
+                    BorderThickness = new Thickness(isSel ? 1 : 0),
+                    Child = fText
+                };
+                fBorder.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+                {
+                    e.Handled = true;
+                    _stationFilterMode = fIdx;
+                    RenderStaffList();
+                };
+                Grid.SetColumn(fBorder, f);
+                filterGrid.Children.Add(fBorder);
+            }
+
+            // Ayrı Pencere Açma Butonu
+            var btnPopout = new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(5, 3, 5, 3),
+                Margin = new Thickness(2, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "İstasyon Çizelgesini Ayrı Masaüstü Widget'ı Olarak Aç",
+                Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(20, 0, 0, 0) : System.Windows.Media.Color.FromArgb(30, 255, 255, 255)),
+                Child = new TextBlock
+                {
+                    Text = "↗ Ayrı Aç",
+                    FontSize = 10.0,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(56, 189, 248)),
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+            };
+            btnPopout.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                _cfg.ShowStationWidget = true;
+                _cfg.Save();
+                if (OnOpenStationWidgetRequested != null) OnOpenStationWidgetRequested();
+            };
+            Grid.SetColumn(btnPopout, 4);
+            filterGrid.Children.Add(btnPopout);
+            _listPanel.Children.Add(filterGrid);
+
+            // Aktif Vardiya Başlık Şeridi
+            string headerText;
+            if (_stationFilterMode == 0)
+            {
+                if (curShiftCode == "S") headerText = "🟢 07:00 - 16:00 · Şu An Sabah İstasyon Nöbeti Görevde";
+                else if (curShiftCode == "A") headerText = "🟢 16:00 - 24:00 · Şu An Akşam İstasyon Nöbeti Görevde";
+                else headerText = "🌙 İstasyonlar Gece Yolcuya Kapalı (Sabah Nöbeti 07:00'de Başlar)";
+            }
+            else if (_stationFilterMode == 1)
+            {
+                headerText = "☀️ 07:00 - 16:00 · Sabah İstasyon Nöbetçileri";
+            }
+            else if (_stationFilterMode == 2)
+            {
+                headerText = "🌙 16:00 - 24:00 · Akşam İstasyon Nöbetçileri";
+            }
+            else
+            {
+                headerText = "📋 M5 Hattı · Sabah & Akşam Tüm İstasyon Kadrosu";
+            }
+
+            var stHeader = new Border
+            {
+                Background = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromArgb(240, 240, 249, 255) 
+                    : System.Windows.Media.Color.FromArgb(220, 15, 23, 42)),
+                BorderBrush = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromRgb(186, 230, 253) 
+                    : System.Windows.Media.Color.FromArgb(140, 14, 165, 233)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(8, 6, 8, 6),
+                Margin = new Thickness(0, 0, 0, 7)
+            };
+            stHeader.Child = new TextBlock
+            {
+                Text = headerText,
+                FontSize = 11.5,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Foreground = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromRgb(3, 105, 161) 
+                    : System.Windows.Media.Color.FromRgb(240, 249, 255)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
+            _listPanel.Children.Add(stHeader);
+
+            // İstasyon kartlarını listele
+            foreach (var stItem in stResult.Stations)
+            {
+                _listPanel.Children.Add(CreateStationCard(stItem, _stationFilterMode, curShiftCode));
+            }
+
+            if (_txtFooterCount != null)
+            {
+                _txtFooterCount.Text = string.Format("{0} İstasyon Bölgesi (Üsküdar ➔ Sultanbeyli)", stResult.Stations.Count);
+            }
+            if (_txtFooterSheet != null)
+            {
+                _txtFooterSheet.Text = !string.IsNullOrEmpty(stResult.SheetName) ? stResult.SheetName : "EKİM 2026";
+            }
+        }
+
+        private Border CreateStationCard(StationDutyItem item, int filterMode, string curShiftCode)
+        {
+            bool isLight = (_cfg.Theme == "light");
+            double op = _cfg.ShiftWidgetOpacity;
+            byte borderAlpha = (byte)Math.Min(255, (int)(op * (isLight ? 180 : 80)));
+
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            var card = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(8, 5, 8, 5),
+                Margin = new Thickness(0, 2, 0, 3),
+                Background = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromArgb(140, 255, 255, 255) 
+                    : System.Windows.Media.Color.FromArgb(20, 255, 255, 255)),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(borderAlpha, 215, 220, 230)
+                    : System.Windows.Media.Color.FromArgb(borderAlpha, 45, 50, 65))
+            };
+
+            var mainStack = new StackPanel { Orientation = Orientation.Vertical };
+
+            bool showBoth = (filterMode == 3);
+            string activeName = null;
+            string activeRole = null;
+            string activeCode = null;
+            bool activeIsLeave = false;
+            bool activeIsOvertime = false;
+            string shiftLabel = null;
+
+            if (!showBoth)
+            {
+                bool useMorning = (filterMode == 1) || (filterMode == 0 && curShiftCode != "A");
+                if (useMorning)
+                {
+                    activeName = item.MorningName;
+                    activeRole = item.MorningRole;
+                    activeCode = item.MorningCode;
+                    activeIsLeave = item.MorningIsLeave;
+                    activeIsOvertime = item.MorningIsOvertime;
+                    shiftLabel = "S (07-16)";
+                }
+                else
+                {
+                    activeName = item.EveningName;
+                    activeRole = item.EveningRole;
+                    activeCode = item.EveningCode;
+                    activeIsLeave = item.EveningIsLeave;
+                    activeIsOvertime = item.EveningIsOvertime;
+                    shiftLabel = "A (16-24)";
+                }
+            }
+
+            var rowGrid = new Grid();
+            rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            // İstasyon sıra numarası (01, 02...)
+            var idxBorder = new Border
+            {
+                Width = 24,
+                Height = 24,
+                CornerRadius = new CornerRadius(12),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 2, 132, 199)),
+                BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(2, 132, 199)),
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(0, 0, 7, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            idxBorder.Child = new TextBlock
+            {
+                Text = item.Order.ToString("D2"),
+                FontSize = 10.5,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(56, 189, 248)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(idxBorder, 0);
+            rowGrid.Children.Add(idxBorder);
+
+            // İstasyon adı ve kapsanan istasyonlar
+            var nameStack = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
+            var stNameTxt = new TextBlock
+            {
+                Text = item.DisplayName,
+                FontWeight = FontWeights.Bold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 12.5,
+                Foreground = new SolidColorBrush(textPrimary),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 180
+            };
+            nameStack.Children.Add(stNameTxt);
+
+            if (!string.IsNullOrEmpty(item.CoveredStations))
+            {
+                nameStack.Children.Add(new TextBlock
+                {
+                    Text = "📍 " + item.CoveredStations,
+                    FontSize = 10.0,
+                    Foreground = new SolidColorBrush(textMuted),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 180
+                });
+            }
+
+            Grid.SetColumn(nameStack, 1);
+            rowGrid.Children.Add(nameStack);
+
+            // Sağ taraf: Nöbetçi personel bilgisi ve badge
+            if (!showBoth)
+            {
+                var dutyStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                var staffInfoStack = new StackPanel { Orientation = Orientation.Vertical, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 6, 0) };
+
+                string dispStaffName = !string.IsNullOrEmpty(activeName) ? activeName : "Belirtilmedi";
+                staffInfoStack.Children.Add(new TextBlock
+                {
+                    Text = dispStaffName,
+                    FontWeight = FontWeights.SemiBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    FontSize = 12.0,
+                    Foreground = new SolidColorBrush(textPrimary),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 120
+                });
+
+                if (!string.IsNullOrEmpty(activeRole))
+                {
+                    staffInfoStack.Children.Add(new TextBlock
+                    {
+                        Text = activeRole,
+                        FontSize = 10.0,
+                        Foreground = new SolidColorBrush(textMuted),
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        MaxWidth = 120
+                    });
+                }
+                dutyStack.Children.Add(staffInfoStack);
+
+                var badge = CreateStationBadge(activeCode, shiftLabel, activeIsLeave, activeIsOvertime);
+                dutyStack.Children.Add(badge);
+
+                Grid.SetColumn(dutyStack, 2);
+                rowGrid.Children.Add(dutyStack);
+                mainStack.Children.Add(rowGrid);
+            }
+            else // showBoth == true
+            {
+                Grid.SetColumnSpan(nameStack, 2);
+                mainStack.Children.Add(rowGrid);
+
+                var bothStack = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(31, 4, 0, 0) };
+
+                // Sabah satırı
+                var mRow = new Grid();
+                mRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                mRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                string mText = string.Format("☀️ 07-16: {0}", !string.IsNullOrEmpty(item.MorningName) ? item.MorningName : "Boş");
+                mRow.Children.Add(new TextBlock { Text = mText, FontSize = 11.2, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
+                var mBadge = CreateStationBadge(item.MorningCode, "S (07-16)", item.MorningIsLeave, item.MorningIsOvertime);
+                Grid.SetColumn(mBadge, 1);
+                mRow.Children.Add(mBadge);
+                bothStack.Children.Add(mRow);
+
+                // Akşam satırı
+                var eRow = new Grid { Margin = new Thickness(0, 3, 0, 0) };
+                eRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                eRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                string eText = string.Format("🌙 16-24: {0}", !string.IsNullOrEmpty(item.EveningName) ? item.EveningName : "Boş");
+                eRow.Children.Add(new TextBlock { Text = eText, FontSize = 11.2, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
+                var eBadge = CreateStationBadge(item.EveningCode, "A (16-24)", item.EveningIsLeave, item.EveningIsOvertime);
+                Grid.SetColumn(eBadge, 1);
+                eRow.Children.Add(eBadge);
+                bothStack.Children.Add(eRow);
+
+                mainStack.Children.Add(bothStack);
+            }
+
+            if (item.ExtraStaff != null && item.ExtraStaff.Count > 0)
+            {
+                mainStack.Children.Add(new TextBlock
+                {
+                    Text = "➕ Fazla Mesai: " + string.Join(", ", item.ExtraStaff.ToArray()),
+                    FontSize = 10.0,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)),
+                    Margin = new Thickness(31, 2, 0, 0)
+                });
+            }
+
+            card.Child = mainStack;
+            return card;
+        }
+
+        private Border CreateStationBadge(string code, string label, bool isLeave, bool isOvertime)
+        {
+            bool isLight = (_cfg.Theme == "light");
+            System.Windows.Media.Color bg, border, fg;
+
+            string badgeText;
+            if (isLeave)
+            {
+                badgeText = !string.IsNullOrEmpty(code) ? (code + " (İzin)") : "İzinli";
+                bg = System.Windows.Media.Color.FromArgb(40, 245, 158, 11);
+                border = System.Windows.Media.Color.FromRgb(217, 119, 6);
+                fg = isLight ? System.Windows.Media.Color.FromRgb(180, 83, 9) : System.Windows.Media.Color.FromRgb(254, 240, 138);
+            }
+            else if (isOvertime)
+            {
+                badgeText = !string.IsNullOrEmpty(code) ? ("FM (" + code + ")") : "FM";
+                bg = System.Windows.Media.Color.FromArgb(50, 234, 88, 12);
+                border = System.Windows.Media.Color.FromRgb(234, 88, 12);
+                fg = isLight ? System.Windows.Media.Color.FromRgb(194, 65, 12) : System.Windows.Media.Color.FromRgb(254, 215, 170);
+            }
+            else if (code == "S" || (label != null && label.Contains("07-16")))
+            {
+                badgeText = "S 07-16";
+                if (isLight)
+                {
+                    bg = System.Windows.Media.Color.FromArgb(35, 14, 165, 233);
+                    border = System.Windows.Media.Color.FromRgb(2, 132, 199);
+                    fg = System.Windows.Media.Color.FromRgb(3, 105, 161);
+                }
+                else
+                {
+                    bg = System.Windows.Media.Color.FromArgb(70, 30, 64, 175);
+                    border = System.Windows.Media.Color.FromRgb(59, 130, 246);
+                    fg = System.Windows.Media.Color.FromRgb(191, 219, 254);
+                }
+            }
+            else if (code == "A" || (label != null && label.Contains("16-24")))
+            {
+                badgeText = "A 16-24";
+                if (isLight)
+                {
+                    bg = System.Windows.Media.Color.FromArgb(35, 249, 115, 22);
+                    border = System.Windows.Media.Color.FromRgb(234, 88, 12);
+                    fg = System.Windows.Media.Color.FromRgb(194, 65, 12);
+                }
+                else
+                {
+                    bg = System.Windows.Media.Color.FromArgb(70, 194, 65, 12);
+                    border = System.Windows.Media.Color.FromRgb(249, 115, 22);
+                    fg = System.Windows.Media.Color.FromRgb(254, 215, 170);
+                }
+            }
+            else
+            {
+                badgeText = !string.IsNullOrEmpty(code) ? code : (!string.IsNullOrEmpty(label) ? label : "-");
+                bg = System.Windows.Media.Color.FromArgb(30, 100, 116, 139);
+                border = System.Windows.Media.Color.FromRgb(100, 116, 139);
+                fg = isLight ? System.Windows.Media.Color.FromRgb(71, 85, 105) : System.Windows.Media.Color.FromRgb(203, 213, 225);
+            }
+
+            var b = new Border
+            {
+                CornerRadius = new CornerRadius(5),
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = new SolidColorBrush(bg),
+                BorderBrush = new SolidColorBrush(border),
+                BorderThickness = new Thickness(1),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            b.Child = new TextBlock
+            {
+                Text = badgeText,
+                FontSize = 10.5,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(fg)
+            };
+            return b;
+        }
+
+        private bool _isApplyingZOrder = false;
+        public void ApplyZOrder()
+        {
+            if (_isApplyingZOrder) return;
+            _isApplyingZOrder = true;
+            try
+            {
+                IntPtr hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd == IntPtr.Zero) return;
+
+                int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                exStyle |= Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE;
+                Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle);
+
+                Win32.SetWindowPos(hwnd, Win32.HWND_BOTTOM, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+            }
+            catch { }
+            finally
+            {
+                _isApplyingZOrder = false;
+            }
+        }
+    }
+
+    // ==========================================
+    // M5 İSTASYON ÇİZELGESİ WİDGET'I
+    // Mimari & Tasarım: Serkan ŞENTÜRK
+    // ==========================================
+    public class StationWidgetWindow : Window
+    {
+        private readonly Config _cfg;
+        private DateTime _viewDate;
+        private int _filterMode = 0; // 0: Anlık, 1: Sabah, 2: Akşam, 3: Tümü
+        private StationDayResult _currentResult = null;
+        private bool _isLoading = false;
+
+        private Border _cardBorder;
+        private Grid _headerGrid;
+        private Border _headerDivider;
+        private Border _footerDivider;
+        private TextBlock _txtTitle;
+        private TextBlock _txtSubtitle;
+        private Border _btnFolder;
+        private TextBlock _txtFolderIcon;
+        private Border _btnRefresh;
+        private TextBlock _txtRefreshIcon;
+        private Border _btnLock;
+        private TextBlock _txtLockIcon;
+        private Border _btnClose;
+        private TextBlock _txtCloseIcon;
+
+        private Border _dateStrip;
+        private TextBlock _txtDateDisplay;
+        private Border _btnPrevDay;
+        private TextBlock _txtPrevDay;
+        private Border _btnNextDay;
+        private TextBlock _txtNextDay;
+        private Border _btnToday;
+        private TextBlock _txtToday;
+
+        private Border _statusBanner;
+        private TextBlock _txtStatusTitle;
+
+        private Border[] _filterBorders = new Border[4];
+        private TextBlock[] _filterTexts = new TextBlock[4];
+
+        private StackPanel _listPanel;
+        private ScrollViewer _scrollViewer;
+        private TextBlock _txtEmpty;
+        private TextBlock _txtFooterCount;
+        private TextBlock _txtFooterSheet;
+
+        private DispatcherTimer _autoUpdateTimer;
+        public Action OnLockChanged;
+
+        public void ResetPosition()
+        {
+            SetInitialPosition();
+        }
+
+        public StationWidgetWindow(Config cfg)
+        {
+            _cfg = cfg;
+            _viewDate = DateTime.Today;
+
+            Title = "M5 İstasyon Çizelgesi";
+            WindowStyle = WindowStyle.None;
+            AllowsTransparency = true;
+            Background = System.Windows.Media.Brushes.Transparent;
+            ShowInTaskbar = false;
+            SizeToContent = SizeToContent.WidthAndHeight;
+            ResizeMode = ResizeMode.NoResize;
+            ShowActivated = false;
+            Topmost = false;
+
+            BuildUI();
+            SetInitialPosition();
+
+            PreviewMouseWheel += delegate(object s, MouseWheelEventArgs e)
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                {
+                    double delta = (e.Delta > 0) ? 0.05 : -0.05;
+                    double newScale = Math.Round((_cfg.StationWidgetScale + delta) * 20.0) / 20.0;
+                    if (newScale < 0.50) newScale = 0.50;
+                    if (newScale > 1.00) newScale = 1.00;
+                    if (Math.Abs(newScale - _cfg.StationWidgetScale) > 0.001)
+                    {
+                        _cfg.StationWidgetScale = newScale;
+                        _cfg.Save();
+                        ApplyThemeAndSurface();
+                    }
+                    e.Handled = true;
+                }
+            };
+
+            SourceInitialized += delegate
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                    Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle | Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE);
+
+                    var source = HwndSource.FromHwnd(hwnd);
+                    if (source != null) source.AddHook(WndProc);
+
+                    ApplyZOrder();
+                }
+            };
+
+            _autoUpdateTimer = new DispatcherTimer(DispatcherPriority.Normal);
+            _autoUpdateTimer.Interval = TimeSpan.FromSeconds(30);
+            _autoUpdateTimer.Tick += delegate
+            {
+                UpdateShiftBanner();
+            };
+            _autoUpdateTimer.Start();
+
+            ApplyThemeAndSurface();
+            UpdateDateDisplay();
+            LoadScheduleAsync(false);
+        }
+
+        private void SetInitialPosition()
+        {
+            var wa = Forms.Screen.PrimaryScreen.WorkingArea;
+            if (_cfg.StationWidgetX >= 0 && _cfg.StationWidgetY >= 0 &&
+                _cfg.StationWidgetX < wa.Right - 50 && _cfg.StationWidgetY < wa.Bottom - 50)
+            {
+                Left = _cfg.StationWidgetX;
+                Top = _cfg.StationWidgetY;
+            }
+            else
+            {
+                Left = wa.Left + 25;
+                Top = wa.Top + 60;
+                _cfg.StationWidgetX = Left;
+                _cfg.StationWidgetY = Top;
+                _cfg.Save();
+            }
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == 0x0021) // WM_MOUSEACTIVATE
+            {
+                handled = true;
+                return (IntPtr)3; // MA_NOACTIVATE
+            }
+            return IntPtr.Zero;
+        }
+
+        private void BuildUI()
+        {
+            _cardBorder = new Border
+            {
+                CornerRadius = new CornerRadius(16),
+                Padding = new Thickness(14, 12, 14, 12),
+                Width = 380,
+                BorderThickness = new Thickness(1)
+            };
+
+            _cardBorder.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                if (!_cfg.LockStationWidgetPosition)
+                {
+                    DragMove();
+                    _cfg.StationWidgetX = Left;
+                    _cfg.StationWidgetY = Top;
+                    _cfg.Save();
+                }
+            };
+
+            var rootStack = new StackPanel { Orientation = Orientation.Vertical };
+
+            // 1. HEADER
+            _headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            _headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            _headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var titleStack = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
+            _txtTitle = new TextBlock
+            {
+                Text = "M5 İSTASYON ÇİZELGESİ",
+                FontWeight = FontWeights.Bold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 14.0
+            };
+            _txtSubtitle = new TextBlock
+            {
+                Text = "Üsküdar ➔ Sultanbeyli İstasyon Nöbetçileri",
+                FontWeight = FontWeights.Normal,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 11.0,
+                Opacity = 0.75,
+                Margin = new Thickness(0, 1, 0, 0)
+            };
+            titleStack.Children.Add(_txtTitle);
+            titleStack.Children.Add(_txtSubtitle);
+            Grid.SetColumn(titleStack, 0);
+            _headerGrid.Children.Add(titleStack);
+
+            var btnStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+
+            _btnFolder = CreateToolButton("📁", "Çizelge Hedefini Seç / Değiştir", out _txtFolderIcon, delegate
+            {
+                PickSupervisorTarget();
+            });
+            btnStack.Children.Add(_btnFolder);
+
+            _btnRefresh = CreateToolButton("↻", "Çizelgeyi Yeniden Oku", out _txtRefreshIcon, delegate
+            {
+                LoadScheduleAsync(true);
+            });
+            btnStack.Children.Add(_btnRefresh);
+
+            _txtLockIcon = new TextBlock { Text = _cfg.LockStationWidgetPosition ? "🔒" : "🔓", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+            _btnLock = new Border
+            {
+                Width = 26,
+                Height = 26,
+                CornerRadius = new CornerRadius(7),
+                Margin = new Thickness(4, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = _cfg.LockStationWidgetPosition ? "Konum Kilitli (Serbest bırakmak için tıklayın)" : "Konum Serbest (Kilitlemek için tıklayın)",
+                Child = _txtLockIcon
+            };
+            _btnLock.MouseEnter += delegate { _btnLock.Opacity = 0.75; };
+            _btnLock.MouseLeave += delegate { _btnLock.Opacity = 1.0; };
+            _btnLock.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                _cfg.LockStationWidgetPosition = !_cfg.LockStationWidgetPosition;
+                _cfg.Save();
+                UpdateLockStateVisuals();
+                if (OnLockChanged != null) OnLockChanged();
+            };
+            btnStack.Children.Add(_btnLock);
+
+            _btnClose = CreateToolButton("✕", "Kapat", out _txtCloseIcon, delegate
+            {
+                _cfg.ShowStationWidget = false;
+                _cfg.Save();
+                this.Hide();
+            });
+            btnStack.Children.Add(_btnClose);
+
+            Grid.SetColumn(btnStack, 1);
+            _headerGrid.Children.Add(btnStack);
+            rootStack.Children.Add(_headerGrid);
+
+            _headerDivider = new Border { Height = 1, Margin = new Thickness(0, 0, 0, 8) };
+            rootStack.Children.Add(_headerDivider);
+
+            // 2. AKTİF DURUM ŞERİDİ
+            _statusBanner = new Border
+            {
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(12, 8, 12, 8),
+                Margin = new Thickness(0, 0, 0, 8),
+                BorderThickness = new Thickness(1)
+            };
+            _txtStatusTitle = new TextBlock
+            {
+                Text = "🟢 İstasyon Nöbet Durumu Hesaplanıyor...",
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 12.0,
+                FontWeight = FontWeights.SemiBold,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            _statusBanner.Child = _txtStatusTitle;
+            rootStack.Children.Add(_statusBanner);
+
+            // 3. TARİH SEÇİCİ
+            _dateStrip = new Border
+            {
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(6, 4, 6, 4),
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var dateGrid = new Grid();
+            dateGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            dateGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            dateGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            dateGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            _btnPrevDay = CreateNavButton("◀", "Önceki Gün", out _txtPrevDay, delegate
+            {
+                _viewDate = _viewDate.AddDays(-1);
+                UpdateDateDisplay();
+                LoadScheduleAsync(false);
+            });
+            Grid.SetColumn(_btnPrevDay, 0);
+            dateGrid.Children.Add(_btnPrevDay);
+
+            _txtDateDisplay = new TextBlock
+            {
+                Text = "",
+                FontWeight = FontWeights.Bold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 12.5,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(_txtDateDisplay, 1);
+            dateGrid.Children.Add(_txtDateDisplay);
+
+            _btnToday = new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(6, 2, 6, 2),
+                Margin = new Thickness(0, 0, 4, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Bugüne Dön"
+            };
+            _txtToday = new TextBlock
+            {
+                Text = "Bugün",
+                FontSize = 11.0,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _btnToday.Child = _txtToday;
+            _btnToday.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                _viewDate = DateTime.Today;
+                UpdateDateDisplay();
+                LoadScheduleAsync(false);
+            };
+            Grid.SetColumn(_btnToday, 2);
+            dateGrid.Children.Add(_btnToday);
+
+            _btnNextDay = CreateNavButton("▶", "Sonraki Gün", out _txtNextDay, delegate
+            {
+                _viewDate = _viewDate.AddDays(1);
+                UpdateDateDisplay();
+                LoadScheduleAsync(false);
+            });
+            Grid.SetColumn(_btnNextDay, 3);
+            dateGrid.Children.Add(_btnNextDay);
+
+            _dateStrip.Child = dateGrid;
+            rootStack.Children.Add(_dateStrip);
+
+            // 4. FİLTRE BUTONLARI (Anlık, Sabah, Akşam, Tümü)
+            var filterGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            for (int f = 0; f < 4; f++) filterGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            string[] filterTitles = new string[] { "Anlık", "Sabah (07-16)", "Akşam (16-24)", "Tümü" };
+            for (int f = 0; f < 4; f++)
+            {
+                int fIdx = f;
+                var fText = new TextBlock
+                {
+                    Text = filterTitles[f],
+                    FontSize = 10.8,
+                    FontWeight = FontWeights.SemiBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                var fBorder = new Border
+                {
+                    CornerRadius = new CornerRadius(7),
+                    Padding = new Thickness(2, 5, 2, 5),
+                    Margin = new Thickness(f == 0 ? 0 : 2, 0, f == 3 ? 0 : 2, 0),
+                    Cursor = Cursors.Hand,
+                    Child = fText
+                };
+                fBorder.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+                {
+                    e.Handled = true;
+                    _filterMode = fIdx;
+                    UpdateFilterStyles();
+                    RenderStationList();
+                };
+                _filterBorders[f] = fBorder;
+                _filterTexts[f] = fText;
+                Grid.SetColumn(fBorder, f);
+                filterGrid.Children.Add(fBorder);
+            }
+            rootStack.Children.Add(filterGrid);
+
+            // 5. İSTASYON LİSTESİ
+            _listPanel = new StackPanel { Orientation = Orientation.Vertical };
+            _txtEmpty = new TextBlock
+            {
+                Text = "İstasyon çizelgesi okunuyor...",
+                FontSize = 12.0,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 20, 0, 20)
+            };
+            _listPanel.Children.Add(_txtEmpty);
+
+            _scrollViewer = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                MaxHeight = 520,
+                Content = _listPanel
+            };
+            rootStack.Children.Add(_scrollViewer);
+
+            _footerDivider = new Border { Height = 1, Margin = new Thickness(0, 8, 0, 6) };
+            rootStack.Children.Add(_footerDivider);
+
+            // 6. FOOTER
+            var footerGrid = new Grid();
+            footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            _txtFooterCount = new TextBlock
+            {
+                Text = "15 İstasyon Bölgesi (Üsküdar ➔ Sultanbeyli)",
+                FontSize = 11.5,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI")
+            };
+            Grid.SetColumn(_txtFooterCount, 0);
+            footerGrid.Children.Add(_txtFooterCount);
+
+            _txtFooterSheet = new TextBlock
+            {
+                Text = "EKİM 2026",
+                FontSize = 11.5,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI")
+            };
+            Grid.SetColumn(_txtFooterSheet, 1);
+            footerGrid.Children.Add(_txtFooterSheet);
+            rootStack.Children.Add(footerGrid);
+
+            _cardBorder.Child = rootStack;
+            Content = _cardBorder;
+        }
+
+        private void PickSupervisorTarget()
+        {
+            string chosen = ShellLinkHelper.PromptPickShortcutOrFile(_cfg.SupervisorFolderPath, "Vardiya Amirliği & İstasyon Çizelgesini Seçin (.lnk veya .xlsx):");
+            if (string.IsNullOrEmpty(chosen)) chosen = ShellLinkHelper.PromptPickFolder(_cfg.SupervisorFolderPath, "Çizelgelerin yer aldığı ana klasörü seçin:");
+            if (!string.IsNullOrEmpty(chosen))
+            {
+                _cfg.SupervisorFolderPath = chosen;
+                _cfg.Save();
+                LoadScheduleAsync(true);
+            }
+        }
+
+        public void LoadScheduleAsync(bool forceRefresh)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+
+            if (_txtEmpty != null)
+            {
+                _txtEmpty.Text = "İstasyon çizelgesi Excel'den okunuyor...";
+                _txtEmpty.Visibility = Visibility.Visible;
+            }
+
+            DateTime targetDate = _viewDate;
+            string supFolder = _cfg.SupervisorFolderPath;
+
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                var result = ShiftScheduleService.GetStationSchedule(targetDate, supFolder, forceRefresh);
+
+                Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    _isLoading = false;
+                    _currentResult = result;
+                    UpdateShiftBanner();
+                    RenderStationList();
+                }));
+            });
+        }
+
+        public void ApplyConfig()
+        {
+            ApplyThemeAndSurface();
+            UpdateDateDisplay();
+            LoadScheduleAsync(false);
+        }
+
+        private void UpdateDateDisplay()
+        {
+            if (_txtDateDisplay != null)
+            {
+                _txtDateDisplay.Text = _viewDate.ToString("dd MMMM yyyy, dddd", new CultureInfo("tr-TR"));
+            }
+            if (_btnToday != null)
+            {
+                _btnToday.Visibility = (_viewDate.Date == DateTime.Today) ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        private void UpdateShiftBanner()
+        {
+            DateTime now = DateTime.Now;
+            string curShiftName, curShiftHours, curShiftCode, nextShiftName, nextShiftHours, nextShiftTime;
+            ShiftScheduleService.GetStationShiftContext(now, out curShiftName, out curShiftHours, out curShiftCode, out nextShiftName, out nextShiftHours, out nextShiftTime);
+
+            bool isLight = (_cfg.Theme == "light");
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            if (_txtStatusTitle != null)
+            {
+                if (curShiftCode == "S")
+                {
+                    _txtStatusTitle.Text = "🟢 Şu An Görevde: Sabah Nöbeti (07:00 - 16:00)";
+                    _txtStatusTitle.Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(4, 120, 87) : System.Windows.Media.Color.FromRgb(52, 211, 153));
+                }
+                else if (curShiftCode == "A")
+                {
+                    _txtStatusTitle.Text = "🟢 Şu An Görevde: Akşam Nöbeti (16:00 - 24:00)";
+                    _txtStatusTitle.Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(194, 65, 12) : System.Windows.Media.Color.FromRgb(251, 146, 60));
+                }
+                else
+                {
+                    _txtStatusTitle.Text = "🌙 İstasyonlar Gece Yolcuya Kapalı (Sabah 07:00'de Başlar)";
+                    _txtStatusTitle.Foreground = new SolidColorBrush(textSecondary);
+                }
+            }
+        }
+
+        private void UpdateFilterStyles()
+        {
+            bool isLight = (_cfg.Theme == "light");
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            for (int f = 0; f < 4; f++)
+            {
+                if (_filterBorders[f] == null || _filterTexts[f] == null) continue;
+
+                if (f == _filterMode)
+                {
+                    _filterBorders[f].Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(2, 132, 199));
+                    _filterBorders[f].BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
+                    _filterBorders[f].BorderThickness = new Thickness(1);
+                    _filterTexts[f].Foreground = System.Windows.Media.Brushes.White;
+                    _filterTexts[f].FontWeight = FontWeights.Bold;
+                }
+                else
+                {
+                    _filterBorders[f].Background = System.Windows.Media.Brushes.Transparent;
+                    _filterBorders[f].BorderThickness = new Thickness(0);
+                    _filterTexts[f].Foreground = new SolidColorBrush(textSecondary);
+                    _filterTexts[f].FontWeight = FontWeights.Medium;
+                }
+            }
+        }
+
+        private void UpdateLockStateVisuals()
+        {
+            if (_btnLock == null || _txtLockIcon == null) return;
+            bool isLight = (_cfg.Theme == "light");
+            _txtLockIcon.Text = _cfg.LockStationWidgetPosition ? "🔒" : "🔓";
+            _btnLock.ToolTip = _cfg.LockStationWidgetPosition 
+                ? "Konum Kilitli (Serbest bırakmak için tıklayın)" 
+                : "Konum Serbest (Kilitlemek için tıklayın)";
+
+            if (_cfg.LockStationWidgetPosition)
+            {
+                _btnLock.Background = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromArgb(30, 2, 132, 199) 
+                    : System.Windows.Media.Color.FromArgb(40, 0, 229, 255));
+            }
+            else
+            {
+                _btnLock.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(20, 0, 0, 0)
+                    : System.Windows.Media.Color.FromArgb(25, 255, 255, 255));
+            }
+        }
+
+        private void ApplyThemeAndSurface()
+        {
+            bool isLight = (_cfg.Theme == "light");
+            double op = _cfg.StationWidgetOpacity;
+            byte bgAlpha = (byte)Math.Min(255, (int)(op * 255));
+            byte borderAlpha = (byte)Math.Min(255, (int)(op * (isLight ? 200 : 120)));
+
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            System.Windows.Media.Color bg;
+            System.Windows.Media.Color border;
+            if (isLight)
+            {
+                bg = System.Windows.Media.Color.FromArgb(bgAlpha, 248, 250, 252);
+                border = System.Windows.Media.Color.FromArgb(borderAlpha, 215, 220, 230);
+            }
+            else
+            {
+                bg = System.Windows.Media.Color.FromArgb(bgAlpha, 20, 22, 30);
+                border = System.Windows.Media.Color.FromArgb(borderAlpha, 45, 50, 65);
+            }
+
+            if (_cardBorder != null)
+            {
+                _cardBorder.Background = new SolidColorBrush(bg);
+                _cardBorder.BorderBrush = new SolidColorBrush(border);
+                _cardBorder.BorderThickness = new Thickness(1);
+                _cardBorder.Effect = new DropShadowEffect
+                {
+                    Color = isLight ? System.Windows.Media.Color.FromRgb(140, 150, 160) : System.Windows.Media.Colors.Black,
+                    BlurRadius = 24,
+                    ShadowDepth = 6,
+                    Opacity = isLight ? (0.15 * op) : (0.35 * op)
+                };
+
+                double scale = _cfg.StationWidgetScale;
+                if (scale < 0.50) scale = 0.50;
+                if (scale > 1.00) scale = 1.00;
+                _cardBorder.LayoutTransform = new ScaleTransform(scale, scale);
+            }
+
+            var divBrush = new SolidColorBrush(border);
+            if (_headerDivider != null) _headerDivider.Background = divBrush;
+            if (_footerDivider != null) _footerDivider.Background = divBrush;
+
+            if (_txtTitle != null) _txtTitle.Foreground = new SolidColorBrush(textPrimary);
+            if (_txtSubtitle != null) _txtSubtitle.Foreground = new SolidColorBrush(textSecondary);
+
+            var btnBg = new SolidColorBrush(isLight
+                ? System.Windows.Media.Color.FromArgb(20, 0, 0, 0)
+                : System.Windows.Media.Color.FromArgb(25, 255, 255, 255));
+            var btnFg = new SolidColorBrush(textPrimary);
+
+            if (_btnFolder != null) _btnFolder.Background = btnBg;
+            if (_txtFolderIcon != null) _txtFolderIcon.Foreground = btnFg;
+
+            if (_btnRefresh != null) _btnRefresh.Background = btnBg;
+            if (_txtRefreshIcon != null) _txtRefreshIcon.Foreground = btnFg;
+
+            if (_btnLock != null) _btnLock.Background = btnBg;
+            if (_txtLockIcon != null) _txtLockIcon.Foreground = btnFg;
+
+            if (_btnClose != null) _btnClose.Background = btnBg;
+            if (_txtCloseIcon != null) _txtCloseIcon.Foreground = btnFg;
+
+            if (_statusBanner != null)
+            {
+                _statusBanner.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(140, 255, 255, 255)
+                    : System.Windows.Media.Color.FromArgb(28, 255, 255, 255));
+                _statusBanner.BorderBrush = divBrush;
+            }
+
+            if (_dateStrip != null)
+            {
+                _dateStrip.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(15, 0, 0, 0)
+                    : System.Windows.Media.Color.FromArgb(20, 255, 255, 255));
+            }
+            if (_txtDateDisplay != null) _txtDateDisplay.Foreground = new SolidColorBrush(textPrimary);
+
+            var navBtnBg = System.Windows.Media.Brushes.Transparent;
+            var navBtnFg = new SolidColorBrush(textSecondary);
+
+            if (_btnPrevDay != null) _btnPrevDay.Background = navBtnBg;
+            if (_txtPrevDay != null) _txtPrevDay.Foreground = navBtnFg;
+
+            if (_btnNextDay != null) _btnNextDay.Background = navBtnBg;
+            if (_txtNextDay != null) _txtNextDay.Foreground = navBtnFg;
+
+            if (_btnToday != null)
+            {
+                _btnToday.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(30, 2, 132, 199)
+                    : System.Windows.Media.Color.FromArgb(40, 14, 165, 233));
+            }
+            if (_txtToday != null)
+            {
+                _txtToday.Foreground = isLight
+                    ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(2, 132, 199))
+                    : new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
+            }
+
+            UpdateFilterStyles();
+            UpdateLockStateVisuals();
+            UpdateShiftBanner();
+
+            if (_txtFooterCount != null) _txtFooterCount.Foreground = new SolidColorBrush(textSecondary);
+            if (_txtFooterSheet != null) _txtFooterSheet.Foreground = new SolidColorBrush(textSecondary);
+
+            RenderStationList();
+        }
+
+        private void RenderStationList()
+        {
+            _listPanel.Children.Clear();
+            bool isLight = (_cfg.Theme == "light");
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            if (_currentResult == null || _currentResult.Stations == null || _currentResult.Stations.Count == 0)
+            {
+                if (string.IsNullOrEmpty(_cfg.SupervisorFolderPath))
+                {
+                    var noSupStack = new StackPanel
+                    {
+                        Orientation = Orientation.Vertical,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Margin = new Thickness(10, 16, 10, 16)
+                    };
+                    noSupStack.Children.Add(new TextBlock
+                    {
+                        Text = "Vardiya Amirliği & İstasyon Çizelgesi Seçilmedi",
+                        FontWeight = FontWeights.Bold,
+                        FontSize = 12,
+                        FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                        Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(30, 41, 59) : System.Windows.Media.Brushes.White.Color),
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Margin = new Thickness(0, 0, 0, 8)
+                    });
+                    var btnSupPick = new Border
+                    {
+                        CornerRadius = new CornerRadius(8),
+                        Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(0, 229, 255)),
+                        Padding = new Thickness(14, 7, 14, 7),
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Cursor = Cursors.Hand,
+                        Child = new TextBlock
+                        {
+                            Text = "📁 İstasyon Çizelgesini Seç...",
+                            FontSize = 11,
+                            FontWeight = FontWeights.SemiBold,
+                            Foreground = System.Windows.Media.Brushes.White
+                        }
+                    };
+                    btnSupPick.MouseLeftButtonUp += delegate
+                    {
+                        PickSupervisorTarget();
+                    };
+                    noSupStack.Children.Add(btnSupPick);
+                    _listPanel.Children.Add(noSupStack);
+                    return;
+                }
+
+                _listPanel.Children.Add(new TextBlock
+                {
+                    Text = (_currentResult != null && !string.IsNullOrEmpty(_currentResult.ErrorMessage)) ? _currentResult.ErrorMessage : "İstasyon çizelgesi bulunamadı veya henüz yüklenmedi.",
+                    FontSize = 12,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(100, 116, 139) : System.Windows.Media.Color.FromRgb(160, 174, 192)),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 20, 0, 20)
+                });
+                return;
+            }
+
+            DateTime now = DateTime.Now;
+            string curShiftName, curShiftHours, curShiftCode, nextShiftName, nextShiftHours, nextShiftTime;
+            ShiftScheduleService.GetStationShiftContext(now, out curShiftName, out curShiftHours, out curShiftCode, out nextShiftName, out nextShiftHours, out nextShiftTime);
+
+            foreach (var item in _currentResult.Stations)
+            {
+                _listPanel.Children.Add(CreateStationCard(item, _filterMode, curShiftCode));
+            }
+
+            if (_txtFooterCount != null)
+            {
+                _txtFooterCount.Text = string.Format("{0} İstasyon Bölgesi (Üsküdar ➔ Sultanbeyli)", _currentResult.Stations.Count);
+            }
+            if (_txtFooterSheet != null)
+            {
+                _txtFooterSheet.Text = !string.IsNullOrEmpty(_currentResult.SheetName) ? _currentResult.SheetName : "EKİM 2026";
+            }
+        }
+
+        private Border CreateStationCard(StationDutyItem item, int filterMode, string curShiftCode)
+        {
+            bool isLight = (_cfg.Theme == "light");
+            double op = _cfg.StationWidgetOpacity;
+            byte borderAlpha = (byte)Math.Min(255, (int)(op * (isLight ? 180 : 80)));
+
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            var card = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(8, 5, 8, 5),
+                Margin = new Thickness(0, 2, 0, 3),
+                Background = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromArgb(140, 255, 255, 255) 
+                    : System.Windows.Media.Color.FromArgb(20, 255, 255, 255)),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(borderAlpha, 215, 220, 230)
+                    : System.Windows.Media.Color.FromArgb(borderAlpha, 45, 50, 65))
+            };
+
+            var mainStack = new StackPanel { Orientation = Orientation.Vertical };
+
+            bool showBoth = (filterMode == 3);
+            string activeName = null;
+            string activeRole = null;
+            string activeCode = null;
+            bool activeIsLeave = false;
+            bool activeIsOvertime = false;
+            string shiftLabel = null;
+
+            if (!showBoth)
+            {
+                bool useMorning = (filterMode == 1) || (filterMode == 0 && curShiftCode != "A");
+                if (useMorning)
+                {
+                    activeName = item.MorningName;
+                    activeRole = item.MorningRole;
+                    activeCode = item.MorningCode;
+                    activeIsLeave = item.MorningIsLeave;
+                    activeIsOvertime = item.MorningIsOvertime;
+                    shiftLabel = "S (07-16)";
+                }
+                else
+                {
+                    activeName = item.EveningName;
+                    activeRole = item.EveningRole;
+                    activeCode = item.EveningCode;
+                    activeIsLeave = item.EveningIsLeave;
+                    activeIsOvertime = item.EveningIsOvertime;
+                    shiftLabel = "A (16-24)";
+                }
+            }
+
+            var rowGrid = new Grid();
+            rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            // İstasyon sıra numarası (01, 02...)
+            var idxBorder = new Border
+            {
+                Width = 24,
+                Height = 24,
+                CornerRadius = new CornerRadius(12),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 2, 132, 199)),
+                BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(2, 132, 199)),
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(0, 0, 7, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            idxBorder.Child = new TextBlock
+            {
+                Text = item.Order.ToString("D2"),
+                FontSize = 10.5,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(56, 189, 248)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(idxBorder, 0);
+            rowGrid.Children.Add(idxBorder);
+
+            // İstasyon adı ve kapsanan istasyonlar
+            var nameStack = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
+            var stNameTxt = new TextBlock
+            {
+                Text = item.DisplayName,
+                FontWeight = FontWeights.Bold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 12.5,
+                Foreground = new SolidColorBrush(textPrimary),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 180
+            };
+            nameStack.Children.Add(stNameTxt);
+
+            if (!string.IsNullOrEmpty(item.CoveredStations))
+            {
+                nameStack.Children.Add(new TextBlock
+                {
+                    Text = "📍 " + item.CoveredStations,
+                    FontSize = 10.0,
+                    Foreground = new SolidColorBrush(textMuted),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 180
+                });
+            }
+
+            Grid.SetColumn(nameStack, 1);
+            rowGrid.Children.Add(nameStack);
+
+            // Sağ taraf: Nöbetçi personel bilgisi ve badge
+            if (!showBoth)
+            {
+                var dutyStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                var staffInfoStack = new StackPanel { Orientation = Orientation.Vertical, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 6, 0) };
+
+                string dispStaffName = !string.IsNullOrEmpty(activeName) ? activeName : "Belirtilmedi";
+                staffInfoStack.Children.Add(new TextBlock
+                {
+                    Text = dispStaffName,
+                    FontWeight = FontWeights.SemiBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    FontSize = 12.0,
+                    Foreground = new SolidColorBrush(textPrimary),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 120
+                });
+
+                if (!string.IsNullOrEmpty(activeRole))
+                {
+                    staffInfoStack.Children.Add(new TextBlock
+                    {
+                        Text = activeRole,
+                        FontSize = 10.0,
+                        Foreground = new SolidColorBrush(textMuted),
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        MaxWidth = 120
+                    });
+                }
+                dutyStack.Children.Add(staffInfoStack);
+
+                var badge = CreateStationBadge(activeCode, shiftLabel, activeIsLeave, activeIsOvertime);
+                dutyStack.Children.Add(badge);
+
+                Grid.SetColumn(dutyStack, 2);
+                rowGrid.Children.Add(dutyStack);
+                mainStack.Children.Add(rowGrid);
+            }
+            else // showBoth == true
+            {
+                Grid.SetColumnSpan(nameStack, 2);
+                mainStack.Children.Add(rowGrid);
+
+                var bothStack = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(31, 4, 0, 0) };
+
+                // Sabah satırı
+                var mRow = new Grid();
+                mRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                mRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                string mText = string.Format("☀️ 07-16: {0}", !string.IsNullOrEmpty(item.MorningName) ? item.MorningName : "Boş");
+                mRow.Children.Add(new TextBlock { Text = mText, FontSize = 11.2, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
+                var mBadge = CreateStationBadge(item.MorningCode, "S (07-16)", item.MorningIsLeave, item.MorningIsOvertime);
+                Grid.SetColumn(mBadge, 1);
+                mRow.Children.Add(mBadge);
+                bothStack.Children.Add(mRow);
+
+                // Akşam satırı
+                var eRow = new Grid { Margin = new Thickness(0, 3, 0, 0) };
+                eRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                eRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                string eText = string.Format("🌙 16-24: {0}", !string.IsNullOrEmpty(item.EveningName) ? item.EveningName : "Boş");
+                eRow.Children.Add(new TextBlock { Text = eText, FontSize = 11.2, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
+                var eBadge = CreateStationBadge(item.EveningCode, "A (16-24)", item.EveningIsLeave, item.EveningIsOvertime);
+                Grid.SetColumn(eBadge, 1);
+                eRow.Children.Add(eBadge);
+                bothStack.Children.Add(eRow);
+
+                mainStack.Children.Add(bothStack);
+            }
+
+            if (item.ExtraStaff != null && item.ExtraStaff.Count > 0)
+            {
+                mainStack.Children.Add(new TextBlock
+                {
+                    Text = "➕ Fazla Mesai: " + string.Join(", ", item.ExtraStaff.ToArray()),
+                    FontSize = 10.0,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)),
+                    Margin = new Thickness(31, 2, 0, 0)
+                });
+            }
+
+            card.Child = mainStack;
+            return card;
+        }
+
+        private Border CreateStationBadge(string code, string label, bool isLeave, bool isOvertime)
+        {
+            bool isLight = (_cfg.Theme == "light");
+            System.Windows.Media.Color bg, border, fg;
+
+            string badgeText;
+            if (isLeave)
+            {
+                badgeText = !string.IsNullOrEmpty(code) ? (code + " (İzin)") : "İzinli";
+                bg = System.Windows.Media.Color.FromArgb(40, 245, 158, 11);
+                border = System.Windows.Media.Color.FromRgb(217, 119, 6);
+                fg = isLight ? System.Windows.Media.Color.FromRgb(180, 83, 9) : System.Windows.Media.Color.FromRgb(254, 240, 138);
+            }
+            else if (isOvertime)
+            {
+                badgeText = !string.IsNullOrEmpty(code) ? ("FM (" + code + ")") : "FM";
+                bg = System.Windows.Media.Color.FromArgb(50, 234, 88, 12);
+                border = System.Windows.Media.Color.FromRgb(234, 88, 12);
+                fg = isLight ? System.Windows.Media.Color.FromRgb(194, 65, 12) : System.Windows.Media.Color.FromRgb(254, 215, 170);
+            }
+            else if (code == "S" || (label != null && label.Contains("07-16")))
+            {
+                badgeText = "S 07-16";
+                if (isLight)
+                {
+                    bg = System.Windows.Media.Color.FromArgb(35, 14, 165, 233);
+                    border = System.Windows.Media.Color.FromRgb(2, 132, 199);
+                    fg = System.Windows.Media.Color.FromRgb(3, 105, 161);
+                }
+                else
+                {
+                    bg = System.Windows.Media.Color.FromArgb(70, 30, 64, 175);
+                    border = System.Windows.Media.Color.FromRgb(59, 130, 246);
+                    fg = System.Windows.Media.Color.FromRgb(191, 219, 254);
+                }
+            }
+            else if (code == "A" || (label != null && label.Contains("16-24")))
+            {
+                badgeText = "A 16-24";
+                if (isLight)
+                {
+                    bg = System.Windows.Media.Color.FromArgb(35, 249, 115, 22);
+                    border = System.Windows.Media.Color.FromRgb(234, 88, 12);
+                    fg = System.Windows.Media.Color.FromRgb(194, 65, 12);
+                }
+                else
+                {
+                    bg = System.Windows.Media.Color.FromArgb(70, 194, 65, 12);
+                    border = System.Windows.Media.Color.FromRgb(249, 115, 22);
+                    fg = System.Windows.Media.Color.FromRgb(254, 215, 170);
+                }
+            }
+            else
+            {
+                badgeText = !string.IsNullOrEmpty(code) ? code : (!string.IsNullOrEmpty(label) ? label : "-");
+                bg = System.Windows.Media.Color.FromArgb(30, 100, 116, 139);
+                border = System.Windows.Media.Color.FromRgb(100, 116, 139);
+                fg = isLight ? System.Windows.Media.Color.FromRgb(71, 85, 105) : System.Windows.Media.Color.FromRgb(203, 213, 225);
+            }
+
+            var b = new Border
+            {
+                CornerRadius = new CornerRadius(5),
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = new SolidColorBrush(bg),
+                BorderBrush = new SolidColorBrush(border),
+                BorderThickness = new Thickness(1),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            b.Child = new TextBlock
+            {
+                Text = badgeText,
+                FontSize = 10.5,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(fg)
+            };
+            return b;
+        }
+
+        private Border CreateToolButton(string icon, string tooltip, out TextBlock txtOut, Action onClick)
+        {
+            var txt = new TextBlock
+            {
+                Text = icon,
+                FontSize = 12,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            txtOut = txt;
+            var b = new Border
+            {
+                Width = 26,
+                Height = 26,
+                CornerRadius = new CornerRadius(7),
+                Margin = new Thickness(4, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = tooltip,
+                Child = txt
+            };
+            b.MouseEnter += delegate { b.Opacity = 0.75; };
+            b.MouseLeave += delegate { b.Opacity = 1.0; };
+            b.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+            };
+            b.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                onClick();
+            };
+            return b;
+        }
+
+        private Border CreateNavButton(string icon, string tooltip, out TextBlock txtOut, Action onClick)
+        {
+            var txt = new TextBlock
+            {
+                Text = icon,
+                FontSize = 12,
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 229, 255)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            txtOut = txt;
+            var b = new Border
+            {
+                Width = 26,
+                Height = 26,
+                CornerRadius = new CornerRadius(6),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(25, 255, 255, 255)),
+                Cursor = Cursors.Hand,
+                ToolTip = tooltip,
+                Child = txt
+            };
+            b.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+            };
+            b.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                onClick();
+            };
+            return b;
         }
 
         private bool _isApplyingZOrder = false;
@@ -18897,7 +21007,64 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             supFolderRow.Children.Add(btnClearSupFolder);
 
             _mainContentPanel.Children.Add(CreateSettingCard("👮 Vardiya Amiri Çizelgesi Klasörü / Kısayolu", "Vardiya Amiri çizelgesinin bulunduğu klasörü, masaüstü kısayolunu (.lnk) veya doğrudan Excel dosyasını (.xlsx) seçebilirsiniz. İleride çizelgenin yeri veya dosya adı değiştiğinde buradan hızlıca güncelleyebilirsiniz.", supFolderRow));
-            // 2. Zen Şeffaf Hızlı Not Kartı (Sticky Pad)
+
+            // 2. M5 İstasyon Çizelgesi Widget'ı (Üsküdar - Sultanbeyli)
+            _mainContentPanel.Children.Add(CreateSectionTitle("🚉 M5 İSTASYON ÇİZELGESİ WİDGET'I (ÜSKÜDAR - SULTANBEYLİ)"));
+
+            var swStation = new PowerToggleSwitch(_cfg.ShowStationWidget, delegate(bool val)
+            {
+                _cfg.ShowStationWidget = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("M5 İstasyon Çizelgesi Widget'ını Göster", "Üsküdar'dan Sultanbeyli'ye kadar 15 istasyon alanında o an görevli olan istasyon personelini (Sabah S 07:00-16:00, Akşam A 16:00-24:00) canlı Excel tablosundan anlık okuyup gösteren bağımsız masaüstü widget'ı.", swStation));
+
+            var swStationOnlyHidden = new PowerToggleSwitch(_cfg.StationOnlyWhenIconsHidden, delegate(bool val)
+            {
+                _cfg.StationOnlyWhenIconsHidden = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Sadece Simgeler Gizlendiğinde Göster (Kapalı = Her Zaman Göster)", "Açıkken: İstasyon çizelgesi yalnızca masaüstü simgeleri gizlendiğinde görünür. Kapalıyken: Masaüstünde simgeler olsa dahi sürekli görünür kalır.", swStationOnlyHidden));
+
+            var swLockStation = new PowerToggleSwitch(_cfg.LockStationWidgetPosition, delegate(bool val)
+            {
+                _cfg.LockStationWidgetPosition = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("🔒 İstasyon Widget Konumunu Kilitle", "İstasyon widget'ının fare ile sürüklenmesini ve yanlışlıkla kaydırılmasını engeller, masaüstünde sabit tutar. Kilit açıkken widget ekran üzerinde serbestçe taşınabilir.", swLockStation));
+
+            var stationScaleStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var sliderStationScale = new System.Windows.Controls.Slider
+            {
+                Minimum = 50,
+                Maximum = 100,
+                Value = (int)Math.Round((_cfg.StationWidgetScale <= 0 ? 1.0 : Math.Min(1.0, _cfg.StationWidgetScale)) * 100),
+                Width = 140,
+                IsSnapToTickEnabled = true,
+                TickFrequency = 5,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var lblStationScale = new TextBlock
+            {
+                Text = "%" + ((int)sliderStationScale.Value).ToString(),
+                FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                Foreground = _textPrimaryBrush,
+                Width = 45,
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            sliderStationScale.ValueChanged += delegate(object s, RoutedPropertyChangedEventArgs<double> e)
+            {
+                int val = (int)sliderStationScale.Value;
+                lblStationScale.Text = "%" + val.ToString();
+                _cfg.StationWidgetScale = val / 100.0;
+                SaveAndNotify();
+            };
+            stationScaleStack.Children.Add(sliderStationScale);
+            stationScaleStack.Children.Add(lblStationScale);
+            _mainContentPanel.Children.Add(CreateSettingCard("İstasyon Widget Boyutu (Küçültme Ölçeği)", "İstasyon widget'ının ekran kaplama boyutunu oranını bozmadan küçültün (%50 - %100, en büyük boyutu %100'dür).", stationScaleStack));
+
+            // 3. Zen Şeffaf Hızlı Not Kartı (Sticky Pad)
             _mainContentPanel.Children.Add(CreateSectionTitle("📝 ZEN ŞEFFAF HIZLI NOT KARTI (STICKY PAD)"));
 
             var swNotes = new PowerToggleSwitch(_cfg.ShowZenNotes, delegate(bool val)
@@ -19857,7 +22024,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
     // ==========================================
     public static class UpdateCheckerService
     {
-        public const string CurrentVersion = "2.5.3";
+        public const string CurrentVersion = "2.5.4";
         public const string GitHubRepo = "836982756578/Zen-Desktop";
 
         public static Version ParseNormalizedVersion(string verStr)
@@ -19937,6 +22104,9 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
         private ShiftWidgetWindow _shiftWidgetWindow;
         private Forms.MenuItem _trayMiShiftWidget;
         private Forms.MenuItem _trayMiLockShift;
+        private StationWidgetWindow _stationWidgetWindow;
+        private Forms.MenuItem _trayMiStationWidget;
+        private Forms.MenuItem _trayMiLockStation;
         private Forms.MenuItem _trayMiMasterLock;
         private Forms.MenuItem _trayMiLockInspiration;
         private Forms.MenuItem _trayMiLockHoliday;
@@ -20165,6 +22335,8 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                     );
                 }
             };
+            _stationWidgetWindow = new StationWidgetWindow(_cfg);
+            _stationWidgetWindow.OnLockChanged = delegate { OnConfigChanged(); };
             _zenNotesWindow = new ZenNotesWindow(_cfg);
             _zenNotesWindow.OnVisibilityModeChanged = delegate { OnConfigChanged(); };
             _zenNotesWindow.OnOpenSettings = delegate { OpenSettings("widgets"); };
@@ -20187,6 +22359,10 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 if (_shiftWidgetWindow != null && _shiftWidgetWindow.IsVisible)
                 {
                     _shiftWidgetWindow.ApplyZOrder();
+                }
+                if (_stationWidgetWindow != null && _stationWidgetWindow.IsVisible)
+                {
+                    _stationWidgetWindow.ApplyZOrder();
                 }
                 if (_zenNotesWindow != null && _zenNotesWindow.IsVisible)
                 {
@@ -20681,10 +22857,11 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
 
             var miMasterLock = new Forms.MenuItem("🔓 / 🔒 Tüm Widget'ları Kilitle / Serbest Bırak", delegate(object s, EventArgs e)
             {
-                bool anyUnlocked = !_cfg.LockWidgetPosition || !_cfg.LockShiftWidgetPosition || !_cfg.LockInspirationPosition || !_cfg.LockHolidayPosition || !_cfg.LockMediaPosition || !_cfg.LockZenNotesPosition || !_cfg.LockDockPosition;
+                bool anyUnlocked = !_cfg.LockWidgetPosition || !_cfg.LockShiftWidgetPosition || !_cfg.LockStationWidgetPosition || !_cfg.LockInspirationPosition || !_cfg.LockHolidayPosition || !_cfg.LockMediaPosition || !_cfg.LockZenNotesPosition || !_cfg.LockDockPosition;
                 bool targetLock = anyUnlocked; // Eğer herhangi biri açıksa hepsini kilitle, hepsi kilitliyse hepsini serbest bırak
                 _cfg.LockWidgetPosition = targetLock;
                 _cfg.LockShiftWidgetPosition = targetLock;
+                _cfg.LockStationWidgetPosition = targetLock;
                 _cfg.LockInspirationPosition = targetLock;
                 _cfg.LockHolidayPosition = targetLock;
                 _cfg.LockMediaPosition = targetLock;
@@ -20716,6 +22893,16 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             miLockShift.Checked = _cfg.LockShiftWidgetPosition;
             _trayMiLockShift = miLockShift;
             miLocksMenu.MenuItems.Add(miLockShift);
+
+            var miLockStation = new Forms.MenuItem("🔒 M5 İstasyon Widget Konumu", delegate(object s, EventArgs e)
+            {
+                _cfg.LockStationWidgetPosition = !_cfg.LockStationWidgetPosition;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miLockStation.Checked = _cfg.LockStationWidgetPosition;
+            _trayMiLockStation = miLockStation;
+            miLocksMenu.MenuItems.Add(miLockStation);
 
             var miLockInspirations = new Forms.MenuItem("🔒 Âyet, Hadîs & Günün Sözü Kartları", delegate(object s, EventArgs e)
             {
@@ -20802,10 +22989,13 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 _cfg.ZenNotesY = -1;
                 _cfg.DockX = -1;
                 _cfg.DockY = -1;
+                _cfg.StationWidgetX = -1;
+                _cfg.StationWidgetY = -1;
                 _cfg.Save();
 
                 if (_widgetWindow != null) _widgetWindow.ResetPosition();
                 if (_shiftWidgetWindow != null) _shiftWidgetWindow.ResetPosition();
+                if (_stationWidgetWindow != null) _stationWidgetWindow.ResetPosition();
                 if (_zenNotesWindow != null) _zenNotesWindow.ResetPosition();
                 if (_zenDockWindow != null) _zenDockWindow.ResetPosition();
                 if (_inspirationManager != null) _inspirationManager.ResetPositions(_widgetWindow);
@@ -20825,6 +23015,16 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             miShift.Checked = _cfg.ShowShiftWidget;
             _trayMiShiftWidget = miShift;
             menu.MenuItems.Add(miShift);
+
+            var miStation = new Forms.MenuItem("🚉 M5 İstasyon Çizelgesi Widget'ı", delegate(object s, EventArgs e)
+            {
+                _cfg.ShowStationWidget = !_cfg.ShowStationWidget;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miStation.Checked = _cfg.ShowStationWidget;
+            _trayMiStationWidget = miStation;
+            menu.MenuItems.Add(miStation);
 
             var miNotes = new Forms.MenuItem("📝 Zen Hızlı Not Kartı", delegate(object s, EventArgs e)
             {
@@ -20877,6 +23077,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 Win32.SetTaskbarVisibility(true);
                 SetIconsAndWallpaperVisibility(true, false);
                 if (_shiftWidgetWindow != null) { try { _shiftWidgetWindow.Close(); } catch { } }
+                if (_stationWidgetWindow != null) { try { _stationWidgetWindow.Close(); } catch { } }
                 if (_zenNotesWindow != null) { try { _zenNotesWindow.SaveNotesToFile(); _zenNotesWindow.Close(); } catch { } }
                 if (_zenDockWindow != null) { try { _zenDockWindow.Close(); } catch { } }
                 if (_inspirationManager != null) { try { _inspirationManager.Close(); } catch { } }
@@ -20923,6 +23124,20 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 else
                 {
                     if (_shiftWidgetWindow.IsVisible) _shiftWidgetWindow.Hide();
+                }
+            }
+
+            if (_stationWidgetWindow != null)
+            {
+                bool shouldShowStation = _cfg.ShowStationWidget && (!_cfg.StationOnlyWhenIconsHidden || !iconsVisible);
+                if (shouldShowStation)
+                {
+                    if (!_stationWidgetWindow.IsVisible) _stationWidgetWindow.Show();
+                    _stationWidgetWindow.ApplyZOrder();
+                }
+                else
+                {
+                    if (_stationWidgetWindow.IsVisible) _stationWidgetWindow.Hide();
                 }
             }
 
@@ -21038,6 +23253,16 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 {
                     if (!_shiftWidgetWindow.IsVisible) _shiftWidgetWindow.Show();
                     IntPtr h = new WindowInteropHelper(_shiftWidgetWindow).Handle;
+                    if (h != IntPtr.Zero && Win32.IsWindow(h))
+                    {
+                        Win32.SetWindowPos(h, Win32.HWND_TOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE | Win32.SWP_SHOWWINDOW);
+                    }
+                }
+
+                if (_stationWidgetWindow != null && _cfg.ShowStationWidget)
+                {
+                    if (!_stationWidgetWindow.IsVisible) _stationWidgetWindow.Show();
+                    IntPtr h = new WindowInteropHelper(_stationWidgetWindow).Handle;
                     if (h != IntPtr.Zero && Win32.IsWindow(h))
                     {
                         Win32.SetWindowPos(h, Win32.HWND_TOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE | Win32.SWP_SHOWWINDOW);
@@ -21166,6 +23391,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 // Widget'ların Z-Order'ını masaüstü seviyesine geri döndür
                 if (_widgetWindow != null && _widgetWindow.IsVisible) _widgetWindow.ApplyZOrder();
                 if (_shiftWidgetWindow != null && _shiftWidgetWindow.IsVisible) _shiftWidgetWindow.ApplyZOrder();
+                if (_stationWidgetWindow != null && _stationWidgetWindow.IsVisible) _stationWidgetWindow.ApplyZOrder();
                 if (_zenNotesWindow != null && _zenNotesWindow.IsVisible) _zenNotesWindow.ApplyZOrder();
                 if (_zenDockWindow != null && _zenDockWindow.IsVisible) _zenDockWindow.ApplyZOrder();
                 if (_inspirationManager != null) _inspirationManager.ApplyZOrder();
@@ -21420,6 +23646,16 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 }
             }
 
+            if (_stationWidgetWindow != null && _stationWidgetWindow.IsVisible)
+            {
+                var helper = new WindowInteropHelper(_stationWidgetWindow);
+                IntPtr stHwnd = helper.Handle;
+                if (stHwnd != IntPtr.Zero && (clickedHwnd == stHwnd || clickedRoot == stHwnd))
+                {
+                    return true;
+                }
+            }
+
             if (_zenNotesWindow != null && _zenNotesWindow.IsVisible)
             {
                 var helper = new WindowInteropHelper(_zenNotesWindow);
@@ -21607,6 +23843,11 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 _shiftWidgetWindow.ApplyConfig();
             }
 
+            if (_stationWidgetWindow != null)
+            {
+                _stationWidgetWindow.ApplyConfig();
+            }
+
             if (_zenNotesWindow != null)
             {
                 _zenNotesWindow.ApplyThemeAndStyle();
@@ -21640,6 +23881,10 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                     {
                         _shiftWidgetWindow.ApplyZOrder();
                     }
+                    if (_stationWidgetWindow != null && _stationWidgetWindow.IsVisible)
+                    {
+                        _stationWidgetWindow.ApplyZOrder();
+                    }
                     if (_zenNotesWindow != null && _zenNotesWindow.IsVisible)
                     {
                         _zenNotesWindow.ApplyZOrder();
@@ -21664,6 +23909,10 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                     {
                         _shiftWidgetWindow.ApplyZOrder();
                     }
+                    if (_stationWidgetWindow != null && _stationWidgetWindow.IsVisible)
+                    {
+                        _stationWidgetWindow.ApplyZOrder();
+                    }
                     if (_zenNotesWindow != null && _zenNotesWindow.IsVisible)
                     {
                         _zenNotesWindow.ApplyZOrder();
@@ -21687,6 +23936,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 if (_trayMiPrayer != null) _trayMiPrayer.Checked = _cfg.ShowPrayerTimes;
                 if (_trayMiLock != null) _trayMiLock.Checked = _cfg.LockWidgetPosition;
                 if (_trayMiLockShift != null) _trayMiLockShift.Checked = _cfg.LockShiftWidgetPosition;
+                if (_trayMiLockStation != null) _trayMiLockStation.Checked = _cfg.LockStationWidgetPosition;
                 if (_trayMiLockInspiration != null) _trayMiLockInspiration.Checked = _cfg.LockInspirationPosition;
                 if (_trayMiLockHoliday != null) _trayMiLockHoliday.Checked = _cfg.LockHolidayPosition;
                 if (_trayMiLockMedia != null) _trayMiLockMedia.Checked = _cfg.LockMediaPosition;
@@ -21695,11 +23945,12 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
 
                 if (_trayMiMasterLock != null)
                 {
-                    bool allLocked = _cfg.LockWidgetPosition && _cfg.LockShiftWidgetPosition && _cfg.LockInspirationPosition && _cfg.LockHolidayPosition && _cfg.LockMediaPosition && _cfg.LockZenNotesPosition && _cfg.LockDockPosition;
+                    bool allLocked = _cfg.LockWidgetPosition && _cfg.LockShiftWidgetPosition && _cfg.LockStationWidgetPosition && _cfg.LockInspirationPosition && _cfg.LockHolidayPosition && _cfg.LockMediaPosition && _cfg.LockZenNotesPosition && _cfg.LockDockPosition;
                     _trayMiMasterLock.Text = allLocked ? "🔓 Tüm Widget Konumlarının Kilidini Aç (Serbest Taşıma)" : "🔒 Tüm Widget Konumlarını Kilitle";
                 }
 
                 if (_trayMiShiftWidget != null) _trayMiShiftWidget.Checked = _cfg.ShowShiftWidget;
+                if (_trayMiStationWidget != null) _trayMiStationWidget.Checked = _cfg.ShowStationWidget;
                 if (_trayMiZenNotes != null) _trayMiZenNotes.Checked = _cfg.ShowZenNotes;
                 if (_trayMiZenNotesAlways != null) _trayMiZenNotesAlways.Checked = !_cfg.ZenNotesOnlyWhenIconsHidden;
                 if (_trayMiZenDock != null) _trayMiZenDock.Checked = _cfg.ShowZenDock;
