@@ -15902,6 +15902,8 @@ namespace ModernAutoHideIcons
                 return;
             }
 
+            if (_scrollViewer != null) _scrollViewer.MaxHeight = 520;
+
             List<ShiftPerson> displayList = new List<ShiftPerson>();
             string commonHours = null;
 
@@ -16581,7 +16583,7 @@ namespace ModernAutoHideIcons
             };
             _listPanel.Children.Add(stHeader);
 
-            if (_scrollViewer != null) _scrollViewer.MaxHeight = 620;
+            if (_scrollViewer != null) _scrollViewer.MaxHeight = 850;
 
             // İstasyon kartlarını gruplayarak listele (Aynı gruptaki ve aynı personeldeki istasyonlar tek kartta, isim tam ortada)
             int stIdx = 0;
@@ -17280,7 +17282,7 @@ namespace ModernAutoHideIcons
             {
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                MaxHeight = 640,
+                MaxHeight = 850,
                 Content = _listPanel
             };
             rootStack.Children.Add(_scrollViewer);
