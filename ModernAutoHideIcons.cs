@@ -30,8 +30,8 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Desktop Zen - Modern Masaüstü İkon Gizleme & Akıllı Widget Sistemi")]
 [assembly: System.Reflection.AssemblyCompany("Serkan ŞENTÜRK")]
 [assembly: System.Reflection.AssemblyCopyright("© 2026 Serkan ŞENTÜRK. Tüm Hakları Saklıdır.")]
-[assembly: System.Reflection.AssemblyVersion("2.5.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.5.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.5.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.5.1.0")]
 
 namespace ModernAutoHideIcons
 {
@@ -13715,7 +13715,22 @@ namespace ModernAutoHideIcons
             double defaultW = 360;
             double defaultH = 460;
 
+            bool posValid = false;
             if (_cfg.ShiftWidgetX >= 0 && _cfg.ShiftWidgetY >= 0)
+            {
+                foreach (var scr in Forms.Screen.AllScreens)
+                {
+                    var r = scr.WorkingArea;
+                    if (_cfg.ShiftWidgetX < r.Right - 60 && _cfg.ShiftWidgetX >= r.Left - 50 &&
+                        _cfg.ShiftWidgetY < r.Bottom - 60 && _cfg.ShiftWidgetY >= r.Top - 50)
+                    {
+                        posValid = true;
+                        break;
+                    }
+                }
+            }
+
+            if (posValid)
             {
                 Left = _cfg.ShiftWidgetX;
                 Top = _cfg.ShiftWidgetY;
@@ -13724,7 +13739,15 @@ namespace ModernAutoHideIcons
             {
                 Left = wa.Right - defaultW - 20;
                 Top = wa.Top + (wa.Height - defaultH) / 2.0;
+                _cfg.ShiftWidgetX = Left;
+                _cfg.ShiftWidgetY = Top;
+                _cfg.Save();
             }
+
+            if (Left < wa.Left) Left = wa.Left + 10;
+            if (Top < wa.Top) Top = wa.Top + 10;
+            if (Left + defaultW > wa.Right && Forms.Screen.AllScreens.Length == 1) Left = wa.Right - defaultW - 10;
+            if (Top + defaultH > wa.Bottom && Forms.Screen.AllScreens.Length == 1) Top = wa.Bottom - defaultH - 10;
         }
 
         private string _lastKmFolder = null;
@@ -18923,6 +18946,46 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             devCard.Child = devStack;
             _mainContentPanel.Children.Add(devCard);
 
+            // Güncelleme Kontrol Butonu
+            var btnCheckUpdates = new System.Windows.Controls.Button
+            {
+                Content = "🔄 Güncellemeleri Denetle (Mevcut: v" + UpdateCheckerService.CurrentVersion + ")",
+                Height = 32,
+                Padding = new Thickness(14, 0, 14, 0),
+                Cursor = Cursors.Hand,
+                FontWeight = FontWeights.SemiBold
+            };
+            btnCheckUpdates.Click += delegate
+            {
+                btnCheckUpdates.IsEnabled = false;
+                btnCheckUpdates.Content = "⏳ GitHub Kontrol Ediliyor...";
+                UpdateCheckerService.CheckForUpdatesAsync(
+                    delegate(string newTag, string url)
+                    {
+                        Dispatcher.BeginInvoke(new Action(delegate
+                        {
+                            btnCheckUpdates.IsEnabled = true;
+                            btnCheckUpdates.Content = "🚀 Yeni Sürüm: " + newTag + " (İndir)";
+                            var r = Forms.MessageBox.Show("Yeni bir Zen Desktop sürümü mevcut: " + newTag + "\n\nGitHub indirme sayfasını açmak istiyor musunuz?", "Zen Desktop Güncelleme", Forms.MessageBoxButtons.YesNo, Forms.MessageBoxIcon.Information);
+                            if (r == Forms.DialogResult.Yes)
+                            {
+                                try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
+                            }
+                        }));
+                    },
+                    delegate
+                    {
+                        Dispatcher.BeginInvoke(new Action(delegate
+                        {
+                            btnCheckUpdates.IsEnabled = true;
+                            btnCheckUpdates.Content = "✅ En Güncel Sürümdesiniz (v" + UpdateCheckerService.CurrentVersion + ")";
+                            Forms.MessageBox.Show("Tebrikler! En güncel Zen Desktop sürümünü kullanıyorsunuz (v" + UpdateCheckerService.CurrentVersion + ").", "Zen Desktop", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
+                        }));
+                    }
+                );
+            };
+            _mainContentPanel.Children.Add(CreateSettingCard("Zen Desktop Güncelleme Denetleyicisi", "GitHub üzerindeki yeni sürümleri ve hata düzeltmelerini anlık olarak denetler, yeni sürüm çıktığında bildirim verir.", btnCheckUpdates));
+
             // 2. Kısayollar ve İpuçları
             _mainContentPanel.Children.Add(CreateSectionTitle("KISAYOLLAR VE KULLANIM İPUÇLARI"));
             _mainContentPanel.Children.Add(CreateSettingCard("Win + Ctrl + D", "Masaüstü ikonlarını anında gizler veya geri getirir.", null));
@@ -19170,6 +19233,71 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
     }
 
     // ==========================================
+    // GITHUB GÜNCELLEME KONTROL SERVİSİ
+    // ==========================================
+    public static class UpdateCheckerService
+    {
+        public const string CurrentVersion = "2.5.1";
+        public const string GitHubRepo = "836982756578/Zen-Desktop";
+
+        public static Version ParseNormalizedVersion(string verStr)
+        {
+            if (string.IsNullOrEmpty(verStr)) return new Version(0, 0, 0);
+            string clean = verStr.Trim().TrimStart('v', 'V');
+            var parts = clean.Split('.');
+            int mj, mn, b;
+            int major = (parts.Length > 0 && int.TryParse(parts[0], out mj)) ? mj : 0;
+            int minor = (parts.Length > 1 && int.TryParse(parts[1], out mn)) ? mn : 0;
+            int build = (parts.Length > 2 && int.TryParse(parts[2], out b)) ? b : 0;
+            return new Version(major, minor, build);
+        }
+
+        public static void CheckForUpdatesAsync(Action<string, string> onNewVersionFound, Action onUpToDate = null)
+        {
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    string url = "https://api.github.com/repos/" + GitHubRepo + "/releases/latest";
+                    var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+                    req.UserAgent = "ZenDesktop-App";
+                    req.Accept = "application/vnd.github.v3+json";
+                    req.Timeout = 8000;
+
+                    using (var resp = req.GetResponse())
+                    using (var stream = resp.GetResponseStream())
+                    using (var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8))
+                    {
+                        string json = reader.ReadToEnd();
+                        var tagMatch = Regex.Match(json, "\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
+                        var urlMatch = Regex.Match(json, "\"html_url\"\\s*:\\s*\"([^\"]+)\"");
+
+                        if (tagMatch.Success)
+                        {
+                            string rawTag = tagMatch.Groups[1].Value.Trim();
+                            string releaseUrl = urlMatch.Success ? urlMatch.Groups[1].Value : "https://github.com/" + GitHubRepo + "/releases/latest";
+
+                            Version curV = ParseNormalizedVersion(CurrentVersion);
+                            Version latV = ParseNormalizedVersion(rawTag);
+                            if (latV > curV)
+                            {
+                                if (onNewVersionFound != null) onNewVersionFound(rawTag, releaseUrl);
+                                return;
+                            }
+                        }
+                    }
+
+                    if (onUpToDate != null) onUpToDate();
+                }
+                catch
+                {
+                    if (onUpToDate != null) onUpToDate();
+                }
+            });
+        }
+    }
+
+    // ==========================================
     // ANA UYGULAMA MOTORU & SİSTEM TEPSİSİ
     // ==========================================
     public class App : Application
@@ -19179,6 +19307,10 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
         private SettingsWindow _settingsWindow;
         private WallpaperWindow _wallpaperWindow;
         private Forms.NotifyIcon _trayIcon;
+        private Forms.MenuItem _trayMiAuto;
+        private Forms.MenuItem _trayMiWidget;
+        private Forms.MenuItem _trayMiUpdateNotification;
+        private string _pendingUpdateUrl = null;
         private Forms.MenuItem _trayMiLock;
         private Forms.MenuItem _trayMiWeatherFx;
         private Forms.MenuItem _trayMiPrayer;
@@ -19533,6 +19665,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             _desktopClickTimer.Start();
 
             RegisterGlobalHotkey();
+            InitUpdateChecker();
 
             try
             {
@@ -19549,6 +19682,35 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 };
             }
             catch { }
+        }
+
+        private void InitUpdateChecker()
+        {
+            var updateTimer = new DispatcherTimer();
+            updateTimer.Interval = TimeSpan.FromSeconds(10);
+            updateTimer.Tick += delegate
+            {
+                updateTimer.Interval = TimeSpan.FromHours(4);
+                UpdateCheckerService.CheckForUpdatesAsync(
+                    delegate(string newTag, string url)
+                    {
+                        Dispatcher.BeginInvoke(new Action(delegate
+                        {
+                            _pendingUpdateUrl = url;
+                            if (_trayMiUpdateNotification != null)
+                            {
+                                _trayMiUpdateNotification.Text = "🚀 Yeni Sürüm Mevcut: " + newTag + " (Tıklayıp İndir)";
+                                _trayMiUpdateNotification.Visible = true;
+                            }
+                            if (_trayIcon != null)
+                            {
+                                _trayIcon.ShowBalloonTip(10000, "Zen Desktop Güncellemesi Mevcut", "Yeni bir sürüm (" + newTag + ") yayınlandı!\nİndirmek için buraya veya sistem tepsisindeki bildirim öğesine tıklayabilirsiniz.", Forms.ToolTipIcon.Info);
+                            }
+                        }));
+                    }
+                );
+            };
+            updateTimer.Start();
         }
 
         private void SetupTrayIcon()
@@ -19588,8 +19750,25 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             }
             _trayIcon.Text = "Desktop Zen\n(Ayarları açmak için tıklayın)";
             _trayIcon.Visible = true;
+            _trayIcon.BalloonTipClicked += delegate
+            {
+                if (!string.IsNullOrEmpty(_pendingUpdateUrl))
+                {
+                    try { Process.Start(new ProcessStartInfo(_pendingUpdateUrl) { UseShellExecute = true }); } catch { }
+                }
+            };
 
             var menu = new Forms.ContextMenu();
+
+            _trayMiUpdateNotification = new Forms.MenuItem("🚀 Yeni Sürüm Mevcut! (İndir)", delegate(object s, EventArgs e)
+            {
+                if (!string.IsNullOrEmpty(_pendingUpdateUrl))
+                {
+                    try { Process.Start(new ProcessStartInfo(_pendingUpdateUrl) { UseShellExecute = true }); } catch { }
+                }
+            });
+            _trayMiUpdateNotification.Visible = false;
+            menu.MenuItems.Add(_trayMiUpdateNotification);
 
             var miSettings = new Forms.MenuItem("⚙️ Ayarlar Paneli", delegate(object s, EventArgs e) { OpenSettings(); });
             miSettings.DefaultItem = true;
@@ -19605,6 +19784,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 OnConfigChanged();
             });
             miAuto.Checked = _cfg.AutoHideEnabled;
+            _trayMiAuto = miAuto;
             menu.MenuItems.Add(miAuto);
 
             var miWidget = new Forms.MenuItem("🪟 Masaüstü Widget'ı", delegate(object s, EventArgs e)
@@ -19614,6 +19794,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 OnConfigChanged();
             });
             miWidget.Checked = _cfg.ShowWidget;
+            _trayMiWidget = miWidget;
             menu.MenuItems.Add(miWidget);
 
             var miWeatherFx = new Forms.MenuItem("🌧️ Ekrandaki Hava Durumu Efekti", delegate(object s, EventArgs e)
@@ -20658,8 +20839,8 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
 
             if (_trayIcon != null && _trayIcon.ContextMenu != null)
             {
-                _trayIcon.ContextMenu.MenuItems[1].Checked = _cfg.AutoHideEnabled;
-                _trayIcon.ContextMenu.MenuItems[2].Checked = _cfg.ShowWidget;
+                if (_trayMiAuto != null) _trayMiAuto.Checked = _cfg.AutoHideEnabled;
+                if (_trayMiWidget != null) _trayMiWidget.Checked = _cfg.ShowWidget;
                 if (_trayMiWeatherFx != null) _trayMiWeatherFx.Checked = _cfg.ShowWeatherWallpaperEffects;
                 if (_trayMiPrayer != null) _trayMiPrayer.Checked = _cfg.ShowPrayerTimes;
                 if (_trayMiLock != null) _trayMiLock.Checked = _cfg.LockWidgetPosition;
