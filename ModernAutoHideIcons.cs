@@ -16583,10 +16583,25 @@ namespace ModernAutoHideIcons
 
             if (_scrollViewer != null) _scrollViewer.MaxHeight = 620;
 
-            // İstasyon kartlarını listele
-            foreach (var stItem in stResult.Stations)
+            // İstasyon kartlarını gruplayarak listele (Aynı gruptaki ve aynı personeldeki istasyonlar tek kartta, isim tam ortada)
+            int stIdx = 0;
+            while (stIdx < stResult.Stations.Count)
             {
-                _listPanel.Children.Add(CreateStationCard(stItem, _stationFilterMode, curShiftCode));
+                var grpList = new List<StationDutyItem>();
+                var firstItem = stResult.Stations[stIdx];
+                grpList.Add(firstItem);
+                stIdx++;
+
+                while (stIdx < stResult.Stations.Count &&
+                       stResult.Stations[stIdx].GroupId == firstItem.GroupId &&
+                       (stResult.Stations[stIdx].MorningName ?? "") == (firstItem.MorningName ?? "") &&
+                       (stResult.Stations[stIdx].EveningName ?? "") == (firstItem.EveningName ?? ""))
+                {
+                    grpList.Add(stResult.Stations[stIdx]);
+                    stIdx++;
+                }
+
+                _listPanel.Children.Add(CreateStationGroupCard(grpList, _stationFilterMode, curShiftCode));
             }
 
             if (_txtFooterCount != null)
@@ -16599,8 +16614,9 @@ namespace ModernAutoHideIcons
             }
         }
 
-        private Border CreateStationCard(StationDutyItem item, int filterMode, string curShiftCode)
+        private Border CreateStationGroupCard(List<StationDutyItem> groupItems, int filterMode, string curShiftCode)
         {
+            var item = groupItems[0];
             bool isLight = (_cfg.Theme == "light");
             System.Windows.Media.Color textPrimary, textSecondary, textMuted;
             WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
@@ -16609,15 +16625,13 @@ namespace ModernAutoHideIcons
 
             var card = new Border
             {
-                CornerRadius = new CornerRadius(5),
-                Padding = new Thickness(6, 2, 7, 2),
-                Margin = new Thickness(0, 1, 0, 1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(6, 2.5, 8, 2.5),
+                Margin = new Thickness(0, 1, 0, 1.5),
                 Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 42 : 36), grpColor.R, grpColor.G, grpColor.B)),
                 BorderThickness = new Thickness(3, 1, 1, 1),
                 BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 175 : 145), grpColor.R, grpColor.G, grpColor.B))
             };
-
-            var mainStack = new StackPanel { Orientation = Orientation.Vertical };
 
             bool showBoth = (filterMode == 3);
             string activeName = null;
@@ -16625,124 +16639,132 @@ namespace ModernAutoHideIcons
             if (!showBoth)
             {
                 bool useMorning = (filterMode == 1) || (filterMode == 0 && curShiftCode != "A");
-                if (useMorning)
-                {
-                    activeName = item.MorningName;
-                }
-                else
-                {
-                    activeName = item.EveningName;
-                }
+                activeName = useMorning ? item.MorningName : item.EveningName;
             }
 
             var rowGrid = new Grid();
-            rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            // İstasyon sıra numarası (01..24) - Grup rengiyle uyumlu
-            var idxBorder = new Border
+            // Sol taraf: Gruptaki istasyonları alt alta diz (07 Ümraniye, 08 Çarşı...)
+            var stationsStack = new StackPanel
             {
-                Width = 19,
-                Height = 19,
-                CornerRadius = new CornerRadius(9.5),
-                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 55 : 65), grpColor.R, grpColor.G, grpColor.B)),
-                BorderBrush = new SolidColorBrush(grpColor),
-                BorderThickness = new Thickness(1),
-                Margin = new Thickness(0, 0, 6, 0),
+                Orientation = Orientation.Vertical,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            idxBorder.Child = new TextBlock
+
+            for (int i = 0; i < groupItems.Count; i++)
             {
-                Text = item.Order.ToString("D2"),
-                FontSize = 9.2,
-                FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush(isLight ? grpColor : System.Windows.Media.Colors.White),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            Grid.SetColumn(idxBorder, 0);
-            rowGrid.Children.Add(idxBorder);
-
-            // İstasyon adı
-            var nameStack = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
-            var stNameTxt = new TextBlock
-            {
-                Text = item.DisplayName,
-                FontWeight = FontWeights.SemiBold,
-                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
-                FontSize = 11.2,
-                Foreground = new SolidColorBrush(textPrimary),
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxWidth = 175
-            };
-            nameStack.Children.Add(stNameTxt);
-
-            Grid.SetColumn(nameStack, 1);
-            rowGrid.Children.Add(nameStack);
-
-            // Sağ taraf: Nöbetçi personel bilgisi
-            if (!showBoth)
-            {
-                var dutyStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                var staffInfoStack = new StackPanel { Orientation = Orientation.Vertical, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 2, 0) };
-
-                string dispStaffName = !string.IsNullOrEmpty(activeName) ? activeName : "Belirtilmedi";
-                staffInfoStack.Children.Add(new TextBlock
+                var st = groupItems[i];
+                var stRow = new StackPanel
                 {
-                    Text = dispStaffName,
+                    Orientation = Orientation.Horizontal,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, i == 0 ? 0 : 2, 0, 0)
+                };
+
+                var idxBorder = new Border
+                {
+                    Width = 18,
+                    Height = 18,
+                    CornerRadius = new CornerRadius(9),
+                    Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 55 : 65), grpColor.R, grpColor.G, grpColor.B)),
+                    BorderBrush = new SolidColorBrush(grpColor),
+                    BorderThickness = new Thickness(1),
+                    Margin = new Thickness(0, 0, 6, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                idxBorder.Child = new TextBlock
+                {
+                    Text = st.Order.ToString("D2"),
+                    FontSize = 9.0,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = new SolidColorBrush(isLight ? grpColor : System.Windows.Media.Colors.White),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                stRow.Children.Add(idxBorder);
+
+                var stNameTxt = new TextBlock
+                {
+                    Text = st.DisplayName,
                     FontWeight = FontWeights.SemiBold,
                     FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
                     FontSize = 11.2,
                     Foreground = new SolidColorBrush(textPrimary),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 165
+                };
+                stRow.Children.Add(stNameTxt);
+
+                stationsStack.Children.Add(stRow);
+            }
+
+            Grid.SetColumn(stationsStack, 0);
+            rowGrid.Children.Add(stationsStack);
+
+            // Sağ taraf: Tek personel ismi, dikeyde tam ortada (VerticalAlignment.Center)
+            if (!showBoth)
+            {
+                string dispStaffName = !string.IsNullOrEmpty(activeName) ? activeName : "Belirtilmedi";
+                var staffTxt = new TextBlock
+                {
+                    Text = dispStaffName,
+                    FontWeight = FontWeights.SemiBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    FontSize = 11.4,
+                    Foreground = new SolidColorBrush(textPrimary),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 195,
+                    Margin = new Thickness(6, 0, 2, 0)
+                };
+
+                Grid.SetColumn(staffTxt, 1);
+                rowGrid.Children.Add(staffTxt);
+            }
+            else // showBoth == true (Tümü sekmesi)
+            {
+                var bothStack = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(6, 0, 2, 0)
+                };
+
+                string mText = string.Format("☀️ {0}", !string.IsNullOrEmpty(item.MorningName) ? item.MorningName : "Boş");
+                bothStack.Children.Add(new TextBlock
+                {
+                    Text = mText,
+                    FontSize = 10.4,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(textPrimary),
                     HorizontalAlignment = HorizontalAlignment.Right,
                     TextTrimming = TextTrimming.CharacterEllipsis,
-                    MaxWidth = 195
+                    MaxWidth = 185
                 });
 
-                dutyStack.Children.Add(staffInfoStack);
-
-                Grid.SetColumn(dutyStack, 2);
-                rowGrid.Children.Add(dutyStack);
-                mainStack.Children.Add(rowGrid);
-            }
-            else // showBoth == true
-            {
-                Grid.SetColumnSpan(nameStack, 2);
-                mainStack.Children.Add(rowGrid);
-
-                var bothStack = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(25, 2, 0, 0) };
-
-                // Sabah satırı
-                var mRow = new Grid();
-                mRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                string mText = string.Format("☀️ 07-16: {0}", !string.IsNullOrEmpty(item.MorningName) ? item.MorningName : "Boş");
-                mRow.Children.Add(new TextBlock { Text = mText, FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
-                bothStack.Children.Add(mRow);
-
-                // Akşam satırı
-                var eRow = new Grid { Margin = new Thickness(0, 1, 0, 0) };
-                eRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                string eText = string.Format("🌙 16-24: {0}", !string.IsNullOrEmpty(item.EveningName) ? item.EveningName : "Boş");
-                eRow.Children.Add(new TextBlock { Text = eText, FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
-                bothStack.Children.Add(eRow);
-
-                mainStack.Children.Add(bothStack);
-            }
-
-            if (item.ExtraStaff != null && item.ExtraStaff.Count > 0)
-            {
-                mainStack.Children.Add(new TextBlock
+                string eText = string.Format("🌙 {0}", !string.IsNullOrEmpty(item.EveningName) ? item.EveningName : "Boş");
+                bothStack.Children.Add(new TextBlock
                 {
-                    Text = "➕ Fazla Mesai: " + string.Join(", ", item.ExtraStaff.ToArray()),
-                    FontSize = 10.0,
+                    Text = eText,
+                    FontSize = 10.4,
                     FontWeight = FontWeights.SemiBold,
-                    Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)),
-                    Margin = new Thickness(31, 2, 0, 0)
+                    Foreground = new SolidColorBrush(textPrimary),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 185,
+                    Margin = new Thickness(0, 1, 0, 0)
                 });
+
+                Grid.SetColumn(bothStack, 1);
+                rowGrid.Children.Add(bothStack);
             }
 
-            card.Child = mainStack;
+            card.Child = rowGrid;
             return card;
         }
 
@@ -17617,9 +17639,24 @@ namespace ModernAutoHideIcons
             string curShiftName, curShiftHours, curShiftCode, nextShiftName, nextShiftHours, nextShiftTime;
             ShiftScheduleService.GetStationShiftContext(now, out curShiftName, out curShiftHours, out curShiftCode, out nextShiftName, out nextShiftHours, out nextShiftTime);
 
-            foreach (var item in _currentResult.Stations)
+            int stIdx = 0;
+            while (stIdx < _currentResult.Stations.Count)
             {
-                _listPanel.Children.Add(CreateStationCard(item, _filterMode, curShiftCode));
+                var grpList = new List<StationDutyItem>();
+                var firstItem = _currentResult.Stations[stIdx];
+                grpList.Add(firstItem);
+                stIdx++;
+
+                while (stIdx < _currentResult.Stations.Count &&
+                       _currentResult.Stations[stIdx].GroupId == firstItem.GroupId &&
+                       (_currentResult.Stations[stIdx].MorningName ?? "") == (firstItem.MorningName ?? "") &&
+                       (_currentResult.Stations[stIdx].EveningName ?? "") == (firstItem.EveningName ?? ""))
+                {
+                    grpList.Add(_currentResult.Stations[stIdx]);
+                    stIdx++;
+                }
+
+                _listPanel.Children.Add(CreateStationGroupCard(grpList, _filterMode, curShiftCode));
             }
 
             if (_txtFooterCount != null)
@@ -17632,8 +17669,9 @@ namespace ModernAutoHideIcons
             }
         }
 
-        private Border CreateStationCard(StationDutyItem item, int filterMode, string curShiftCode)
+        private Border CreateStationGroupCard(List<StationDutyItem> groupItems, int filterMode, string curShiftCode)
         {
+            var item = groupItems[0];
             bool isLight = (_cfg.Theme == "light");
             System.Windows.Media.Color textPrimary, textSecondary, textMuted;
             WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
@@ -17642,15 +17680,13 @@ namespace ModernAutoHideIcons
 
             var card = new Border
             {
-                CornerRadius = new CornerRadius(5),
-                Padding = new Thickness(6, 2, 7, 2),
-                Margin = new Thickness(0, 1, 0, 1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(6, 2.5, 8, 2.5),
+                Margin = new Thickness(0, 1, 0, 1.5),
                 Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 42 : 36), grpColor.R, grpColor.G, grpColor.B)),
                 BorderThickness = new Thickness(3, 1, 1, 1),
                 BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 175 : 145), grpColor.R, grpColor.G, grpColor.B))
             };
-
-            var mainStack = new StackPanel { Orientation = Orientation.Vertical };
 
             bool showBoth = (filterMode == 3);
             string activeName = null;
@@ -17658,124 +17694,132 @@ namespace ModernAutoHideIcons
             if (!showBoth)
             {
                 bool useMorning = (filterMode == 1) || (filterMode == 0 && curShiftCode != "A");
-                if (useMorning)
-                {
-                    activeName = item.MorningName;
-                }
-                else
-                {
-                    activeName = item.EveningName;
-                }
+                activeName = useMorning ? item.MorningName : item.EveningName;
             }
 
             var rowGrid = new Grid();
-            rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            // İstasyon sıra numarası (01..24) - Grup rengiyle uyumlu
-            var idxBorder = new Border
+            // Sol taraf: Gruptaki istasyonları alt alta diz (07 Ümraniye, 08 Çarşı...)
+            var stationsStack = new StackPanel
             {
-                Width = 19,
-                Height = 19,
-                CornerRadius = new CornerRadius(9.5),
-                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 55 : 65), grpColor.R, grpColor.G, grpColor.B)),
-                BorderBrush = new SolidColorBrush(grpColor),
-                BorderThickness = new Thickness(1),
-                Margin = new Thickness(0, 0, 6, 0),
+                Orientation = Orientation.Vertical,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            idxBorder.Child = new TextBlock
+
+            for (int i = 0; i < groupItems.Count; i++)
             {
-                Text = item.Order.ToString("D2"),
-                FontSize = 9.2,
-                FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush(isLight ? grpColor : System.Windows.Media.Colors.White),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            Grid.SetColumn(idxBorder, 0);
-            rowGrid.Children.Add(idxBorder);
-
-            // İstasyon adı
-            var nameStack = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
-            var stNameTxt = new TextBlock
-            {
-                Text = item.DisplayName,
-                FontWeight = FontWeights.SemiBold,
-                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
-                FontSize = 11.2,
-                Foreground = new SolidColorBrush(textPrimary),
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxWidth = 175
-            };
-            nameStack.Children.Add(stNameTxt);
-
-            Grid.SetColumn(nameStack, 1);
-            rowGrid.Children.Add(nameStack);
-
-            // Sağ taraf: Nöbetçi personel bilgisi
-            if (!showBoth)
-            {
-                var dutyStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                var staffInfoStack = new StackPanel { Orientation = Orientation.Vertical, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 2, 0) };
-
-                string dispStaffName = !string.IsNullOrEmpty(activeName) ? activeName : "Belirtilmedi";
-                staffInfoStack.Children.Add(new TextBlock
+                var st = groupItems[i];
+                var stRow = new StackPanel
                 {
-                    Text = dispStaffName,
+                    Orientation = Orientation.Horizontal,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, i == 0 ? 0 : 2, 0, 0)
+                };
+
+                var idxBorder = new Border
+                {
+                    Width = 18,
+                    Height = 18,
+                    CornerRadius = new CornerRadius(9),
+                    Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(isLight ? 55 : 65), grpColor.R, grpColor.G, grpColor.B)),
+                    BorderBrush = new SolidColorBrush(grpColor),
+                    BorderThickness = new Thickness(1),
+                    Margin = new Thickness(0, 0, 6, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                idxBorder.Child = new TextBlock
+                {
+                    Text = st.Order.ToString("D2"),
+                    FontSize = 9.0,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = new SolidColorBrush(isLight ? grpColor : System.Windows.Media.Colors.White),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                stRow.Children.Add(idxBorder);
+
+                var stNameTxt = new TextBlock
+                {
+                    Text = st.DisplayName,
                     FontWeight = FontWeights.SemiBold,
                     FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
                     FontSize = 11.2,
                     Foreground = new SolidColorBrush(textPrimary),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 165
+                };
+                stRow.Children.Add(stNameTxt);
+
+                stationsStack.Children.Add(stRow);
+            }
+
+            Grid.SetColumn(stationsStack, 0);
+            rowGrid.Children.Add(stationsStack);
+
+            // Sağ taraf: Tek personel ismi, dikeyde tam ortada (VerticalAlignment.Center)
+            if (!showBoth)
+            {
+                string dispStaffName = !string.IsNullOrEmpty(activeName) ? activeName : "Belirtilmedi";
+                var staffTxt = new TextBlock
+                {
+                    Text = dispStaffName,
+                    FontWeight = FontWeights.SemiBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    FontSize = 11.4,
+                    Foreground = new SolidColorBrush(textPrimary),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 195,
+                    Margin = new Thickness(6, 0, 2, 0)
+                };
+
+                Grid.SetColumn(staffTxt, 1);
+                rowGrid.Children.Add(staffTxt);
+            }
+            else // showBoth == true (Tümü sekmesi)
+            {
+                var bothStack = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(6, 0, 2, 0)
+                };
+
+                string mText = string.Format("☀️ {0}", !string.IsNullOrEmpty(item.MorningName) ? item.MorningName : "Boş");
+                bothStack.Children.Add(new TextBlock
+                {
+                    Text = mText,
+                    FontSize = 10.4,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(textPrimary),
                     HorizontalAlignment = HorizontalAlignment.Right,
                     TextTrimming = TextTrimming.CharacterEllipsis,
-                    MaxWidth = 195
+                    MaxWidth = 185
                 });
 
-                dutyStack.Children.Add(staffInfoStack);
-
-                Grid.SetColumn(dutyStack, 2);
-                rowGrid.Children.Add(dutyStack);
-                mainStack.Children.Add(rowGrid);
-            }
-            else // showBoth == true
-            {
-                Grid.SetColumnSpan(nameStack, 2);
-                mainStack.Children.Add(rowGrid);
-
-                var bothStack = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(25, 2, 0, 0) };
-
-                // Sabah satırı
-                var mRow = new Grid();
-                mRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                string mText = string.Format("☀️ 07-16: {0}", !string.IsNullOrEmpty(item.MorningName) ? item.MorningName : "Boş");
-                mRow.Children.Add(new TextBlock { Text = mText, FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
-                bothStack.Children.Add(mRow);
-
-                // Akşam satırı
-                var eRow = new Grid { Margin = new Thickness(0, 1, 0, 0) };
-                eRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                string eText = string.Format("🌙 16-24: {0}", !string.IsNullOrEmpty(item.EveningName) ? item.EveningName : "Boş");
-                eRow.Children.Add(new TextBlock { Text = eText, FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
-                bothStack.Children.Add(eRow);
-
-                mainStack.Children.Add(bothStack);
-            }
-
-            if (item.ExtraStaff != null && item.ExtraStaff.Count > 0)
-            {
-                mainStack.Children.Add(new TextBlock
+                string eText = string.Format("🌙 {0}", !string.IsNullOrEmpty(item.EveningName) ? item.EveningName : "Boş");
+                bothStack.Children.Add(new TextBlock
                 {
-                    Text = "➕ Fazla Mesai: " + string.Join(", ", item.ExtraStaff.ToArray()),
-                    FontSize = 10.0,
+                    Text = eText,
+                    FontSize = 10.4,
                     FontWeight = FontWeights.SemiBold,
-                    Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)),
-                    Margin = new Thickness(31, 2, 0, 0)
+                    Foreground = new SolidColorBrush(textPrimary),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 185,
+                    Margin = new Thickness(0, 1, 0, 0)
                 });
+
+                Grid.SetColumn(bothStack, 1);
+                rowGrid.Children.Add(bothStack);
             }
 
-            card.Child = mainStack;
+            card.Child = rowGrid;
             return card;
         }
 
