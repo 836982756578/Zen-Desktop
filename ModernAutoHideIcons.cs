@@ -16323,7 +16323,7 @@ namespace ModernAutoHideIcons
             for (int f = 0; f < 4; f++) filterGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             filterGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            string[] filterTitles = new string[] { "Anlık", "Sabah (07-16)", "Akşam (16-24)", "Tümü" };
+            string[] filterTitles = new string[] { "Anlık", "Sabah", "Akşam", "Tümü" };
             for (int f = 0; f < 4; f++)
             {
                 int fIdx = f;
@@ -17138,7 +17138,7 @@ namespace ModernAutoHideIcons
             var filterGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
             for (int f = 0; f < 4; f++) filterGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            string[] filterTitles = new string[] { "Anlık", "Sabah (07-16)", "Akşam (16-24)", "Tümü" };
+            string[] filterTitles = new string[] { "Anlık", "Sabah", "Akşam", "Tümü" };
             for (int f = 0; f < 4; f++)
             {
                 int fIdx = f;
