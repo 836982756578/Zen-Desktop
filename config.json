@@ -62,7 +62,7 @@
   "ShowMatchLiveScores": true,
   "GoalEffectStyle": "tsubasa_net",
   "ShowMediaPlayer": true,
-  "ShowPrayerTimes": false,
+  "ShowPrayerTimes": true,
   "PrayerCity": "Ä°stanbul",
   "ShowDailyVerse": false,
   "ShowDailyHadith": false,

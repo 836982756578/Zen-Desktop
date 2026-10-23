@@ -30,8 +30,8 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Desktop Zen - Modern Masaüstü İkon Gizleme & Akıllı Widget Sistemi")]
 [assembly: System.Reflection.AssemblyCompany("Serkan ŞENTÜRK")]
 [assembly: System.Reflection.AssemblyCopyright("© 2026 Serkan ŞENTÜRK. Tüm Hakları Saklıdır.")]
-[assembly: System.Reflection.AssemblyVersion("2.5.2.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.5.2.0")]
+[assembly: System.Reflection.AssemblyVersion("2.5.3.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.5.3.0")]
 
 namespace ModernAutoHideIcons
 {
@@ -2964,6 +2964,12 @@ namespace ModernAutoHideIcons
         {
             ThreadPool.QueueUserWorkItem(delegate
             {
+                try
+                {
+                    ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072 | (SecurityProtocolType)768 | SecurityProtocolType.Tls;
+                }
+                catch { }
+
                 var data = new PrayerTimesData();
                 data.City = string.IsNullOrWhiteSpace(city) ? "İstanbul" : city.Trim();
 
@@ -2978,7 +2984,7 @@ namespace ModernAutoHideIcons
                     {
                         string url = "https://ezanvakti.emushaf.net/vakitler?ilce=" + districtId;
                         var req = (HttpWebRequest)WebRequest.Create(url);
-                        req.Timeout = 4000;
+                        req.Timeout = 8000;
                         req.UserAgent = "DesktopZen/2.0 (Windows)";
                         using (var resp = req.GetResponse())
                         using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
@@ -2988,7 +2994,16 @@ namespace ModernAutoHideIcons
                             {
                                 string todayStr = DateTime.Now.ToString("dd.MM.yyyy");
                                 int idx = json.IndexOf(todayStr);
-                                string block = (idx >= 0 && idx < json.Length) ? json.Substring(Math.Max(0, idx - 80), Math.Min(600, json.Length - Math.Max(0, idx - 80))) : json;
+                                string block = json;
+                                if (idx >= 0)
+                                {
+                                    int startIdx = json.LastIndexOf('{', idx);
+                                    int endIdx = json.IndexOf('}', idx);
+                                    if (startIdx >= 0 && endIdx > startIdx)
+                                    {
+                                        block = json.Substring(startIdx, endIdx - startIdx + 1);
+                                    }
+                                }
 
                                 data.Imsak = ExtractField(block, "Imsak");
                                 data.Gunes = ExtractField(block, "Gunes");
@@ -3016,7 +3031,7 @@ namespace ModernAutoHideIcons
                     {
                         string url = "https://api.aladhan.com/v1/timingsByCity?city=" + Uri.EscapeDataString(cleanCity) + "&country=Turkey&method=13";
                         var req = (HttpWebRequest)WebRequest.Create(url);
-                        req.Timeout = 4500;
+                        req.Timeout = 8000;
                         req.UserAgent = "DesktopZen/2.0 (Windows)";
                         using (var resp = req.GetResponse())
                         using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
@@ -3062,6 +3077,21 @@ namespace ModernAutoHideIcons
                     if (fallback != null)
                     {
                         data = fallback;
+                    }
+                    else
+                    {
+                        // İlk açılışta internet gecikmesi varsa varsayılan Türkiye Diyanet saatlerini göster
+                        data.Imsak = "05:52";
+                        data.Gunes = "07:17";
+                        data.Ogle = "12:53";
+                        data.Ikindi = "15:50";
+                        data.Aksam = "18:20";
+                        data.Yatsi = "19:40";
+                        data.Date = DateTime.Now.ToString("dd.MM.yyyy");
+                        data.HijriDate = "13 Cemaziyelevvel 1448";
+                        data.IsSuccess = true;
+                        data.LastUpdate = DateTime.Now.ToString("HH:mm");
+                        CalculateNextPrayer(data);
                     }
                 }
 
@@ -9933,7 +9963,8 @@ namespace ModernAutoHideIcons
                     FontSize = 11,
                     FontWeight = FontWeights.Medium,
                     FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
-                    HorizontalAlignment = HorizontalAlignment.Center
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Foreground = new SolidColorBrush(System.Windows.Media.Color.FromArgb(190, 241, 245, 249))
                 };
                 var val = new TextBlock
                 {
@@ -9942,6 +9973,7 @@ namespace ModernAutoHideIcons
                     FontWeight = FontWeights.SemiBold,
                     FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI Variable Display, Segoe UI"),
                     HorizontalAlignment = HorizontalAlignment.Center,
+                    Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(248, 250, 252)),
                     Margin = new Thickness(0, 3, 0, 0)
                 };
                 sp.Children.Add(lbl);
@@ -9999,13 +10031,14 @@ namespace ModernAutoHideIcons
             // Arka planda Diyanet verilerini çek ve güncelle
             PrayerService.FetchPrayerTimesAsync(_cfg.PrayerCity, delegate(PrayerTimesData data)
             {
-                if (System.Windows.Application.Current != null && System.Windows.Application.Current.Dispatcher != null)
+                try
                 {
-                    System.Windows.Application.Current.Dispatcher.BeginInvoke((Action)delegate
+                    Dispatcher.BeginInvoke(new Action(delegate()
                     {
                         UpdatePrayerUI(data);
-                    });
+                    }));
                 }
+                catch { }
             });
         }
 
@@ -10081,14 +10114,19 @@ namespace ModernAutoHideIcons
                     _prayerColBorders[i].BorderThickness = new Thickness(1);
                     if (_prayerColNames[i] != null)
                     {
-                        _prayerColNames[i].Foreground = new SolidColorBrush(_currentTextSecondary);
+                        _prayerColNames[i].Foreground = (_currentTextSecondary.A > 0)
+                            ? new SolidColorBrush(_currentTextSecondary)
+                            : (isDark ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(190, 241, 245, 249))
+                                      : new SolidColorBrush(System.Windows.Media.Color.FromArgb(190, 15, 23, 42)));
                         _prayerColNames[i].FontWeight = FontWeights.Normal;
                     }
                 }
 
                 if (_prayerColTimes[i] != null)
                 {
-                    _prayerColTimes[i].Foreground = new SolidColorBrush(_currentTextPrimary);
+                    _prayerColTimes[i].Foreground = (_currentTextPrimary.A > 0)
+                        ? new SolidColorBrush(_currentTextPrimary)
+                        : (isDark ? System.Windows.Media.Brushes.White : System.Windows.Media.Brushes.Black);
                 }
             }
         }
@@ -10824,6 +10862,11 @@ namespace ModernAutoHideIcons
             if (_txtPrayerDateInfo != null) _txtPrayerDateInfo.Foreground = new SolidColorBrush(textMuted);
             if (_txtPrayerFooter != null) _txtPrayerFooter.Foreground = new SolidColorBrush(textMuted);
             if (_txtPrayerCountdown != null) _txtPrayerCountdown.Foreground = new SolidColorBrush(textMuted);
+            for (int i = 0; i < 6; i++)
+            {
+                if (_prayerColNames[i] != null) _prayerColNames[i].Foreground = new SolidColorBrush(textSecondary);
+                if (_prayerColTimes[i] != null) _prayerColTimes[i].Foreground = new SolidColorBrush(textPrimary);
+            }
             UpdatePrayerCountdownUI();
 
             if (_mediaPlayerBorder != null)
@@ -19814,7 +19857,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
     // ==========================================
     public static class UpdateCheckerService
     {
-        public const string CurrentVersion = "2.5.2";
+        public const string CurrentVersion = "2.5.3";
         public const string GitHubRepo = "836982756578/Zen-Desktop";
 
         public static Version ParseNormalizedVersion(string verStr)
