@@ -16632,7 +16632,7 @@ namespace ModernAutoHideIcons
             Grid.SetColumn(idxBorder, 0);
             rowGrid.Children.Add(idxBorder);
 
-            // İstasyon adı ve kapsanan istasyonlar
+            // İstasyon adı
             var nameStack = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
             var stNameTxt = new TextBlock
             {
@@ -16642,21 +16642,9 @@ namespace ModernAutoHideIcons
                 FontSize = 12.5,
                 Foreground = new SolidColorBrush(textPrimary),
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxWidth = 180
+                MaxWidth = 185
             };
             nameStack.Children.Add(stNameTxt);
-
-            if (!string.IsNullOrEmpty(item.CoveredStations))
-            {
-                nameStack.Children.Add(new TextBlock
-                {
-                    Text = "📍 " + item.CoveredStations,
-                    FontSize = 10.0,
-                    Foreground = new SolidColorBrush(textMuted),
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    MaxWidth = 180
-                });
-            }
 
             Grid.SetColumn(nameStack, 1);
             rowGrid.Children.Add(nameStack);
@@ -17697,7 +17685,7 @@ namespace ModernAutoHideIcons
             Grid.SetColumn(idxBorder, 0);
             rowGrid.Children.Add(idxBorder);
 
-            // İstasyon adı ve kapsanan istasyonlar
+            // İstasyon adı
             var nameStack = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
             var stNameTxt = new TextBlock
             {
@@ -17707,21 +17695,9 @@ namespace ModernAutoHideIcons
                 FontSize = 12.5,
                 Foreground = new SolidColorBrush(textPrimary),
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxWidth = 180
+                MaxWidth = 185
             };
             nameStack.Children.Add(stNameTxt);
-
-            if (!string.IsNullOrEmpty(item.CoveredStations))
-            {
-                nameStack.Children.Add(new TextBlock
-                {
-                    Text = "📍 " + item.CoveredStations,
-                    FontSize = 10.0,
-                    Foreground = new SolidColorBrush(textMuted),
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    MaxWidth = 180
-                });
-            }
 
             Grid.SetColumn(nameStack, 1);
             rowGrid.Children.Add(nameStack);
