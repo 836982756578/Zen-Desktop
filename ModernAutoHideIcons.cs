@@ -13719,10 +13719,10 @@ namespace ModernAutoHideIcons
                 };
 
                 // KULLANICI KURALI:
-                // S nobeti 07:00 16:00
-                // A nobeti 14:00 23:00
+                // S / FS nobeti 07:00 16:00
+                // A / FA nobeti 14:00 23:00
                 // NS nobeti 08:00 16:00
-                if (shiftCode == "S" || shiftCode == "S1" || shiftCode.StartsWith("S"))
+                if (shiftCode == "S" || shiftCode == "S1" || shiftCode == "FS" || shiftCode.StartsWith("S") || shiftCode.StartsWith("FS"))
                 {
                     p.ShiftType = "S";
                     p.ShiftHours = "07:00 - 16:00";
@@ -13730,7 +13730,7 @@ namespace ModernAutoHideIcons
                     res.Supervisors.Add(p);
                     res.AllWorking.Add(p);
                 }
-                else if (shiftCode == "A" || shiftCode.StartsWith("A"))
+                else if (shiftCode == "A" || shiftCode == "FA" || shiftCode.StartsWith("A") || shiftCode.StartsWith("FA"))
                 {
                     p.ShiftType = "A";
                     p.ShiftHours = "14:00 - 23:00";
@@ -13746,7 +13746,7 @@ namespace ModernAutoHideIcons
                     res.Supervisors.Add(p);
                     res.AllWorking.Add(p);
                 }
-                else if (shiftCode == "G" || shiftCode.StartsWith("G"))
+                else if (shiftCode == "G" || shiftCode == "FG" || shiftCode.StartsWith("G") || shiftCode.StartsWith("FG"))
                 {
                     p.ShiftType = "G";
                     p.ShiftHours = "23:00 - 07:00";
@@ -13791,8 +13791,8 @@ namespace ModernAutoHideIcons
                 string code = (p.ShiftCode ?? "").Trim().ToUpperInvariant();
                 string type = (p.ShiftType ?? "").Trim().ToUpperInvariant();
 
-                // S nobeti: 07:00 - 16:00
-                if (type == "S" || code == "S" || code == "S1")
+                // S / FS nobeti: 07:00 - 16:00
+                if (type == "S" || code == "S" || code == "S1" || code == "FS")
                 {
                     if (t >= TimeSpan.FromHours(7) && t < TimeSpan.FromHours(16))
                     {
@@ -13807,8 +13807,8 @@ namespace ModernAutoHideIcons
                         active.Add(p);
                     }
                 }
-                // A nobeti: 14:00 - 23:00
-                else if (type == "A" || code == "A")
+                // A / FA nobeti: 14:00 - 23:00
+                else if (type == "A" || code == "A" || code == "FA")
                 {
                     if (t >= TimeSpan.FromHours(14) && t < TimeSpan.FromHours(23))
                     {
@@ -13816,7 +13816,7 @@ namespace ModernAutoHideIcons
                     }
                 }
                 // Gece: 23:00 - 07:00
-                else if (type == "G" || code == "G")
+                else if (type == "G" || code == "G" || code == "FG")
                 {
                     if (t >= TimeSpan.FromHours(23) || t < TimeSpan.FromHours(7))
                     {
@@ -13921,19 +13921,39 @@ namespace ModernAutoHideIcons
                             CoveredStations = "Depo ve Atölye Sahası"
                         };
                     }
-                    if (code == "N" || code == "S" || code == "FS" || code.StartsWith("S"))
+                    if (code == "N" || code == "NS" || code == "S" || code == "FS" || code.StartsWith("S") || code.StartsWith("FS"))
                     {
-                        depoItem.MorningName = name;
-                        depoItem.MorningRole = role;
-                        depoItem.MorningCode = code;
+                        if (string.IsNullOrEmpty(depoItem.MorningName) || depoItem.MorningIsLeave)
+                        {
+                            depoItem.MorningName = name;
+                            depoItem.MorningRole = role;
+                            depoItem.MorningCode = code;
+                            depoItem.MorningIsOvertime = code.StartsWith("F");
+                            depoItem.MorningIsLeave = false;
+                        }
+                        else
+                        {
+                            depoItem.MorningName = depoItem.MorningName + " / " + name;
+                            if (code.StartsWith("F")) depoItem.MorningIsOvertime = true;
+                        }
                     }
-                    else if (code == "A" || code == "FA" || code.StartsWith("A"))
+                    else if (code == "A" || code == "FA" || code.StartsWith("A") || code.StartsWith("FA"))
                     {
-                        depoItem.EveningName = name;
-                        depoItem.EveningRole = role;
-                        depoItem.EveningCode = code;
+                        if (string.IsNullOrEmpty(depoItem.EveningName) || depoItem.EveningIsLeave)
+                        {
+                            depoItem.EveningName = name;
+                            depoItem.EveningRole = role;
+                            depoItem.EveningCode = code;
+                            depoItem.EveningIsOvertime = code.StartsWith("F");
+                            depoItem.EveningIsLeave = false;
+                        }
+                        else
+                        {
+                            depoItem.EveningName = depoItem.EveningName + " / " + name;
+                            if (code.StartsWith("F")) depoItem.EveningIsOvertime = true;
+                        }
                     }
-                    else
+                    else if (string.IsNullOrEmpty(depoItem.MorningName) && (code == "Yİ" || code == "R" || code == "Üİ"))
                     {
                         depoItem.MorningName = name;
                         depoItem.MorningRole = role;
@@ -13963,57 +13983,50 @@ namespace ModernAutoHideIcons
 
                 if (matched != null)
                 {
-                    bool isMorning = (code == "S" || code == "FS" || code.StartsWith("S"));
-                    bool isEvening = (code == "A" || code == "FA" || code.StartsWith("A"));
-                    bool isLeave = (code == "Yİ" || code == "R" || code == "Üİ" || code == "OFF" || code == "D" || code.Contains("İZİN") || code.Contains("RAPOR"));
+                    // KULLANICI KURALI:
+                    // S veya FS ise Sabah nöbetinde (07:00 - 16:00) göster
+                    // A veya FA ise Akşam nöbetinde (16:00 - 24:00) göster
+                    bool isMorning = (code == "S" || code == "FS" || code == "N" || code == "NS" || code.StartsWith("S") || code.StartsWith("FS"));
+                    bool isEvening = (code == "A" || code == "FA" || code.StartsWith("A") || code.StartsWith("FA"));
 
                     if (isMorning)
                     {
-                        if (string.IsNullOrEmpty(matched.MorningName) || code == "S")
+                        if (string.IsNullOrEmpty(matched.MorningName) || matched.MorningIsLeave)
                         {
                             matched.MorningName = name;
                             matched.MorningRole = role;
                             matched.MorningCode = code;
                             matched.MorningIsOvertime = code.StartsWith("F");
+                            matched.MorningIsLeave = false;
                         }
                         else
                         {
-                            matched.ExtraStaff.Add(string.Format("{0} ({1})", name, code));
+                            matched.MorningName = matched.MorningName + " / " + name;
+                            if (code.StartsWith("F"))
+                            {
+                                matched.MorningIsOvertime = true;
+                                matched.MorningCode = code;
+                            }
                         }
                     }
                     else if (isEvening)
                     {
-                        if (string.IsNullOrEmpty(matched.EveningName) || code == "A")
+                        if (string.IsNullOrEmpty(matched.EveningName) || matched.EveningIsLeave)
                         {
                             matched.EveningName = name;
                             matched.EveningRole = role;
                             matched.EveningCode = code;
                             matched.EveningIsOvertime = code.StartsWith("F");
+                            matched.EveningIsLeave = false;
                         }
                         else
                         {
-                            matched.ExtraStaff.Add(string.Format("{0} ({1})", name, code));
-                        }
-                    }
-                    else if (isLeave)
-                    {
-                        if (r >= 2 && r <= 16 && string.IsNullOrEmpty(matched.EveningName))
-                        {
-                            matched.EveningName = name;
-                            matched.EveningRole = role;
-                            matched.EveningCode = code;
-                            matched.EveningIsLeave = true;
-                        }
-                        else if (r >= 33 && r <= 48 && string.IsNullOrEmpty(matched.MorningName))
-                        {
-                            matched.MorningName = name;
-                            matched.MorningRole = role;
-                            matched.MorningCode = code;
-                            matched.MorningIsLeave = true;
-                        }
-                        else
-                        {
-                            matched.ExtraStaff.Add(string.Format("{0} ({1})", name, code));
+                            matched.EveningName = matched.EveningName + " / " + name;
+                            if (code.StartsWith("F"))
+                            {
+                                matched.EveningIsOvertime = true;
+                                matched.EveningCode = code;
+                            }
                         }
                     }
                 }
@@ -16751,7 +16764,18 @@ namespace ModernAutoHideIcons
             }
             else if (isOvertime)
             {
-                badgeText = !string.IsNullOrEmpty(code) ? ("FM (" + code + ")") : "FM";
+                if (code == "FS" || (label != null && label.Contains("07-16")))
+                {
+                    badgeText = "FS 07-16";
+                }
+                else if (code == "FA" || (label != null && label.Contains("16-24")))
+                {
+                    badgeText = "FA 16-24";
+                }
+                else
+                {
+                    badgeText = !string.IsNullOrEmpty(code) ? ("FM (" + code + ")") : "FM";
+                }
                 bg = System.Windows.Media.Color.FromArgb(50, 234, 88, 12);
                 border = System.Windows.Media.Color.FromRgb(234, 88, 12);
                 fg = isLight ? System.Windows.Media.Color.FromRgb(194, 65, 12) : System.Windows.Media.Color.FromRgb(254, 215, 170);
@@ -17828,7 +17852,18 @@ namespace ModernAutoHideIcons
             }
             else if (isOvertime)
             {
-                badgeText = !string.IsNullOrEmpty(code) ? ("FM (" + code + ")") : "FM";
+                if (code == "FS" || (label != null && label.Contains("07-16")))
+                {
+                    badgeText = "FS 07-16";
+                }
+                else if (code == "FA" || (label != null && label.Contains("16-24")))
+                {
+                    badgeText = "FA 16-24";
+                }
+                else
+                {
+                    badgeText = !string.IsNullOrEmpty(code) ? ("FM (" + code + ")") : "FM";
+                }
                 bg = System.Windows.Media.Color.FromArgb(50, 234, 88, 12);
                 border = System.Windows.Media.Color.FromRgb(234, 88, 12);
                 fg = isLight ? System.Windows.Media.Color.FromRgb(194, 65, 12) : System.Windows.Media.Color.FromRgb(254, 215, 170);
