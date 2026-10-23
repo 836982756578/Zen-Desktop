@@ -30,8 +30,8 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Desktop Zen - Modern Masaüstü İkon Gizleme & Akıllı Widget Sistemi")]
 [assembly: System.Reflection.AssemblyCompany("Serkan ŞENTÜRK")]
 [assembly: System.Reflection.AssemblyCopyright("© 2026 Serkan ŞENTÜRK. Tüm Hakları Saklıdır.")]
-[assembly: System.Reflection.AssemblyVersion("2.5.1.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.5.1.0")]
+[assembly: System.Reflection.AssemblyVersion("2.5.2.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.5.2.0")]
 
 namespace ModernAutoHideIcons
 {
@@ -91,6 +91,15 @@ namespace ModernAutoHideIcons
         public double NowPlayingWidgetScale = 1.0; // Medya Oynatici widget boyut olcegi (0.50 - 1.00)
         public string ShiftFolderPath = ""; // Çizelgelerin ana klasörü (örn: D:\2026 ÇALIŞMA ÇİZELGELERİ). Boş ise özellik çalışmaz.
         public string SupervisorFolderPath = ""; // Vardiya Amirliği çizelgesi klasörü (Boş ise pasif)
+        public bool ShiftHandoverAlarmEnabled = true; // 30 ve 15 dk kala sesli & balonlu bildirim
+        public int ShiftHandoverAlarmMinutes = 30;
+        public string ShiftHandoverNotes = ""; // Vardiya Değişim Notları (Günün Notu)
+
+        // Zen & Odaklanma (Productivity)
+        public bool DesktopVolumeScrollEnabled = true; // Masaüstü boşluğunda fare tekeri ile ses açıp kısma
+        public bool HealthRemindersEnabled = true; // 60 dakikada bir su & ergonomi hatırlatıcısı
+        public int HealthReminderMinutes = 60;
+        public bool PomodoroEnabled = false; // Zen Pomodoro Odak Sayacı
 
         // Görünüm, Saydamlık & Boyut Ölçeği
         public double WidgetOpacity = 0.95; // 0.0 (tamamen şeffaf) ile 1.0 (%100)
@@ -708,7 +717,35 @@ namespace ModernAutoHideIcons
         public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
         public const byte VK_LWIN = 0x5B;
         public const byte VK_D = 0x44;
+        public const byte VK_VOLUME_MUTE = 0xAD;
+        public const byte VK_VOLUME_DOWN = 0xAE;
+        public const byte VK_VOLUME_UP = 0xAF;
         public const uint KEYEVENTF_KEYUP = 0x0002;
+
+        public delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        public static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MSLLHOOKSTRUCT
+        {
+            public POINT pt;
+            public uint mouseData;
+            public uint flags;
+            public uint time;
+            public UIntPtr dwExtraInfo;
+        }
 
         public const int VK_LBUTTON = 0x01;
         public const int VK_MBUTTON = 0x04;
@@ -7688,6 +7725,24 @@ namespace ModernAutoHideIcons
                 UpdateLockVisuals();
             };
 
+            var btnTodo = new TextBlock
+            {
+                Text = "☑️",
+                FontSize = 11,
+                Opacity = 0.7,
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(0, 0, 8, 0),
+                ToolTip = "Yapılacaklar Maddesi Ekle ([ ] )",
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            btnTodo.MouseEnter += delegate { btnTodo.Opacity = 1.0; };
+            btnTodo.MouseLeave += delegate { btnTodo.Opacity = 0.7; };
+            btnTodo.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                InsertTodoItem();
+            };
+
             var btnClear = new TextBlock
             {
                 Text = "🗑️",
@@ -7732,6 +7787,7 @@ namespace ModernAutoHideIcons
                 Hide();
             };
 
+            rightHeader.Children.Add(btnTodo);
             rightHeader.Children.Add(_btnPinMode);
             rightHeader.Children.Add(_btnLock);
             rightHeader.Children.Add(btnClear);
@@ -7774,6 +7830,11 @@ namespace ModernAutoHideIcons
                 }
                 _debounceTimer.Stop();
                 _debounceTimer.Start();
+            };
+
+            _txtNotes.MouseDoubleClick += delegate(object s, MouseButtonEventArgs e)
+            {
+                ToggleTodoOnCurrentLine();
             };
 
             Grid.SetRow(_txtNotes, 1);
@@ -8035,6 +8096,56 @@ namespace ModernAutoHideIcons
                     {
                         _txtNotes.Text = text;
                     }
+                }
+            }
+            catch { }
+        }
+
+        public void InsertTodoItem()
+        {
+            if (_txtNotes == null) return;
+            try
+            {
+                int caret = _txtNotes.CaretIndex;
+                string text = _txtNotes.Text ?? "";
+                string insertStr = (caret > 0 && text[caret - 1] != '\n') ? "\n[ ] " : "[ ] ";
+                _txtNotes.Text = text.Insert(caret, insertStr);
+                _txtNotes.CaretIndex = caret + insertStr.Length;
+                _txtNotes.Focus();
+            }
+            catch { }
+        }
+
+        private void ToggleTodoOnCurrentLine()
+        {
+            if (_txtNotes == null) return;
+            try
+            {
+                int caret = _txtNotes.CaretIndex;
+                string text = _txtNotes.Text ?? "";
+                if (string.IsNullOrEmpty(text)) return;
+
+                int lineIndex = _txtNotes.GetLineIndexFromCharacterIndex(caret);
+                int lineStart = _txtNotes.GetCharacterIndexFromLineIndex(lineIndex);
+                int lineLen = _txtNotes.GetLineLength(lineIndex);
+                if (lineLen <= 0) return;
+
+                string line = text.Substring(lineStart, lineLen);
+                string newLine = null;
+                if (line.Contains("[ ]"))
+                {
+                    newLine = line.Replace("[ ]", "[x]");
+                }
+                else if (line.Contains("[x]") || line.Contains("[X]"))
+                {
+                    newLine = line.Replace("[x]", "[ ]").Replace("[X]", "[ ]");
+                }
+
+                if (newLine != null)
+                {
+                    _txtNotes.Text = text.Remove(lineStart, lineLen).Insert(lineStart, newLine);
+                    _txtNotes.CaretIndex = Math.Min(_txtNotes.Text.Length, caret);
+                    SaveNotesToFile();
                 }
             }
             catch { }
@@ -13552,7 +13663,7 @@ namespace ModernAutoHideIcons
     {
         private readonly Config _cfg;
         private DateTime _viewDate;
-        private int _selectedTab = 0; // 0: Devralacak, 1: Sabah, 2: Aksam, 3: Gece
+        private int _selectedTab = 0; // 0: Mevcut, 1: Devralacak, 2: Sabah, 3: Aksam, 4: Gece
         private ShiftDayResult _currentResult = null;
         private bool _isLoading = false;
 
@@ -13589,8 +13700,22 @@ namespace ModernAutoHideIcons
         private Border _borderSupervisorCard;
         private TextBlock _txtSupervisorShift;
 
-        private Border[] _tabBorders = new Border[4];
-        private TextBlock[] _tabTexts = new TextBlock[4];
+        private Border[] _tabBorders = new Border[5];
+        private TextBlock[] _tabTexts = new TextBlock[5];
+
+        private Border _noteDivider;
+        private StackPanel _notesContainer;
+        private TextBlock _txtNoteTitle;
+        private Border _btnEditNote;
+        private TextBlock _txtEditNoteIcon;
+        private Border _cardNoteView;
+        private TextBlock _txtNoteContent;
+        private StackPanel _panelNoteEdit;
+        private TextBox _txtNoteEdit;
+
+        private int _lastHandoverAlarmHour = -1;
+        private int _lastHandoverAlarmMinutes = -1;
+        public Action<int, string, string> OnHandoverAlarm;
 
         private StackPanel _listPanel;
         private ScrollViewer _scrollViewer;
@@ -13679,7 +13804,8 @@ namespace ModernAutoHideIcons
             _autoUpdateTimer.Tick += delegate
             {
                 UpdateShiftBanner();
-                if (DateTime.Now.Second == 0 && _selectedTab == 0)
+                CheckHandoverAlarm();
+                if (DateTime.Now.Second == 0 && (_selectedTab == 0 || _selectedTab == 1))
                 {
                     RenderStaffList();
                 }
@@ -14067,18 +14193,18 @@ namespace ModernAutoHideIcons
             _dateStrip.Child = dateGrid;
             rootStack.Children.Add(_dateStrip);
 
-            // 4. SEKME BUTONLARI (Devralacak, Sabah, Aksam, Gece)
+            // 4. SEKME BUTONLARI (Mevcut, Devralacak, Sabah, Aksam, Gece)
             var tabGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
-            for (int i = 0; i < 4; i++) tabGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            for (int i = 0; i < 5; i++) tabGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            string[] tabTitles = new string[] { "Devralacak", "Sabah", "Akşam", "Gece" };
-            for (int i = 0; i < 4; i++)
+            string[] tabTitles = new string[] { "Mevcut", "Devralacak", "Sabah", "Akşam", "Gece" };
+            for (int i = 0; i < 5; i++)
             {
                 int tabIdx = i;
                 var tText = new TextBlock
                 {
                     Text = tabTitles[i],
-                    FontSize = 11.8,
+                    FontSize = (i == 1) ? 10.5 : 11.2,
                     FontWeight = FontWeights.SemiBold,
                     FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
                     HorizontalAlignment = HorizontalAlignment.Center,
@@ -14087,8 +14213,8 @@ namespace ModernAutoHideIcons
                 var tBorder = new Border
                 {
                     CornerRadius = new CornerRadius(8),
-                    Padding = new Thickness(2, 6, 2, 6),
-                    Margin = new Thickness(i == 0 ? 0 : 2, 0, i == 3 ? 0 : 2, 0),
+                    Padding = new Thickness(1, 6, 1, 6),
+                    Margin = new Thickness(i == 0 ? 0 : 2, 0, i == 4 ? 0 : 2, 0),
                     Cursor = Cursors.Hand,
                     Child = tText
                 };
@@ -14164,6 +14290,135 @@ namespace ModernAutoHideIcons
             footerGrid.Children.Add(_txtFooterSheet);
 
             rootStack.Children.Add(footerGrid);
+
+            // 7. VARDIYA DEĞİŞİM NOTU (GÜNÜN NOTU)
+            _noteDivider = new Border
+            {
+                Height = 1,
+                Margin = new Thickness(0, 8, 0, 6)
+            };
+            rootStack.Children.Add(_noteDivider);
+
+            _notesContainer = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 0, 0) };
+
+            var noteHeaderGrid = new Grid { Margin = new Thickness(0, 0, 0, 4) };
+            noteHeaderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            noteHeaderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var noteTitleRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var txtNoteIcon = new TextBlock { Text = "📌", FontSize = 11, Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
+            _txtNoteTitle = new TextBlock
+            {
+                Text = "Vardiya & Günün Notu",
+                FontSize = 11.2,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            noteTitleRow.Children.Add(txtNoteIcon);
+            noteTitleRow.Children.Add(_txtNoteTitle);
+            Grid.SetColumn(noteTitleRow, 0);
+            noteHeaderGrid.Children.Add(noteTitleRow);
+
+            _btnEditNote = new Border
+            {
+                CornerRadius = new CornerRadius(5),
+                Padding = new Thickness(6, 2, 6, 2),
+                Cursor = Cursors.Hand,
+                ToolTip = "Vardiya Notunu Düzenle"
+            };
+            _txtEditNoteIcon = new TextBlock
+            {
+                Text = "✏️ Düzenle",
+                FontSize = 10.0,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI")
+            };
+            _btnEditNote.Child = _txtEditNoteIcon;
+            _btnEditNote.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                ToggleEditNote(true);
+            };
+            Grid.SetColumn(_btnEditNote, 1);
+            noteHeaderGrid.Children.Add(_btnEditNote);
+            _notesContainer.Children.Add(noteHeaderGrid);
+
+            // Görüntüleme Kartı
+            _cardNoteView = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(8, 6, 8, 6),
+                BorderThickness = new Thickness(1),
+                Cursor = Cursors.Hand,
+                ToolTip = "Düzenlemek için tıklayın"
+            };
+            _txtNoteContent = new TextBlock
+            {
+                Text = string.IsNullOrEmpty(_cfg.ShiftHandoverNotes) ? "Henüz bir devir notu eklenmedi. Eklemek için tıklayın..." : _cfg.ShiftHandoverNotes,
+                FontSize = 11.0,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                TextWrapping = TextWrapping.Wrap,
+                FontStyle = string.IsNullOrEmpty(_cfg.ShiftHandoverNotes) ? FontStyles.Italic : FontStyles.Normal,
+                Opacity = string.IsNullOrEmpty(_cfg.ShiftHandoverNotes) ? 0.7 : 1.0
+            };
+            _cardNoteView.Child = _txtNoteContent;
+            _cardNoteView.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                ToggleEditNote(true);
+            };
+            _notesContainer.Children.Add(_cardNoteView);
+
+            // Düzenleme Paneli
+            _panelNoteEdit = new StackPanel { Orientation = Orientation.Vertical, Visibility = Visibility.Collapsed };
+            _txtNoteEdit = new TextBox
+            {
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                Height = 48,
+                FontSize = 11.0,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Padding = new Thickness(6, 4, 6, 4),
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            _panelNoteEdit.Children.Add(_txtNoteEdit);
+
+            var noteBtnRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            var btnSaveNote = new Border
+            {
+                CornerRadius = new CornerRadius(5),
+                Padding = new Thickness(10, 3, 10, 3),
+                Margin = new Thickness(0, 0, 6, 0),
+                Cursor = Cursors.Hand,
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129)),
+                Child = new TextBlock { Text = "💾 Kaydet", FontSize = 10.5, FontWeight = FontWeights.Bold, Foreground = System.Windows.Media.Brushes.White }
+            };
+            btnSaveNote.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                SaveHandoverNote(_txtNoteEdit.Text);
+                ToggleEditNote(false);
+            };
+            noteBtnRow.Children.Add(btnSaveNote);
+
+            var btnCancelNote = new Border
+            {
+                CornerRadius = new CornerRadius(5),
+                Padding = new Thickness(8, 3, 8, 3),
+                Cursor = Cursors.Hand,
+                Child = new TextBlock { Text = "✕ İptal", FontSize = 10.5, FontWeight = FontWeights.Medium }
+            };
+            btnCancelNote.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                ToggleEditNote(false);
+            };
+            noteBtnRow.Children.Add(btnCancelNote);
+            _panelNoteEdit.Children.Add(noteBtnRow);
+
+            _notesContainer.Children.Add(_panelNoteEdit);
+            rootStack.Children.Add(_notesContainer);
 
             _cardBorder.Child = rootStack;
             Content = _cardBorder;
@@ -14524,7 +14779,7 @@ namespace ModernAutoHideIcons
             System.Windows.Media.Color textPrimary, textSecondary, textMuted;
             WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
 
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 5; i++)
             {
                 if (_tabBorders[i] == null || _tabTexts[i] == null) continue;
 
@@ -14717,14 +14972,166 @@ namespace ModernAutoHideIcons
             if (_txtFooterCount != null) _txtFooterCount.Foreground = new SolidColorBrush(textSecondary);
             if (_txtFooterSheet != null) _txtFooterSheet.Foreground = new SolidColorBrush(textSecondary);
 
+            if (_noteDivider != null) _noteDivider.Background = divBrush;
+            if (_txtNoteTitle != null) _txtNoteTitle.Foreground = new SolidColorBrush(textPrimary);
+            if (_btnEditNote != null)
+            {
+                _btnEditNote.Background = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromArgb(25, 2, 132, 199) 
+                    : System.Windows.Media.Color.FromArgb(35, 14, 165, 233));
+            }
+            if (_txtEditNoteIcon != null)
+            {
+                _txtEditNoteIcon.Foreground = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromRgb(2, 132, 199) 
+                    : System.Windows.Media.Color.FromRgb(56, 189, 248));
+            }
+            if (_cardNoteView != null)
+            {
+                _cardNoteView.Background = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromArgb(18, 0, 0, 0) 
+                    : System.Windows.Media.Color.FromArgb(25, 255, 255, 255));
+                _cardNoteView.BorderBrush = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromArgb(28, 0, 0, 0) 
+                    : System.Windows.Media.Color.FromArgb(35, 255, 255, 255));
+            }
+            if (_txtNoteContent != null) _txtNoteContent.Foreground = new SolidColorBrush(textPrimary);
+            if (_txtNoteEdit != null)
+            {
+                _txtNoteEdit.Background = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromRgb(255, 255, 255) 
+                    : System.Windows.Media.Color.FromRgb(30, 34, 48));
+                _txtNoteEdit.Foreground = new SolidColorBrush(textPrimary);
+                _txtNoteEdit.BorderBrush = divBrush;
+            }
+
+            UpdateHandoverNoteVisuals();
             UpdateLockStateVisuals();
             RenderStaffList();
+        }
+
+        private void ToggleEditNote(bool editing)
+        {
+            if (editing)
+            {
+                if (_txtNoteEdit != null) _txtNoteEdit.Text = _cfg.ShiftHandoverNotes ?? "";
+                if (_cardNoteView != null) _cardNoteView.Visibility = Visibility.Collapsed;
+                if (_panelNoteEdit != null) _panelNoteEdit.Visibility = Visibility.Visible;
+                if (_btnEditNote != null) _btnEditNote.Visibility = Visibility.Collapsed;
+                if (_txtNoteEdit != null) _txtNoteEdit.Focus();
+            }
+            else
+            {
+                if (_cardNoteView != null) _cardNoteView.Visibility = Visibility.Visible;
+                if (_panelNoteEdit != null) _panelNoteEdit.Visibility = Visibility.Collapsed;
+                if (_btnEditNote != null) _btnEditNote.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void SaveHandoverNote(string text)
+        {
+            _cfg.ShiftHandoverNotes = (text ?? "").Trim();
+            _cfg.Save();
+            UpdateHandoverNoteVisuals();
+
+            try
+            {
+                string noteFile = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vardiya_notu.txt");
+                File.WriteAllText(noteFile, _cfg.ShiftHandoverNotes, Encoding.UTF8);
+            }
+            catch { }
+        }
+
+        private void UpdateHandoverNoteVisuals()
+        {
+            if (_txtNoteContent != null)
+            {
+                bool hasText = !string.IsNullOrEmpty(_cfg.ShiftHandoverNotes);
+                _txtNoteContent.Text = hasText ? _cfg.ShiftHandoverNotes : "Henüz bir devir notu eklenmedi. Eklemek için tıklayın...";
+                _txtNoteContent.FontStyle = hasText ? FontStyles.Normal : FontStyles.Italic;
+                _txtNoteContent.Opacity = hasText ? 1.0 : 0.7;
+            }
+        }
+
+        private void CheckHandoverAlarm()
+        {
+            if (!_cfg.ShiftHandoverCountdown && !_cfg.ShiftHandoverAlarmEnabled) return;
+
+            DateTime now = DateTime.Now;
+            DateTime nextHandover;
+            if (now.Hour >= 23 || now.Hour < 7)
+            {
+                nextHandover = (now.Hour >= 23) ? now.Date.AddDays(1).AddHours(7) : now.Date.AddHours(7);
+            }
+            else if (now.Hour < 15)
+            {
+                nextHandover = now.Date.AddHours(15);
+            }
+            else
+            {
+                nextHandover = now.Date.AddHours(23);
+            }
+
+            TimeSpan rem = nextHandover - now;
+            int totalMins = (int)Math.Floor(rem.TotalMinutes);
+
+            if (_cfg.ShiftHandoverAlarmEnabled)
+            {
+                if (totalMins > 35 && _lastHandoverAlarmMinutes != -1)
+                {
+                    _lastHandoverAlarmMinutes = -1;
+                    _lastHandoverAlarmHour = -1;
+                }
+
+                int alarmTarget = 0;
+                int targetSetting = _cfg.ShiftHandoverAlarmMinutes; // 0 = her ikisi, 30 = sadece 30, 15 = sadece 15
+                if (totalMins == 30 && (targetSetting == 0 || targetSetting == 30) && _lastHandoverAlarmMinutes != 30)
+                {
+                    alarmTarget = 30;
+                }
+                else if (totalMins == 15 && (targetSetting == 0 || targetSetting == 15) && _lastHandoverAlarmMinutes != 15)
+                {
+                    alarmTarget = 15;
+                }
+
+                if (alarmTarget > 0 && (_lastHandoverAlarmHour != nextHandover.Hour || _lastHandoverAlarmMinutes != alarmTarget))
+                {
+                    _lastHandoverAlarmMinutes = alarmTarget;
+                    _lastHandoverAlarmHour = nextHandover.Hour;
+
+                    try { System.Media.SystemSounds.Asterisk.Play(); } catch { }
+
+                    string curName, incName, handoverTime, curShiftCode, incShiftCode;
+                    DateTime curDate, incDate;
+                    ShiftScheduleService.GetShiftContext(now, out curName, out incName, out handoverTime, out curDate, out curShiftCode, out incDate, out incShiftCode);
+
+                    if (OnHandoverAlarm != null)
+                    {
+                        OnHandoverAlarm(alarmTarget, incName, handoverTime);
+                    }
+                }
+            }
         }
 
         private void LoadScheduleAsync(bool forceRefresh)
         {
             if (_isLoading) return;
             _isLoading = true;
+
+            try
+            {
+                string noteFile = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vardiya_notu.txt");
+                if (File.Exists(noteFile))
+                {
+                    string diskNote = File.ReadAllText(noteFile, Encoding.UTF8).Trim();
+                    if (!string.IsNullOrEmpty(diskNote))
+                    {
+                        _cfg.ShiftHandoverNotes = diskNote;
+                    }
+                }
+            }
+            catch { }
+            UpdateHandoverNoteVisuals();
 
             if (_txtEmpty != null)
             {
@@ -14915,7 +15322,58 @@ namespace ModernAutoHideIcons
             List<ShiftPerson> displayList = new List<ShiftPerson>();
             string commonHours = null;
 
-            if (_selectedTab == 0)
+            if (_selectedTab == 0) // MEVCUT (Şu an görevdeki kadro)
+            {
+                DateTime now = DateTime.Now;
+                string curName, incName, handoverTime, curShiftCode, incShiftCode;
+                DateTime curDate, incDate;
+                ShiftScheduleService.GetShiftContext(now, out curName, out incName, out handoverTime, out curDate, out curShiftCode, out incDate, out incShiftCode);
+
+                ShiftDayResult curResult;
+                if (curDate.Date != _currentResult.Date.Date)
+                {
+                    curResult = ShiftScheduleService.GetSchedule(curDate, _cfg.ShiftFolderPath, _cfg.SupervisorFolderPath, false);
+                }
+                else
+                {
+                    curResult = _currentResult;
+                }
+
+                if (curShiftCode == "S") { displayList = curResult.Morning; commonHours = "07:00 - 15:00"; }
+                else if (curShiftCode == "A") { displayList = curResult.Evening; commonHours = "15:00 - 23:00"; }
+                else if (curShiftCode == "G") { displayList = curResult.Night; commonHours = "23:00 - 07:00"; }
+
+                string shiftName = (curShiftCode == "S" ? "Sabah" : (curShiftCode == "A" ? "Akşam" : "Gece"));
+
+                var mevcutHeader = new Border
+                {
+                    Background = new SolidColorBrush(isLight 
+                        ? System.Windows.Media.Color.FromArgb(240, 240, 253, 244) 
+                        : System.Windows.Media.Color.FromArgb(220, 6, 78, 59)),
+                    BorderBrush = new SolidColorBrush(isLight 
+                        ? System.Windows.Media.Color.FromRgb(167, 243, 208) 
+                        : System.Windows.Media.Color.FromArgb(140, 52, 211, 153)),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(8, 7, 8, 7),
+                    Margin = new Thickness(0, 0, 0, 8)
+                };
+                var mevcutText = new TextBlock
+                {
+                    Text = string.Format("🟢 {0} · Şu An Görevdeki Kadro ({1} Nöbeti)", commonHours, shiftName),
+                    FontSize = 11.8,
+                    FontWeight = FontWeights.SemiBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    Foreground = new SolidColorBrush(isLight 
+                        ? System.Windows.Media.Color.FromRgb(4, 120, 87) 
+                        : System.Windows.Media.Color.FromRgb(209, 250, 229)),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                mevcutHeader.Child = mevcutText;
+                _listPanel.Children.Add(mevcutHeader);
+            }
+            else if (_selectedTab == 1) // DEVRALACAK
             {
                 DateTime now = DateTime.Now;
                 string curName, incName, handoverTime, curShiftCode, incShiftCode;
@@ -14967,11 +15425,11 @@ namespace ModernAutoHideIcons
                 devirHeader.Child = devirText;
                 _listPanel.Children.Add(devirHeader);
             }
-            else
+            else // _selectedTab == 2 (Sabah), 3 (Akşam), 4 (Gece)
             {
                 string tabNameStr;
-                if (_selectedTab == 1) { displayList = _currentResult.Morning; commonHours = "07:00 - 15:00"; tabNameStr = "Sabah"; }
-                else if (_selectedTab == 2) { displayList = _currentResult.Evening; commonHours = "15:00 - 23:00"; tabNameStr = "Akşam"; }
+                if (_selectedTab == 2) { displayList = _currentResult.Morning; commonHours = "07:00 - 15:00"; tabNameStr = "Sabah"; }
+                else if (_selectedTab == 3) { displayList = _currentResult.Evening; commonHours = "15:00 - 23:00"; tabNameStr = "Akşam"; }
                 else { displayList = _currentResult.Night; commonHours = "23:00 - 07:00"; tabNameStr = "Gece"; }
 
                 var tabHeader = new Border
@@ -15007,14 +15465,14 @@ namespace ModernAutoHideIcons
             {
                 _listPanel.Children.Add(new TextBlock
                 {
-                    Text = (_selectedTab == 0) ? "Devralacak vardiyada kayıtlı nöbetçi personel bulunamadı." : "Bu vardiyada kayıtlı nöbetçi personel bulunamadı.",
+                    Text = (_selectedTab == 0) ? "Mevcut vardiyada kayıtlı nöbetçi personel bulunamadı." : ((_selectedTab == 1) ? "Devralacak vardiyada kayıtlı nöbetçi personel bulunamadı." : "Bu vardiyada kayıtlı nöbetçi personel bulunamadı."),
                     FontSize = 12,
                     FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
                     Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(100, 116, 139) : System.Windows.Media.Color.FromRgb(160, 174, 192)),
                     HorizontalAlignment = HorizontalAlignment.Center,
                     Margin = new Thickness(0, 20, 0, 20)
                 });
-                if (_txtFooterCount != null) _txtFooterCount.Text = (_selectedTab == 0) ? "0 Personel Devralacak" : "0 Personel Görevde";
+                if (_txtFooterCount != null) _txtFooterCount.Text = (_selectedTab == 0) ? "0 Personel Görevde" : ((_selectedTab == 1) ? "0 Personel Devralacak" : "0 Personel Kayıtlı");
                 return;
             }
 
@@ -15022,11 +15480,15 @@ namespace ModernAutoHideIcons
             {
                 if (_selectedTab == 0)
                 {
+                    _txtFooterCount.Text = string.Format("{0} Personel Şu An Görevde", displayList.Count);
+                }
+                else if (_selectedTab == 1)
+                {
                     _txtFooterCount.Text = string.Format("{0} Personel Devralacak", displayList.Count);
                 }
                 else
                 {
-                    _txtFooterCount.Text = string.Format("{0} Personel Görevde", displayList.Count);
+                    _txtFooterCount.Text = string.Format("{0} Personel Kayıtlı", displayList.Count);
                 }
             }
             if (_txtFooterSheet != null)
@@ -15431,6 +15893,24 @@ namespace ModernAutoHideIcons
             grid.Children.Add(_particleCanvas);
 
             Content = grid;
+
+            PreviewMouseWheel += delegate(object s, MouseWheelEventArgs e)
+            {
+                if (_cfg != null && _cfg.DesktopVolumeScrollEnabled)
+                {
+                    if (e.Delta > 0)
+                    {
+                        Win32.keybd_event(0xAF, 0, 0, UIntPtr.Zero);
+                        Win32.keybd_event(0xAF, 0, 2, UIntPtr.Zero);
+                    }
+                    else if (e.Delta < 0)
+                    {
+                        Win32.keybd_event(0xAE, 0, 0, UIntPtr.Zero);
+                        Win32.keybd_event(0xAE, 0, 2, UIntPtr.Zero);
+                    }
+                    e.Handled = true;
+                }
+            };
 
             _particleTimer = new DispatcherTimer(DispatcherPriority.Render);
             _particleTimer.Interval = TimeSpan.FromMilliseconds(33); // ~30 FPS, ultra hafif ve GPU dostu
@@ -18113,6 +18593,61 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             }, _isDark);
             _mainContentPanel.Children.Add(CreateSettingCard("⏰ Vardiya Devir Geri Sayımı (07:00, 15:00, 23:00)", "Vardiya devir saatlerine kalan süreyi saniye saniye sayar ve devir saatine 15 dakika kala dikkat çekici amber sarı uyarı moduna geçer.", swCountdown));
 
+            // Vardiya Devir & Hazırlık Alarmı
+            var alarmRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var swAlarm = new PowerToggleSwitch(_cfg.ShiftHandoverAlarmEnabled, delegate(bool val)
+            {
+                _cfg.ShiftHandoverAlarmEnabled = val;
+                SaveAndNotify();
+            }, _isDark);
+            alarmRow.Children.Add(swAlarm);
+
+            var cbAlarmMins = new System.Windows.Controls.ComboBox
+            {
+                Height = 28,
+                Width = 160,
+                Margin = new Thickness(12, 0, 0, 0),
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            cbAlarmMins.Items.Add(new System.Windows.Controls.ComboBoxItem { Content = "30 ve 15 dk kala (Önerilen)", Tag = 0 });
+            cbAlarmMins.Items.Add(new System.Windows.Controls.ComboBoxItem { Content = "Yalnızca 30 dk kala", Tag = 30 });
+            cbAlarmMins.Items.Add(new System.Windows.Controls.ComboBoxItem { Content = "Yalnızca 15 dk kala", Tag = 15 });
+            if (_cfg.ShiftHandoverAlarmMinutes == 30) cbAlarmMins.SelectedIndex = 1;
+            else if (_cfg.ShiftHandoverAlarmMinutes == 15) cbAlarmMins.SelectedIndex = 2;
+            else cbAlarmMins.SelectedIndex = 0;
+
+            cbAlarmMins.SelectionChanged += delegate
+            {
+                var sel = cbAlarmMins.SelectedItem as System.Windows.Controls.ComboBoxItem;
+                if (sel != null && sel.Tag is int)
+                {
+                    _cfg.ShiftHandoverAlarmMinutes = (int)sel.Tag;
+                    SaveAndNotify();
+                }
+            };
+            alarmRow.Children.Add(cbAlarmMins);
+
+            var btnTestAlarm = new System.Windows.Controls.Button
+            {
+                Content = "🔔 Test Et",
+                Height = 28,
+                Padding = new Thickness(10, 0, 10, 0),
+                Margin = new Thickness(8, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Vardiya devir uyarı sesini ve balon bildirimini hemen test edin"
+            };
+            btnTestAlarm.Click += delegate
+            {
+                var app = Application.Current as App;
+                if (app != null)
+                {
+                    app.TestHandoverAlarm();
+                }
+            };
+            alarmRow.Children.Add(btnTestAlarm);
+
+            _mainContentPanel.Children.Add(CreateSettingCard("🔔 Vardiya Devir & Hazırlık Alarmı", "Vardiya bitimine ve devir saatine (07:00, 15:00, 23:00) 30 veya 15 dakika kala sağ alt bildirim alanından zarif bir uyarı sesi ve balon bildirimi gösterir.", alarmRow));
+
             // Vardiya Widget Boyut Olcegi Slider (%50 - %100, en buyuk boyutu suanki %100)
             var shiftScaleStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             var sliderShiftScale = new System.Windows.Controls.Slider
@@ -18383,6 +18918,48 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 SaveAndNotify();
             }, _isDark);
             _mainContentPanel.Children.Add(CreateSettingCard("🔒 Medya Mini Oynatıcı Konumunu Kilitle", "Medya çubuğunun ekrandaki konumunu sabitler veya fareyle serbestçe taşınmasını sağlar.", swLockMedia));
+
+            // 5. Zen & Odaklanma (Productivity) Yenilikleri
+            _mainContentPanel.Children.Add(CreateSectionTitle("🧘 ZEN ODAKLANMA, VERİMLİLİK & ERGONOMİ"));
+
+            var swVolScroll = new PowerToggleSwitch(_cfg.DesktopVolumeScrollEnabled, delegate(bool val)
+            {
+                _cfg.DesktopVolumeScrollEnabled = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("🔊 Masaüstünde Fare Tekerleğiyle Ses Kontrolü", "Masaüstü boşluğundayken veya kilit/dinlenme ekranındayken fare tekerleğini yukarı/aşağı kaydırarak Windows ana ses seviyesini doğrudan artırıp azaltın.", swVolScroll));
+
+            var pomoRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var swPomodoro = new PowerToggleSwitch(_cfg.PomodoroEnabled, delegate(bool val)
+            {
+                _cfg.PomodoroEnabled = val;
+                SaveAndNotify();
+            }, _isDark);
+            pomoRow.Children.Add(swPomodoro);
+
+            var btnPomoToggle = new System.Windows.Controls.Button
+            {
+                Content = "🍅 Pomodoro Başlat / Durdur",
+                Height = 28,
+                Padding = new Thickness(10, 0, 10, 0),
+                Margin = new Thickness(12, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "25 dk Odak / 5 dk Dinlenme döngüsünü başlatın veya durdurun"
+            };
+            btnPomoToggle.Click += delegate
+            {
+                var app = Application.Current as App;
+                if (app != null) app.TogglePomodoro();
+            };
+            pomoRow.Children.Add(btnPomoToggle);
+            _mainContentPanel.Children.Add(CreateSettingCard("🍅 Zen Pomodoro Odak Sayacı (25 Dk Odak / 5 Dk Mola)", "Dikkat dağılmasını önlemek için 25 dakikalık derin odaklanma ve ardından 5 dakikalık dinlenme döngüsü. Sağ alt tepsi simgesine sağ tıklayarak da yönetebilirsiniz.", pomoRow));
+
+            var swHealth = new PowerToggleSwitch(_cfg.HealthRemindersEnabled, delegate(bool val)
+            {
+                _cfg.HealthRemindersEnabled = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("💧 Sağlık & Ergonomi Hatırlatıcısı (Su & Göz Dinlendirme)", "Her 60 dakikalık kesintisiz çalışma sonunda ekranda su içme, omurga esnetme ve 20 saniye uzağa bakma (20-20-20 kuralı) nazik hatırlatması gösterir.", swHealth));
         }
 
         // ==========================================
@@ -19237,7 +19814,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
     // ==========================================
     public static class UpdateCheckerService
     {
-        public const string CurrentVersion = "2.5.1";
+        public const string CurrentVersion = "2.5.2";
         public const string GitHubRepo = "836982756578/Zen-Desktop";
 
         public static Version ParseNormalizedVersion(string verStr)
@@ -19333,6 +19910,19 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
         private ZenVictoryFlagWindow _victoryFlagWindow;
         private bool _isFlagDemoActive = false;
         private string _flagDemoTeam = null;
+
+        private Win32.LowLevelMouseProc _mouseHookProc;
+        private IntPtr _hMouseHook = IntPtr.Zero;
+
+        // Zen Pomodoro & Sağlık
+        private DispatcherTimer _pomodoroTimer;
+        private int _pomodoroSeconds = 25 * 60;
+        private bool _isPomodoroRunning = false;
+        private bool _isPomodoroBreak = false;
+        private Forms.MenuItem _trayMiPomodoro;
+
+        private DispatcherTimer _healthTimer;
+        private int _activeWorkMinutes = 0;
 
         private DispatcherTimer _inactivityTimer;
         private DispatcherTimer _desktopClickTimer;
@@ -19520,6 +20110,18 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
 
             _shiftWidgetWindow = new ShiftWidgetWindow(_cfg);
             _shiftWidgetWindow.OnLockChanged = delegate { OnConfigChanged(); };
+            _shiftWidgetWindow.OnHandoverAlarm = delegate(int mins, string incName, string handoverTime)
+            {
+                if (_trayIcon != null)
+                {
+                    _trayIcon.ShowBalloonTip(
+                        8000,
+                        "⏰ Vardiya Devir & Hazırlık Vakti!",
+                        string.Format("Vardiya devrine {0} dakika kaldı (Saat {1}).\nDevralacak kadro: {2}", mins, handoverTime, incName),
+                        Forms.ToolTipIcon.Info
+                    );
+                }
+            };
             _zenNotesWindow = new ZenNotesWindow(_cfg);
             _zenNotesWindow.OnVisibilityModeChanged = delegate { OnConfigChanged(); };
             _zenNotesWindow.OnOpenSettings = delegate { OpenSettings("widgets"); };
@@ -19666,6 +20268,8 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
 
             RegisterGlobalHotkey();
             InitUpdateChecker();
+            SetupMouseHook();
+            InitHealthTimer();
 
             try
             {
@@ -19711,6 +20315,188 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                 );
             };
             updateTimer.Start();
+        }
+
+        private void SetupMouseHook()
+        {
+            try
+            {
+                _mouseHookProc = LowLevelMouseHookCallback;
+                IntPtr hMod = Win32.GetModuleHandle(null);
+                _hMouseHook = Win32.SetWindowsHookEx(14 /*WH_MOUSE_LL*/, _mouseHookProc, hMod, 0);
+            }
+            catch { }
+        }
+
+        private IntPtr LowLevelMouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            try
+            {
+                if (nCode >= 0 && wParam == (IntPtr)0x020A /*WM_MOUSEWHEEL*/ && _cfg != null && _cfg.DesktopVolumeScrollEnabled)
+                {
+                    var hookStruct = (Win32.MSLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(Win32.MSLLHOOKSTRUCT));
+                    var pt = hookStruct.pt;
+                    if (!IsCursorOverOurWindows(pt) && Win32.IsPointOverDesktop(pt))
+                    {
+                        short delta = (short)((hookStruct.mouseData >> 16) & 0xffff);
+                        if (delta > 0)
+                        {
+                            Win32.keybd_event(0xAF, 0, 0, UIntPtr.Zero);
+                            Win32.keybd_event(0xAF, 0, 2, UIntPtr.Zero);
+                        }
+                        else if (delta < 0)
+                        {
+                            Win32.keybd_event(0xAE, 0, 0, UIntPtr.Zero);
+                            Win32.keybd_event(0xAE, 0, 2, UIntPtr.Zero);
+                        }
+                        return (IntPtr)1;
+                    }
+                }
+            }
+            catch { }
+            return Win32.CallNextHookEx(_hMouseHook, nCode, wParam, lParam);
+        }
+
+        private void InitHealthTimer()
+        {
+            _healthTimer = new DispatcherTimer();
+            _healthTimer.Interval = TimeSpan.FromMinutes(1);
+            _healthTimer.Tick += delegate
+            {
+                if (_cfg == null || !_cfg.HealthRemindersEnabled) return;
+                uint idle = Win32.GetIdleTimeMs();
+                if (idle < 120000) // son 2 dk içinde aktivite varsa
+                {
+                    _activeWorkMinutes++;
+                    int target = _cfg.HealthReminderMinutes > 0 ? _cfg.HealthReminderMinutes : 60;
+                    if (_activeWorkMinutes >= target)
+                    {
+                        _activeWorkMinutes = 0;
+                        try { System.Media.SystemSounds.Asterisk.Play(); } catch { }
+                        if (_trayIcon != null)
+                        {
+                            _trayIcon.ShowBalloonTip(
+                                8000,
+                                "💧 Zen Dinlenme & Sağlık Vakti",
+                                "1 saattir aralıksız bilgisayar başındasınız!\nLütfen bir bardak su için, derin bir nefes alın ve gözlerinizi 20 saniye ekrandan uzaklaştırın.",
+                                Forms.ToolTipIcon.Info
+                            );
+                        }
+                    }
+                }
+                else
+                {
+                    if (idle > 300000 && _activeWorkMinutes > 0)
+                    {
+                        _activeWorkMinutes = 0;
+                    }
+                }
+            };
+            _healthTimer.Start();
+        }
+
+        public void TogglePomodoro()
+        {
+            if (_isPomodoroRunning)
+            {
+                StopPomodoro();
+            }
+            else
+            {
+                StartPomodoro();
+            }
+        }
+
+        public void TestHandoverAlarm()
+        {
+            if (_trayIcon != null)
+            {
+                try { System.Media.SystemSounds.Asterisk.Play(); } catch { }
+                _trayIcon.ShowBalloonTip(
+                    8000,
+                    "⏰ Vardiya Devir & Hazırlık Vakti (Test)",
+                    "Vardiya devrine 30 dakika kaldı.\nDevralacak kadro ve günün notları hazır!",
+                    Forms.ToolTipIcon.Info
+                );
+            }
+        }
+
+        public void StartPomodoro()
+        {
+            _isPomodoroRunning = true;
+            _isPomodoroBreak = false;
+            _pomodoroSeconds = 25 * 60;
+            if (_pomodoroTimer == null)
+            {
+                _pomodoroTimer = new DispatcherTimer();
+                _pomodoroTimer.Interval = TimeSpan.FromSeconds(1);
+                _pomodoroTimer.Tick += PomodoroTimer_Tick;
+            }
+            _pomodoroTimer.Start();
+            UpdatePomodoroTrayText();
+            if (_trayIcon != null)
+            {
+                _trayIcon.ShowBalloonTip(5000, "🍅 Zen Pomodoro Başlatıldı", "25 dakikalık odaklanma süresi başladı. İyi çalışmalar!", Forms.ToolTipIcon.Info);
+            }
+        }
+
+        public void StopPomodoro()
+        {
+            _isPomodoroRunning = false;
+            if (_pomodoroTimer != null) _pomodoroTimer.Stop();
+            _pomodoroSeconds = 25 * 60;
+            _isPomodoroBreak = false;
+            UpdatePomodoroTrayText();
+            if (_trayIcon != null)
+            {
+                _trayIcon.ShowBalloonTip(4000, "🍅 Zen Pomodoro Durduruldu", "Odaklanma sayacı durduruldu ve sıfırlandı.", Forms.ToolTipIcon.Info);
+            }
+        }
+
+        private void PomodoroTimer_Tick(object sender, EventArgs e)
+        {
+            if (!_isPomodoroRunning) return;
+            _pomodoroSeconds--;
+            UpdatePomodoroTrayText();
+
+            if (_pomodoroSeconds <= 0)
+            {
+                try { System.Media.SystemSounds.Asterisk.Play(); } catch { }
+
+                if (!_isPomodoroBreak)
+                {
+                    _isPomodoroBreak = true;
+                    _pomodoroSeconds = 5 * 60;
+                    if (_trayIcon != null)
+                    {
+                        _trayIcon.ShowBalloonTip(9000, "🎉 Tebrikler! 25 Dk Odak Tamamlandı", "Harika iş çıkardınız! Şimdi 5 dakikalık dinlenme ve mola vakti.", Forms.ToolTipIcon.Info);
+                    }
+                }
+                else
+                {
+                    StopPomodoro();
+                    if (_trayIcon != null)
+                    {
+                        _trayIcon.ShowBalloonTip(8000, "🔔 Mola Tamamlandı", "5 dakikalık mola bitti. Yeni bir odak seansı başlatabilirsiniz.", Forms.ToolTipIcon.Info);
+                    }
+                }
+            }
+        }
+
+        private void UpdatePomodoroTrayText()
+        {
+            if (_trayMiPomodoro == null) return;
+            if (!_isPomodoroRunning)
+            {
+                _trayMiPomodoro.Text = "🍅 Zen Pomodoro: 25 Dk Odak Başlat";
+            }
+            else
+            {
+                int m = _pomodoroSeconds / 60;
+                int s = _pomodoroSeconds % 60;
+                string mode = _isPomodoroBreak ? "Mola" : "Odak";
+                _trayMiPomodoro.Text = string.Format("🍅 {0}: {1:D2}:{2:D2} (Durdur)", mode, m, s);
+            }
         }
 
         private void SetupTrayIcon()
@@ -19773,6 +20559,12 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             var miSettings = new Forms.MenuItem("⚙️ Ayarlar Paneli", delegate(object s, EventArgs e) { OpenSettings(); });
             miSettings.DefaultItem = true;
             menu.MenuItems.Add(miSettings);
+
+            _trayMiPomodoro = new Forms.MenuItem("🍅 Zen Pomodoro: 25 Dk Odak Başlat", delegate(object s, EventArgs e)
+            {
+                TogglePomodoro();
+            });
+            menu.MenuItems.Add(_trayMiPomodoro);
 
             var miToggle = new Forms.MenuItem("👁️ İkonları Göster / Gizle", delegate(object s, EventArgs e) { ToggleIcons(); });
             menu.MenuItems.Add(miToggle);
@@ -20032,6 +20824,13 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
 
             var miExit = new Forms.MenuItem("❌ Çıkış", delegate(object s, EventArgs e)
             {
+                if (_hMouseHook != IntPtr.Zero)
+                {
+                    try { Win32.UnhookWindowsHookEx(_hMouseHook); } catch { }
+                    _hMouseHook = IntPtr.Zero;
+                }
+                if (_pomodoroTimer != null) { try { _pomodoroTimer.Stop(); } catch { } }
+                if (_healthTimer != null) { try { _healthTimer.Stop(); } catch { } }
                 Win32.SetTaskbarVisibility(true);
                 SetIconsAndWallpaperVisibility(true, false);
                 if (_shiftWidgetWindow != null) { try { _shiftWidgetWindow.Close(); } catch { } }
