@@ -16661,11 +16661,11 @@ namespace ModernAutoHideIcons
             Grid.SetColumn(nameStack, 1);
             rowGrid.Children.Add(nameStack);
 
-            // Sağ taraf: Nöbetçi personel bilgisi ve badge
+            // Sağ taraf: Nöbetçi personel bilgisi
             if (!showBoth)
             {
                 var dutyStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                var staffInfoStack = new StackPanel { Orientation = Orientation.Vertical, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 6, 0) };
+                var staffInfoStack = new StackPanel { Orientation = Orientation.Vertical, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 2, 0) };
 
                 string dispStaffName = !string.IsNullOrEmpty(activeName) ? activeName : "Belirtilmedi";
                 staffInfoStack.Children.Add(new TextBlock
@@ -16673,29 +16673,14 @@ namespace ModernAutoHideIcons
                     Text = dispStaffName,
                     FontWeight = FontWeights.SemiBold,
                     FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
-                    FontSize = 12.0,
+                    FontSize = 12.2,
                     Foreground = new SolidColorBrush(textPrimary),
                     HorizontalAlignment = HorizontalAlignment.Right,
                     TextTrimming = TextTrimming.CharacterEllipsis,
-                    MaxWidth = 120
+                    MaxWidth = 195
                 });
 
-                if (!string.IsNullOrEmpty(activeRole))
-                {
-                    staffInfoStack.Children.Add(new TextBlock
-                    {
-                        Text = activeRole,
-                        FontSize = 10.0,
-                        Foreground = new SolidColorBrush(textMuted),
-                        HorizontalAlignment = HorizontalAlignment.Right,
-                        TextTrimming = TextTrimming.CharacterEllipsis,
-                        MaxWidth = 120
-                    });
-                }
                 dutyStack.Children.Add(staffInfoStack);
-
-                var badge = CreateStationBadge(activeCode, shiftLabel, activeIsLeave, activeIsOvertime);
-                dutyStack.Children.Add(badge);
 
                 Grid.SetColumn(dutyStack, 2);
                 rowGrid.Children.Add(dutyStack);
@@ -16711,23 +16696,15 @@ namespace ModernAutoHideIcons
                 // Sabah satırı
                 var mRow = new Grid();
                 mRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                mRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 string mText = string.Format("☀️ 07-16: {0}", !string.IsNullOrEmpty(item.MorningName) ? item.MorningName : "Boş");
                 mRow.Children.Add(new TextBlock { Text = mText, FontSize = 11.2, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
-                var mBadge = CreateStationBadge(item.MorningCode, "S (07-16)", item.MorningIsLeave, item.MorningIsOvertime);
-                Grid.SetColumn(mBadge, 1);
-                mRow.Children.Add(mBadge);
                 bothStack.Children.Add(mRow);
 
                 // Akşam satırı
                 var eRow = new Grid { Margin = new Thickness(0, 3, 0, 0) };
                 eRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                eRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 string eText = string.Format("🌙 16-24: {0}", !string.IsNullOrEmpty(item.EveningName) ? item.EveningName : "Boş");
                 eRow.Children.Add(new TextBlock { Text = eText, FontSize = 11.2, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
-                var eBadge = CreateStationBadge(item.EveningCode, "A (16-24)", item.EveningIsLeave, item.EveningIsOvertime);
-                Grid.SetColumn(eBadge, 1);
-                eRow.Children.Add(eBadge);
                 bothStack.Children.Add(eRow);
 
                 mainStack.Children.Add(bothStack);
@@ -17749,11 +17726,11 @@ namespace ModernAutoHideIcons
             Grid.SetColumn(nameStack, 1);
             rowGrid.Children.Add(nameStack);
 
-            // Sağ taraf: Nöbetçi personel bilgisi ve badge
+            // Sağ taraf: Nöbetçi personel bilgisi
             if (!showBoth)
             {
                 var dutyStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                var staffInfoStack = new StackPanel { Orientation = Orientation.Vertical, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 6, 0) };
+                var staffInfoStack = new StackPanel { Orientation = Orientation.Vertical, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 2, 0) };
 
                 string dispStaffName = !string.IsNullOrEmpty(activeName) ? activeName : "Belirtilmedi";
                 staffInfoStack.Children.Add(new TextBlock
@@ -17761,29 +17738,14 @@ namespace ModernAutoHideIcons
                     Text = dispStaffName,
                     FontWeight = FontWeights.SemiBold,
                     FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
-                    FontSize = 12.0,
+                    FontSize = 12.2,
                     Foreground = new SolidColorBrush(textPrimary),
                     HorizontalAlignment = HorizontalAlignment.Right,
                     TextTrimming = TextTrimming.CharacterEllipsis,
-                    MaxWidth = 120
+                    MaxWidth = 195
                 });
 
-                if (!string.IsNullOrEmpty(activeRole))
-                {
-                    staffInfoStack.Children.Add(new TextBlock
-                    {
-                        Text = activeRole,
-                        FontSize = 10.0,
-                        Foreground = new SolidColorBrush(textMuted),
-                        HorizontalAlignment = HorizontalAlignment.Right,
-                        TextTrimming = TextTrimming.CharacterEllipsis,
-                        MaxWidth = 120
-                    });
-                }
                 dutyStack.Children.Add(staffInfoStack);
-
-                var badge = CreateStationBadge(activeCode, shiftLabel, activeIsLeave, activeIsOvertime);
-                dutyStack.Children.Add(badge);
 
                 Grid.SetColumn(dutyStack, 2);
                 rowGrid.Children.Add(dutyStack);
@@ -17799,23 +17761,15 @@ namespace ModernAutoHideIcons
                 // Sabah satırı
                 var mRow = new Grid();
                 mRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                mRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 string mText = string.Format("☀️ 07-16: {0}", !string.IsNullOrEmpty(item.MorningName) ? item.MorningName : "Boş");
                 mRow.Children.Add(new TextBlock { Text = mText, FontSize = 11.2, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
-                var mBadge = CreateStationBadge(item.MorningCode, "S (07-16)", item.MorningIsLeave, item.MorningIsOvertime);
-                Grid.SetColumn(mBadge, 1);
-                mRow.Children.Add(mBadge);
                 bothStack.Children.Add(mRow);
 
                 // Akşam satırı
                 var eRow = new Grid { Margin = new Thickness(0, 3, 0, 0) };
                 eRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                eRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 string eText = string.Format("🌙 16-24: {0}", !string.IsNullOrEmpty(item.EveningName) ? item.EveningName : "Boş");
                 eRow.Children.Add(new TextBlock { Text = eText, FontSize = 11.2, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(textPrimary), TextTrimming = TextTrimming.CharacterEllipsis });
-                var eBadge = CreateStationBadge(item.EveningCode, "A (16-24)", item.EveningIsLeave, item.EveningIsOvertime);
-                Grid.SetColumn(eBadge, 1);
-                eRow.Children.Add(eBadge);
                 bothStack.Children.Add(eRow);
 
                 mainStack.Children.Add(bothStack);
