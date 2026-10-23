@@ -14276,8 +14276,8 @@ namespace ModernAutoHideIcons
         private Border _borderSupervisorCard;
         private TextBlock _txtSupervisorShift;
 
-        private Border[] _tabBorders = new Border[6];
-        private TextBlock[] _tabTexts = new TextBlock[6];
+        private Border[] _tabBorders = new Border[5];
+        private TextBlock[] _tabTexts = new TextBlock[5];
 
         private Border _noteDivider;
         private StackPanel _notesContainer;
@@ -14769,18 +14769,18 @@ namespace ModernAutoHideIcons
             _dateStrip.Child = dateGrid;
             rootStack.Children.Add(_dateStrip);
 
-            // 4. SEKME BUTONLARI (Mevcut, Devralacak, Sabah, Aksam, Gece, İstasyon)
+            // 4. SEKME BUTONLARI (Devralacak, Sabah, Aksam, Gece, İstasyon)
             var tabGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
-            for (int i = 0; i < 6; i++) tabGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            for (int i = 0; i < 5; i++) tabGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            string[] tabTitles = new string[] { "Mevcut", "Devir", "Sabah", "Akşam", "Gece", "🚉 İstasyon" };
-            for (int i = 0; i < 6; i++)
+            string[] tabTitles = new string[] { "Devralacak", "Sabah", "Akşam", "Gece", "🚉 İstasyon" };
+            for (int i = 0; i < 5; i++)
             {
                 int tabIdx = i;
                 var tText = new TextBlock
                 {
                     Text = tabTitles[i],
-                    FontSize = (i == 5) ? 10.5 : ((i == 1) ? 10.5 : 11.2),
+                    FontSize = (i == 0 || i == 4) ? 10.5 : 11.2,
                     FontWeight = FontWeights.SemiBold,
                     FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
                     HorizontalAlignment = HorizontalAlignment.Center,
@@ -14789,8 +14789,8 @@ namespace ModernAutoHideIcons
                 var tBorder = new Border
                 {
                     CornerRadius = new CornerRadius(8),
-                    Padding = new Thickness(1, 6, 1, 6),
-                    Margin = new Thickness(i == 0 ? 0 : 2, 0, i == 5 ? 0 : 2, 0),
+                    Padding = new Thickness(2, 6, 2, 6),
+                    Margin = new Thickness(i == 0 ? 0 : 2, 0, i == 4 ? 0 : 2, 0),
                     Cursor = Cursors.Hand,
                     Child = tText
                 };
@@ -15356,7 +15356,7 @@ namespace ModernAutoHideIcons
             System.Windows.Media.Color textPrimary, textSecondary, textMuted;
             WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
 
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < 5; i++)
             {
                 if (_tabBorders[i] == null || _tabTexts[i] == null) continue;
 
@@ -15896,7 +15896,7 @@ namespace ModernAutoHideIcons
                 return;
             }
 
-            if (_selectedTab == 5) // İSTASYON KADROSU
+            if (_selectedTab == 4) // İSTASYON KADROSU
             {
                 RenderStationListTab();
                 return;
@@ -15907,58 +15907,7 @@ namespace ModernAutoHideIcons
             List<ShiftPerson> displayList = new List<ShiftPerson>();
             string commonHours = null;
 
-            if (_selectedTab == 0) // MEVCUT (Şu an görevdeki kadro)
-            {
-                DateTime now = DateTime.Now;
-                string curName, incName, handoverTime, curShiftCode, incShiftCode;
-                DateTime curDate, incDate;
-                ShiftScheduleService.GetShiftContext(now, out curName, out incName, out handoverTime, out curDate, out curShiftCode, out incDate, out incShiftCode);
-
-                ShiftDayResult curResult;
-                if (curDate.Date != _currentResult.Date.Date)
-                {
-                    curResult = ShiftScheduleService.GetSchedule(curDate, _cfg.ShiftFolderPath, _cfg.SupervisorFolderPath, false);
-                }
-                else
-                {
-                    curResult = _currentResult;
-                }
-
-                if (curShiftCode == "S") { displayList = curResult.Morning; commonHours = "07:00 - 15:00"; }
-                else if (curShiftCode == "A") { displayList = curResult.Evening; commonHours = "15:00 - 23:00"; }
-                else if (curShiftCode == "G") { displayList = curResult.Night; commonHours = "23:00 - 07:00"; }
-
-                string shiftName = (curShiftCode == "S" ? "Sabah" : (curShiftCode == "A" ? "Akşam" : "Gece"));
-
-                var mevcutHeader = new Border
-                {
-                    Background = new SolidColorBrush(isLight 
-                        ? System.Windows.Media.Color.FromArgb(240, 240, 253, 244) 
-                        : System.Windows.Media.Color.FromArgb(220, 6, 78, 59)),
-                    BorderBrush = new SolidColorBrush(isLight 
-                        ? System.Windows.Media.Color.FromRgb(167, 243, 208) 
-                        : System.Windows.Media.Color.FromArgb(140, 52, 211, 153)),
-                    BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(8),
-                    Padding = new Thickness(8, 7, 8, 7),
-                    Margin = new Thickness(0, 0, 0, 8)
-                };
-                var mevcutText = new TextBlock
-                {
-                    Text = string.Format("🟢 {0} · Şu An Görevdeki Kadro ({1} Nöbeti)", commonHours, shiftName),
-                    FontSize = 11.8,
-                    FontWeight = FontWeights.SemiBold,
-                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
-                    Foreground = new SolidColorBrush(isLight 
-                        ? System.Windows.Media.Color.FromRgb(4, 120, 87) 
-                        : System.Windows.Media.Color.FromRgb(209, 250, 229)),
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    TextTrimming = TextTrimming.CharacterEllipsis
-                };
-                mevcutHeader.Child = mevcutText;
-                _listPanel.Children.Add(mevcutHeader);
-            }
-            else if (_selectedTab == 1) // DEVRALACAK
+            if (_selectedTab == 0) // DEVRALACAK
             {
                 DateTime now = DateTime.Now;
                 string curName, incName, handoverTime, curShiftCode, incShiftCode;
@@ -16010,11 +15959,11 @@ namespace ModernAutoHideIcons
                 devirHeader.Child = devirText;
                 _listPanel.Children.Add(devirHeader);
             }
-            else // _selectedTab == 2 (Sabah), 3 (Akşam), 4 (Gece)
+            else // _selectedTab == 1 (Sabah), 2 (Akşam), 3 (Gece)
             {
                 string tabNameStr;
-                if (_selectedTab == 2) { displayList = _currentResult.Morning; commonHours = "07:00 - 15:00"; tabNameStr = "Sabah"; }
-                else if (_selectedTab == 3) { displayList = _currentResult.Evening; commonHours = "15:00 - 23:00"; tabNameStr = "Akşam"; }
+                if (_selectedTab == 1) { displayList = _currentResult.Morning; commonHours = "07:00 - 15:00"; tabNameStr = "Sabah"; }
+                else if (_selectedTab == 2) { displayList = _currentResult.Evening; commonHours = "15:00 - 23:00"; tabNameStr = "Akşam"; }
                 else { displayList = _currentResult.Night; commonHours = "23:00 - 07:00"; tabNameStr = "Gece"; }
 
                 var tabHeader = new Border
@@ -16050,24 +15999,20 @@ namespace ModernAutoHideIcons
             {
                 _listPanel.Children.Add(new TextBlock
                 {
-                    Text = (_selectedTab == 0) ? "Mevcut vardiyada kayıtlı nöbetçi personel bulunamadı." : ((_selectedTab == 1) ? "Devralacak vardiyada kayıtlı nöbetçi personel bulunamadı." : "Bu vardiyada kayıtlı nöbetçi personel bulunamadı."),
+                    Text = (_selectedTab == 0) ? "Devralacak vardiyada kayıtlı nöbetçi personel bulunamadı." : "Bu vardiyada kayıtlı nöbetçi personel bulunamadı.",
                     FontSize = 12,
                     FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
                     Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(100, 116, 139) : System.Windows.Media.Color.FromRgb(160, 174, 192)),
                     HorizontalAlignment = HorizontalAlignment.Center,
                     Margin = new Thickness(0, 20, 0, 20)
                 });
-                if (_txtFooterCount != null) _txtFooterCount.Text = (_selectedTab == 0) ? "0 Personel Görevde" : ((_selectedTab == 1) ? "0 Personel Devralacak" : "0 Personel Kayıtlı");
+                if (_txtFooterCount != null) _txtFooterCount.Text = (_selectedTab == 0) ? "0 Personel Devralacak" : "0 Personel Kayıtlı";
                 return;
             }
 
             if (_txtFooterCount != null)
             {
                 if (_selectedTab == 0)
-                {
-                    _txtFooterCount.Text = string.Format("{0} Personel Şu An Görevde", displayList.Count);
-                }
-                else if (_selectedTab == 1)
                 {
                     _txtFooterCount.Text = string.Format("{0} Personel Devralacak", displayList.Count);
                 }
