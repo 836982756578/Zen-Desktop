@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -85,7 +85,7 @@ namespace ModernAutoHideIcons
         public double ShiftWidgetY = -1;
         public double ShiftWidgetOpacity = 0.95;
         public double ShiftWidgetScale = 1.0; // Vardiya widget boyut olcegi (0.50 - 1.00, varsayilan 1.0 = %100 en buyuk boyut)
-        public bool ShowStationWidget = false; // M5 İstasyon Çizelgesi Widget'ı (Üsküdar - Sultanbeyli)
+        public bool ShowStationWidget = false; // İstasyon Çizelgesi Widget'ı (Üsküdar - Sultanbeyli)
         public bool StationOnlyWhenIconsHidden = false;
         public bool LockStationWidgetPosition = true;
         public double StationWidgetX = -1;
@@ -373,7 +373,7 @@ namespace ModernAutoHideIcons
                     cfg.ShiftWidgetOpacity = Math.Max(0.1, Math.Min(1.0, GetDouble(json, "ShiftWidgetOpacity", 0.95)));
                     cfg.ShiftWidgetScale = Math.Max(0.50, Math.Min(1.0, GetDouble(json, "ShiftWidgetScale", 1.0)));
 
-                    // İstasyon Çizelgesi Widget'ı (M5 Üsküdar - Sultanbeyli)
+                    // İstasyon Çizelgesi Widget'ı (Üsküdar - Sultanbeyli)
                     cfg.ShowStationWidget = GetBool(json, "ShowStationWidget", false);
                     cfg.StationOnlyWhenIconsHidden = GetBool(json, "StationOnlyWhenIconsHidden", false);
                     cfg.LockStationWidgetPosition = GetBool(json, "LockStationWidgetPosition", true);
@@ -13011,7 +13011,7 @@ namespace ModernAutoHideIcons
         private static ShiftScheduleCache _stationCache = null;
         private static readonly object _syncLock = new object();
 
-        public static readonly string[] M5StationList = new string[]
+        public static readonly string[] StationList = new string[]
         {
             "Üsküdar",
             "Fıstıkağacı / Bağlarbaşı",
@@ -13856,10 +13856,10 @@ namespace ModernAutoHideIcons
 
             if (dayCol <= 0 || dayCol > cCount) return res;
 
-            // Standart 15 İstasyon Bölgesini M5 Hat Sırasına Göre Başlat
-            for (int i = 0; i < M5StationList.Length; i++)
+            // Standart 15 İstasyon Bölgesini Hat Sırasına Göre Başlat
+            for (int i = 0; i < StationList.Length; i++)
             {
-                string sName = M5StationList[i];
+                string sName = StationList[i];
                 var item = new StationDutyItem
                 {
                     Order = i + 1,
@@ -13918,7 +13918,7 @@ namespace ModernAutoHideIcons
                             Order = res.Stations.Count + 1,
                             DisplayName = "Depo Sahası",
                             ZoneKey = "DEPO",
-                            CoveredStations = "M5 Depo ve Atölye Sahası"
+                            CoveredStations = "Depo ve Atölye Sahası"
                         };
                     }
                     if (code == "N" || code == "S" || code == "FS" || code.StartsWith("S"))
@@ -16488,7 +16488,7 @@ namespace ModernAutoHideIcons
             }
             else
             {
-                headerText = "📋 M5 Hattı · Sabah & Akşam Tüm İstasyon Kadrosu";
+                headerText = "📋 Sabah & Akşam Tüm İstasyon Kadrosu";
             }
 
             var stHeader = new Border
@@ -16840,7 +16840,7 @@ namespace ModernAutoHideIcons
     }
 
     // ==========================================
-    // M5 İSTASYON ÇİZELGESİ WİDGET'I
+    // İSTASYON ÇİZELGESİ WİDGET'I
     // Mimari & Tasarım: Serkan ŞENTÜRK
     // ==========================================
     public class StationWidgetWindow : Window
@@ -16900,7 +16900,7 @@ namespace ModernAutoHideIcons
             _cfg = cfg;
             _viewDate = DateTime.Today;
 
-            Title = "M5 İstasyon Çizelgesi";
+            Title = "İstasyon Çizelgesi";
             WindowStyle = WindowStyle.None;
             AllowsTransparency = true;
             Background = System.Windows.Media.Brushes.Transparent;
@@ -17019,7 +17019,7 @@ namespace ModernAutoHideIcons
             var titleStack = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
             _txtTitle = new TextBlock
             {
-                Text = "M5 İSTASYON ÇİZELGESİ",
+                Text = "İSTASYON ÇİZELGESİ",
                 FontWeight = FontWeights.Bold,
                 FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
                 FontSize = 14.0
@@ -21008,15 +21008,15 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
 
             _mainContentPanel.Children.Add(CreateSettingCard("👮 Vardiya Amiri Çizelgesi Klasörü / Kısayolu", "Vardiya Amiri çizelgesinin bulunduğu klasörü, masaüstü kısayolunu (.lnk) veya doğrudan Excel dosyasını (.xlsx) seçebilirsiniz. İleride çizelgenin yeri veya dosya adı değiştiğinde buradan hızlıca güncelleyebilirsiniz.", supFolderRow));
 
-            // 2. M5 İstasyon Çizelgesi Widget'ı (Üsküdar - Sultanbeyli)
-            _mainContentPanel.Children.Add(CreateSectionTitle("🚉 M5 İSTASYON ÇİZELGESİ WİDGET'I (ÜSKÜDAR - SULTANBEYLİ)"));
+            // 2. İstasyon Çizelgesi Widget'ı (Üsküdar - Sultanbeyli)
+            _mainContentPanel.Children.Add(CreateSectionTitle("🚉 İSTASYON ÇİZELGESİ WİDGET'I (ÜSKÜDAR - SULTANBEYLİ)"));
 
             var swStation = new PowerToggleSwitch(_cfg.ShowStationWidget, delegate(bool val)
             {
                 _cfg.ShowStationWidget = val;
                 SaveAndNotify();
             }, _isDark);
-            _mainContentPanel.Children.Add(CreateSettingCard("M5 İstasyon Çizelgesi Widget'ını Göster", "Üsküdar'dan Sultanbeyli'ye kadar 15 istasyon alanında o an görevli olan istasyon personelini (Sabah S 07:00-16:00, Akşam A 16:00-24:00) canlı Excel tablosundan anlık okuyup gösteren bağımsız masaüstü widget'ı.", swStation));
+            _mainContentPanel.Children.Add(CreateSettingCard("İstasyon Çizelgesi Widget'ını Göster", "Üsküdar'dan Sultanbeyli'ye kadar 15 istasyon alanında o an görevli olan istasyon personelini (Sabah S 07:00-16:00, Akşam A 16:00-24:00) canlı Excel tablosundan anlık okuyup gösteren bağımsız masaüstü widget'ı.", swStation));
 
             var swStationOnlyHidden = new PowerToggleSwitch(_cfg.StationOnlyWhenIconsHidden, delegate(bool val)
             {
@@ -22894,7 +22894,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             _trayMiLockShift = miLockShift;
             miLocksMenu.MenuItems.Add(miLockShift);
 
-            var miLockStation = new Forms.MenuItem("🔒 M5 İstasyon Widget Konumu", delegate(object s, EventArgs e)
+            var miLockStation = new Forms.MenuItem("🔒 İstasyon Widget Konumu", delegate(object s, EventArgs e)
             {
                 _cfg.LockStationWidgetPosition = !_cfg.LockStationWidgetPosition;
                 _cfg.Save();
@@ -23016,7 +23016,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             _trayMiShiftWidget = miShift;
             menu.MenuItems.Add(miShift);
 
-            var miStation = new Forms.MenuItem("🚉 M5 İstasyon Çizelgesi Widget'ı", delegate(object s, EventArgs e)
+            var miStation = new Forms.MenuItem("🚉 İstasyon Çizelgesi Widget'ı", delegate(object s, EventArgs e)
             {
                 _cfg.ShowStationWidget = !_cfg.ShowStationWidget;
                 _cfg.Save();

@@ -1,4 +1,4 @@
-# Modern AutoHide Desktop Icons - PowerShell Derleme Betiği
+﻿# Modern AutoHide Desktop Icons - PowerShell Derleme Betiği
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 Write-Host "===================================================" -ForegroundColor Cyan
