@@ -14301,9 +14301,12 @@ namespace ModernAutoHideIcons
 
         private DispatcherTimer _autoUpdateTimer;
         public Action OnLockChanged;
+        private double _anchoredBottom = -1;
+        private bool _adjustingTop = false;
 
         public void ResetPosition()
         {
+            _anchoredBottom = -1;
             SetInitialPosition();
         }
 
@@ -14343,21 +14346,51 @@ namespace ModernAutoHideIcons
                 }
             };
 
-            SizeChanged += delegate
+            SizeChanged += delegate(object s, SizeChangedEventArgs e)
             {
+                if (!e.HeightChanged || _adjustingTop) return;
                 try
                 {
+                    _adjustingTop = true;
                     var wa = Forms.Screen.PrimaryScreen.WorkingArea;
-                    if (Top + ActualHeight > wa.Bottom - 10)
+                    foreach (var scr in Forms.Screen.AllScreens)
                     {
-                        double newTop = wa.Bottom - ActualHeight - 10;
-                        if (newTop >= wa.Top + 10)
+                        var r = scr.WorkingArea;
+                        if (Left >= r.Left - 50 && Left < r.Right)
                         {
-                            Top = newTop;
+                            wa = r;
+                            break;
                         }
+                    }
+
+                    if (_anchoredBottom < 0 && e.PreviousSize.Height > 0)
+                    {
+                        _anchoredBottom = Top + e.PreviousSize.Height;
+                    }
+                    else if (_anchoredBottom < 0)
+                    {
+                        _anchoredBottom = Top + e.NewSize.Height;
+                        if (_anchoredBottom > wa.Bottom - 10)
+                        {
+                            _anchoredBottom = wa.Bottom - 10;
+                        }
+                    }
+
+                    double newTop = _anchoredBottom - e.NewSize.Height;
+                    if (newTop < wa.Top + 6)
+                    {
+                        newTop = wa.Top + 6;
+                    }
+                    if (Math.Abs(Top - newTop) > 0.5)
+                    {
+                        Top = newTop;
                     }
                 }
                 catch { }
+                finally
+                {
+                    _adjustingTop = false;
+                }
             };
 
             SourceInitialized += delegate
@@ -14494,6 +14527,10 @@ namespace ModernAutoHideIcons
                 if (!_cfg.LockShiftWidgetPosition)
                 {
                     DragMove();
+                    if (ActualHeight > 0)
+                    {
+                        _anchoredBottom = Top + ActualHeight;
+                    }
                     _cfg.ShiftWidgetX = Left;
                     _cfg.ShiftWidgetY = Top;
                     _cfg.Save();
@@ -16879,9 +16916,12 @@ namespace ModernAutoHideIcons
 
         private DispatcherTimer _autoUpdateTimer;
         public Action OnLockChanged;
+        private double _anchoredBottom = -1;
+        private bool _adjustingTop = false;
 
         public void ResetPosition()
         {
+            _anchoredBottom = -1;
             SetInitialPosition();
         }
 
@@ -16918,6 +16958,53 @@ namespace ModernAutoHideIcons
                         ApplyThemeAndSurface();
                     }
                     e.Handled = true;
+                }
+            };
+
+            SizeChanged += delegate(object s, SizeChangedEventArgs e)
+            {
+                if (!e.HeightChanged || _adjustingTop) return;
+                try
+                {
+                    _adjustingTop = true;
+                    var wa = Forms.Screen.PrimaryScreen.WorkingArea;
+                    foreach (var scr in Forms.Screen.AllScreens)
+                    {
+                        var r = scr.WorkingArea;
+                        if (Left >= r.Left - 50 && Left < r.Right)
+                        {
+                            wa = r;
+                            break;
+                        }
+                    }
+
+                    if (_anchoredBottom < 0 && e.PreviousSize.Height > 0)
+                    {
+                        _anchoredBottom = Top + e.PreviousSize.Height;
+                    }
+                    else if (_anchoredBottom < 0)
+                    {
+                        _anchoredBottom = Top + e.NewSize.Height;
+                        if (_anchoredBottom > wa.Bottom - 10)
+                        {
+                            _anchoredBottom = wa.Bottom - 10;
+                        }
+                    }
+
+                    double newTop = _anchoredBottom - e.NewSize.Height;
+                    if (newTop < wa.Top + 6)
+                    {
+                        newTop = wa.Top + 6;
+                    }
+                    if (Math.Abs(Top - newTop) > 0.5)
+                    {
+                        Top = newTop;
+                    }
+                }
+                catch { }
+                finally
+                {
+                    _adjustingTop = false;
                 }
             };
 
@@ -16993,6 +17080,10 @@ namespace ModernAutoHideIcons
                 if (!_cfg.LockStationWidgetPosition)
                 {
                     DragMove();
+                    if (ActualHeight > 0)
+                    {
+                        _anchoredBottom = Top + ActualHeight;
+                    }
                     _cfg.StationWidgetX = Left;
                     _cfg.StationWidgetY = Top;
                     _cfg.Save();
