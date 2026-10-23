@@ -1,0 +1,20734 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
+using System.Globalization;
+using System.IO;
+using System.Net;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Web.Script.Serialization;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
+using System.Windows.Shapes;
+using System.Windows.Threading;
+using Microsoft.Win32;
+using Forms = System.Windows.Forms;
+
+[assembly: System.Reflection.AssemblyTitle("Desktop Zen")]
+[assembly: System.Reflection.AssemblyProduct("Desktop Zen")]
+[assembly: System.Reflection.AssemblyDescription("Desktop Zen - Modern Masaüstü İkon Gizleme & Akıllı Widget Sistemi")]
+[assembly: System.Reflection.AssemblyCompany("Serkan ŞENTÜRK")]
+[assembly: System.Reflection.AssemblyCopyright("© 2026 Serkan ŞENTÜRK. Tüm Hakları Saklıdır.")]
+[assembly: System.Reflection.AssemblyVersion("2.5.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.5.0.0")]
+
+namespace ModernAutoHideIcons
+{
+    // ==========================================
+    // FİNANS API ADRESLERİ (KOLAYCA DEĞİŞTİRİLEBİLİR)
+    // ==========================================
+    public static class FinanceEndpoints
+    {
+        // Döviz ve Altın Veri Kaynağı (USD, EUR, Gram Altın, Ons Altın)
+        public const string DefaultCurrencyGoldUrl = "https://finans.truncgil.com/v3/today.json";
+        // Borsa Endeksi Kaynağı (BIST 100)
+        public const string DefaultBistUrl = "https://query1.finance.yahoo.com/v8/finance/chart/XU100.IS?interval=1d";
+        // Kripto Para Kaynakları (Bitcoin & Ethereum)
+        public const string DefaultBtcUrl = "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT";
+        public const string DefaultEthUrl = "https://api.binance.com/api/v3/ticker/24hr?symbol=ETHUSDT";
+    }
+
+    // ==========================================
+    // YAPILANDIRMA (CONFIG)
+    // ==========================================
+    public class Config
+    {
+        public bool AutoHideEnabled = true;
+        public int TimeoutSeconds = 5;
+        public bool RestoreOnMouseMove = true;
+        public bool RestoreOnDesktopClick = true;
+        public bool DesktopDoubleClickToggle = true;
+        public bool RestoreOnDesktopRightClick = true;
+        // Belli bir süre sonra duvar kâğıdı ve widget'ları tüm pencerelerin en üstüne çıkar (Zen Dinlenme / Ambient Mod)
+        public bool ZenAmbientModeEnabled = true;
+        public int ZenAmbientTimeoutSeconds = 30; // Boşta kalma süresi (sn)
+        public bool ShowWidget = true;
+        public bool ClockOnlyWhenIconsHidden = false; // Saat widget'ı sadece simgeler gizlendiğinde devreye girsin
+        public bool WidgetPinnedToDesktop = true;
+        public bool WidgetAlwaysOnTop = false;
+        public string Theme = "dark";       // "dark" veya "light"
+        public string TextColor = "beyaz";  // "beyaz", "siyah", "mavi", "yesil", "sari", "turuncu", "kirmizi", "mor", "pembe", "turkuaz"
+        public string City = "İstanbul";
+        public bool ShowSeconds = true;
+        public string WidgetPosition = "top_center"; // "top_center", "center", "custom"
+        public bool LockWidgetPosition = true; // Widget sabit dursun, fare ile hareket ettirilemesin
+        public double WidgetX = -1;
+        public double WidgetY = -1;
+        public bool StartWithWindows = false;
+
+        // Vardiya & Nöbetçi Çizelgesi Widget'ı
+        public bool ShowShiftWidget = true;
+        public bool ShiftOnlyWhenIconsHidden = false; // Vardiya widget'ı sadece simgeler gizlendiğinde devreye girsin
+        public bool LockShiftWidgetPosition = true; // Varsayılan kilitli, kilit açılınca serbestçe taşınabilir
+        public double ShiftWidgetX = -1;
+        public double ShiftWidgetY = -1;
+        public double ShiftWidgetOpacity = 0.95;
+        public double ShiftWidgetScale = 1.0; // Vardiya widget boyut olcegi (0.50 - 1.00, varsayilan 1.0 = %100 en buyuk boyut)
+        public double InspirationWidgetScale = 1.0; // Gunun Sozleri / Ayet / Hadis widget boyut olcegi (0.50 - 1.00)
+        public double HolidayWidgetScale = 1.0; // Resmi Tatil widget boyut olcegi (0.50 - 1.00)
+        public double NotesWidgetScale = 1.0; // Notlar widget boyut olcegi (0.50 - 1.00)
+        public double NowPlayingWidgetScale = 1.0; // Medya Oynatici widget boyut olcegi (0.50 - 1.00)
+        public string ShiftFolderPath = ""; // Çizelgelerin ana klasörü (örn: D:\2026 ÇALIŞMA ÇİZELGELERİ). Boş ise özellik çalışmaz.
+        public string SupervisorFolderPath = ""; // Vardiya Amirliği çizelgesi klasörü (Boş ise pasif)
+
+        // Görünüm, Saydamlık & Boyut Ölçeği
+        public double WidgetOpacity = 0.95; // 0.0 (tamamen şeffaf) ile 1.0 (%100)
+        public double WidgetScale = 1.0; // Yüzdelik boyut ölçeği (0.50 - 1.50, varsayılan 1.0 = %100)
+        public double WidgetFontScale = 1.0; // Widget içi metin boyutu ölçeği (%80 - %135, varsayılan 1.0 = %100, arka plan sabit kalır)
+        public bool CompactMode = false;
+
+        // Finans ve Kripto Paneli
+        public bool ShowFinance = true;
+        public bool ShowCrypto = true;
+        public bool ShowUsd = true;
+        public bool ShowEur = true;
+        public bool ShowGramGold = true;
+        public bool ShowOunceGold = true;
+        public bool ShowBist = true;
+        public bool ShowBtc = true;
+        public bool ShowEth = true;
+        public string CustomParities = "";
+        public string FinanceApiUrl = FinanceEndpoints.DefaultCurrencyGoldUrl;
+        public string BistApiUrl = FinanceEndpoints.DefaultBistUrl;
+        public string CryptoBtcUrl = FinanceEndpoints.DefaultBtcUrl;
+        public string CryptoEthUrl = FinanceEndpoints.DefaultEthUrl;
+
+        // Maç Takipçisi (Galatasaray, Fenerbahçe, Beşiktaş, Trabzonspor, Türkiye)
+        public bool ShowMatchTracker = true;
+        public bool ShowUpcomingMatch = true;
+        public bool MatchClockThemeEnabled = true;
+        public bool TrackTurkey = true;
+        public bool TrackGalatasaray = true;
+        public bool TrackFenerbahce = true;
+        public bool TrackBesiktas = true;
+        public bool TrackTrabzonspor = true;
+        public string MatchApiUrl = "";
+
+        // Zen Dinlenme Modu Zafer Bayrağı
+        public bool ZenVictoryFlagEnabled = true;
+        public string ZenVictoryTeam = "auto"; // "auto", "galatasaray", "fenerbahce", "besiktas", "trabzonspor", "turkiye"
+        public string FlagSide = "right"; // "right" (Sağ Üst) veya "left" (Sol Üst)
+        public bool LockFlagPosition = true;
+        public double FlagX = -1;
+        public double FlagY = -1;
+
+        // Akıllı Modlar & Sistem
+        public bool ShowSystemMonitor = true;
+        public bool GameModeEnabled = true;
+
+        // Duvar Kağıdı Görünümü (Simgeler Gizlendiğinde)
+        public bool ShowWallpaperOnHide = true;
+        public string CustomWallpaperPath = "";
+        public bool ShowWeatherWallpaperEffects = true; // Duvar kâğıdında canlı yağmur/kar/parçacık efekti
+        public string CustomParticleEffect = "auto"; // "auto", "fireflies", "leaves", "rain", "snow", "none"
+
+        // Günün Saatine Göre Dinamik Duvar Kâğıdı
+        public bool DynamicWallpaperEnabled = false;
+        public string WallpaperMorning = "";  // 06:00 - 11:00 (Sabah)
+        public string WallpaperNoon = "";     // 11:00 - 17:00 (Öğle)
+        public string WallpaperEvening = "";  // 17:00 - 21:00 (Akşam)
+        public string WallpaperNight = "";    // 21:00 - 06:00 (Gece)
+
+        // Başlat & Görev Çubukları (Hiçbir zaman gizlenmez - daima görünür)
+        public bool HideTaskbarOnHide = false;
+        public bool HideTaskbarAlways = false;
+
+        // Canlı Skorlar ve Medya Oynatıcı
+        public bool ShowMatchLiveScores = true; // Maçlarda canlı skor ve anlık gol kutlaması
+        public string GoalEffectStyle = "tsubasa_net"; // "tsubasa_net" (Kaptan Tsubasa Ağları Havalandırma) veya "bouncing_ball" (Seken Futbol Topu)
+        public bool ShowMediaPlayer = true; // Canlı Medya & Spotify mini oynatıcı
+
+        // Diyanet Namaz Vakitleri
+        public bool ShowPrayerTimes = true; // Widget'ın en altında Diyanet namaz vakitleri tablosu
+        public string PrayerCity = "İstanbul"; // Varsayılan bölge: İstanbul
+
+        // Manevi Rehber (Günün Âyeti, Hadîsi, Özdeyiş / Günün Sözü) ve Türkiye Resmî Tatilleri
+        public bool ShowDailyVerse = true;       // İkonlar gizlenince ekranın solunda Günün Âyeti
+        public bool ShowDailyHadith = true;      // İkonlar gizlenince ekranın sağında Günün Hadîsi
+        public bool ShowDailyQuote = true;       // İkonlar gizlenince ekranın sol üstünde Günün Sözü / Özdeyiş
+        public bool ShowNationalHolidays = true; // Widget'ın en altında Türkiye Resmî Tatilleri
+
+        // Zen Şeffaf Hızlı Not Kartı (Sticky Pad)
+        public bool ShowZenNotes = false;
+        public bool LockZenNotesPosition = false;
+        public double ZenNotesX = -1;
+        public double ZenNotesY = -1;
+        public bool ZenNotesOnlyWhenIconsHidden = true;
+        public double ZenNotesOpacity = 0.95;
+
+        // Zen Uygulama Çekmecesi (Minimal Dock / Launchpad)
+        public bool ShowZenDock = true;
+        public bool DockOnlyWhenIconsHidden = true;
+        public bool LockDockPosition = true;
+        public double DockX = -1;
+        public double DockY = -1;
+
+        // İlham Kartları (Günün Sözü, Âyet, Hadis) Konumları
+        public bool LockInspirationPosition = false;
+        public double QuoteX = -1;
+        public double QuoteY = -1;
+        public double VerseX = -1;
+        public double VerseY = -1;
+        public double HadithX = -1;
+        public double HadithY = -1;
+
+        // Resmî Tatiller & Medya Çalar Konumları
+        public bool LockHolidayPosition = false;
+        public double HolidayX = -1;
+        public double HolidayY = -1;
+        public bool LockMediaPosition = false;
+        public double MediaX = -1;
+        public double MediaY = -1;
+
+        // Vardiya Devir Geri Sayımı
+        public bool ShiftHandoverCountdown = true; // 15:00, 23:00, 07:00 vardiya devir geri sayımı ve 15 dk kala uyarı
+
+        private static string ConfigPath
+        {
+            get
+            {
+                string p1 = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
+                if (System.IO.File.Exists(p1)) return p1;
+                try
+                {
+                    string asmDir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                    string p2 = System.IO.Path.Combine(asmDir, "config.json");
+                    if (System.IO.File.Exists(p2)) return p2;
+                }
+                catch { }
+                string p3 = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "config.json");
+                if (System.IO.File.Exists(p3)) return p3;
+                return p1;
+            }
+        }
+
+        public static Config Load()
+        {
+            var cfg = new Config();
+            try
+            {
+                if (File.Exists(ConfigPath))
+                {
+                    string json = File.ReadAllText(ConfigPath, Encoding.UTF8);
+                    cfg.AutoHideEnabled = GetBool(json, "AutoHideEnabled", true);
+                    cfg.TimeoutSeconds = GetInt(json, "TimeoutSeconds", 5);
+                    cfg.RestoreOnMouseMove = GetBool(json, "RestoreOnMouseMove", true);
+                    cfg.RestoreOnDesktopClick = GetBool(json, "RestoreOnDesktopClick", true);
+                    cfg.DesktopDoubleClickToggle = GetBool(json, "DesktopDoubleClickToggle", true);
+                    cfg.RestoreOnDesktopRightClick = GetBool(json, "RestoreOnDesktopRightClick", true);
+                    cfg.ZenAmbientModeEnabled = GetBool(json, "ZenAmbientModeEnabled", true);
+                    cfg.ZenAmbientTimeoutSeconds = GetInt(json, "ZenAmbientTimeoutSeconds", 30);
+                    cfg.ShowWidget = GetBool(json, "ShowWidget", true);
+                    cfg.ClockOnlyWhenIconsHidden = GetBool(json, "ClockOnlyWhenIconsHidden", false);
+                    cfg.WidgetPinnedToDesktop = GetBool(json, "WidgetPinnedToDesktop", true);
+                    cfg.WidgetAlwaysOnTop = GetBool(json, "WidgetAlwaysOnTop", false);
+                    cfg.Theme = GetString(json, "Theme", "dark");
+                    if (cfg.Theme != "light") cfg.Theme = "dark";
+                    cfg.TextColor = GetString(json, "TextColor", (cfg.Theme == "light" ? "siyah" : "beyaz"));
+                    cfg.City = GetString(json, "City", "İstanbul");
+                    cfg.ShowSeconds = GetBool(json, "ShowSeconds", true);
+                    cfg.WidgetPosition = GetString(json, "WidgetPosition", "top_center");
+                    cfg.LockWidgetPosition = GetBool(json, "LockWidgetPosition", true);
+                    cfg.WidgetX = GetDouble(json, "WidgetX", -1);
+                    cfg.WidgetY = GetDouble(json, "WidgetY", -1);
+                    cfg.StartWithWindows = GetBool(json, "StartWithWindows", false);
+
+                    cfg.WidgetOpacity = Math.Max(0.0, Math.Min(1.0, GetDouble(json, "WidgetOpacity", 0.95)));
+                    cfg.WidgetScale = GetDouble(json, "WidgetScale", 1.0);
+                    cfg.WidgetFontScale = Math.Max(0.70, Math.Min(1.40, GetDouble(json, "WidgetFontScale", 1.0)));
+                    cfg.CompactMode = GetBool(json, "CompactMode", false);
+
+                    cfg.ShowFinance = GetBool(json, "ShowFinance", true);
+                    cfg.ShowCrypto = GetBool(json, "ShowCrypto", true);
+                    cfg.ShowUsd = GetBool(json, "ShowUsd", true);
+                    cfg.ShowEur = GetBool(json, "ShowEur", true);
+                    cfg.ShowGramGold = GetBool(json, "ShowGramGold", true);
+                    cfg.ShowOunceGold = GetBool(json, "ShowOunceGold", true);
+                    cfg.ShowBist = GetBool(json, "ShowBist", true);
+                    cfg.ShowBtc = GetBool(json, "ShowBtc", true);
+                    cfg.ShowEth = GetBool(json, "ShowEth", true);
+                    cfg.CustomParities = GetString(json, "CustomParities", "");
+                    cfg.FinanceApiUrl = GetString(json, "FinanceApiUrl", FinanceEndpoints.DefaultCurrencyGoldUrl);
+                    cfg.BistApiUrl = GetString(json, "BistApiUrl", FinanceEndpoints.DefaultBistUrl);
+                    cfg.CryptoBtcUrl = GetString(json, "CryptoBtcUrl", FinanceEndpoints.DefaultBtcUrl);
+                    cfg.CryptoEthUrl = GetString(json, "CryptoEthUrl", FinanceEndpoints.DefaultEthUrl);
+
+                    cfg.ShowMatchTracker = GetBool(json, "ShowMatchTracker", true);
+                    cfg.ShowUpcomingMatch = GetBool(json, "ShowUpcomingMatch", true);
+                    cfg.MatchClockThemeEnabled = GetBool(json, "MatchClockThemeEnabled", true);
+                    cfg.TrackTurkey = GetBool(json, "TrackTurkey", true);
+                    cfg.TrackGalatasaray = GetBool(json, "TrackGalatasaray", false);
+                    cfg.TrackFenerbahce = GetBool(json, "TrackFenerbahce", false);
+                    cfg.TrackBesiktas = GetBool(json, "TrackBesiktas", false);
+                    cfg.TrackTrabzonspor = GetBool(json, "TrackTrabzonspor", false);
+                    cfg.MatchApiUrl = GetString(json, "MatchApiUrl", "");
+                    cfg.ZenVictoryFlagEnabled = GetBool(json, "ZenVictoryFlagEnabled", true);
+                    cfg.ZenVictoryTeam = GetString(json, "ZenVictoryTeam", "auto");
+                    cfg.FlagSide = GetString(json, "FlagSide", "right");
+                    cfg.LockFlagPosition = GetBool(json, "LockFlagPosition", true);
+                    cfg.FlagX = GetDouble(json, "FlagX", -1);
+                    cfg.FlagY = GetDouble(json, "FlagY", -1);
+
+                    cfg.ShowSystemMonitor = GetBool(json, "ShowSystemMonitor", true);
+                    cfg.GameModeEnabled = GetBool(json, "GameModeEnabled", true);
+
+                    cfg.ShowWallpaperOnHide = GetBool(json, "ShowWallpaperOnHide", true);
+                    cfg.CustomWallpaperPath = GetString(json, "CustomWallpaperPath", "");
+                    cfg.ShowWeatherWallpaperEffects = GetBool(json, "ShowWeatherWallpaperEffects", true);
+                    cfg.HideTaskbarOnHide = false;
+                    cfg.HideTaskbarAlways = false;
+                    cfg.ShowMatchLiveScores = GetBool(json, "ShowMatchLiveScores", true);
+                    cfg.GoalEffectStyle = GetString(json, "GoalEffectStyle", "tsubasa_net");
+                    cfg.ShowMediaPlayer = GetBool(json, "ShowMediaPlayer", true);
+                    cfg.ShowPrayerTimes = GetBool(json, "ShowPrayerTimes", true);
+                    cfg.PrayerCity = GetString(json, "PrayerCity", "İstanbul");
+                    cfg.ShowDailyVerse = GetBool(json, "ShowDailyVerse", true);
+                    cfg.ShowDailyHadith = GetBool(json, "ShowDailyHadith", true);
+                    cfg.ShowDailyQuote = GetBool(json, "ShowDailyQuote", true);
+                    cfg.ShowNationalHolidays = GetBool(json, "ShowNationalHolidays", true);
+
+                    // Dinamik Duvar Kâğıdı & Parçacıklar
+                    cfg.CustomParticleEffect = GetString(json, "CustomParticleEffect", "auto");
+                    cfg.DynamicWallpaperEnabled = GetBool(json, "DynamicWallpaperEnabled", false);
+                    cfg.WallpaperMorning = GetString(json, "WallpaperMorning", "");
+                    cfg.WallpaperNoon = GetString(json, "WallpaperNoon", "");
+                    cfg.WallpaperEvening = GetString(json, "WallpaperEvening", "");
+                    cfg.WallpaperNight = GetString(json, "WallpaperNight", "");
+
+                    // Zen Şeffaf Hızlı Not Kartı
+                    cfg.ShowZenNotes = GetBool(json, "ShowZenNotes", false);
+                    cfg.LockZenNotesPosition = GetBool(json, "LockZenNotesPosition", false);
+                    cfg.ZenNotesX = GetDouble(json, "ZenNotesX", -1);
+                    cfg.ZenNotesY = GetDouble(json, "ZenNotesY", -1);
+                    cfg.ZenNotesOnlyWhenIconsHidden = GetBool(json, "ZenNotesOnlyWhenIconsHidden", true);
+                    cfg.ZenNotesOpacity = Math.Max(0.1, Math.Min(1.0, GetDouble(json, "ZenNotesOpacity", 0.95)));
+
+                    // Zen Minimal Dock
+                    cfg.ShowZenDock = GetBool(json, "ShowZenDock", true);
+                    cfg.DockOnlyWhenIconsHidden = GetBool(json, "DockOnlyWhenIconsHidden", true);
+                    cfg.LockDockPosition = GetBool(json, "LockDockPosition", true);
+                    cfg.DockX = GetDouble(json, "DockX", -1);
+                    cfg.DockY = GetDouble(json, "DockY", -1);
+
+                    // İlham Kartları (Günün Sözü, Âyet, Hadis)
+                    cfg.LockInspirationPosition = GetBool(json, "LockInspirationPosition", false);
+                    cfg.QuoteX = GetDouble(json, "QuoteX", -1);
+                    cfg.QuoteY = GetDouble(json, "QuoteY", -1);
+                    cfg.VerseX = GetDouble(json, "VerseX", -1);
+                    cfg.VerseY = GetDouble(json, "VerseY", -1);
+                    cfg.HadithX = GetDouble(json, "HadithX", -1);
+                    cfg.HadithY = GetDouble(json, "HadithY", -1);
+
+                    // Resmî Tatiller & Medya Çalar
+                    cfg.LockHolidayPosition = GetBool(json, "LockHolidayPosition", false);
+                    cfg.HolidayX = GetDouble(json, "HolidayX", -1);
+                    cfg.HolidayY = GetDouble(json, "HolidayY", -1);
+                    cfg.LockMediaPosition = GetBool(json, "LockMediaPosition", false);
+                    cfg.MediaX = GetDouble(json, "MediaX", -1);
+                    cfg.MediaY = GetDouble(json, "MediaY", -1);
+
+                    // Vardiya Widget'ı
+                    cfg.ShowShiftWidget = GetBool(json, "ShowShiftWidget", true);
+                    cfg.ShiftOnlyWhenIconsHidden = GetBool(json, "ShiftOnlyWhenIconsHidden", false);
+                    cfg.LockShiftWidgetPosition = GetBool(json, "LockShiftWidgetPosition", true);
+                    cfg.ShiftWidgetX = GetDouble(json, "ShiftWidgetX", -1);
+                    cfg.ShiftWidgetY = GetDouble(json, "ShiftWidgetY", -1);
+                    cfg.ShiftWidgetOpacity = Math.Max(0.1, Math.Min(1.0, GetDouble(json, "ShiftWidgetOpacity", 0.95)));
+                    cfg.ShiftWidgetScale = Math.Max(0.50, Math.Min(1.0, GetDouble(json, "ShiftWidgetScale", 1.0)));
+                    cfg.InspirationWidgetScale = Math.Max(0.50, Math.Min(1.0, GetDouble(json, "InspirationWidgetScale", 1.0)));
+                    cfg.HolidayWidgetScale = Math.Max(0.50, Math.Min(1.0, GetDouble(json, "HolidayWidgetScale", 1.0)));
+                    cfg.NotesWidgetScale = Math.Max(0.50, Math.Min(1.0, GetDouble(json, "NotesWidgetScale", 1.0)));
+                    cfg.NowPlayingWidgetScale = Math.Max(0.50, Math.Min(1.0, GetDouble(json, "NowPlayingWidgetScale", 1.0)));
+                    cfg.ShiftFolderPath = GetString(json, "ShiftFolderPath", GetString(json, "ShiftExcelPath", ""));
+                    cfg.SupervisorFolderPath = GetString(json, "SupervisorFolderPath", "");
+                    cfg.ShiftHandoverCountdown = GetBool(json, "ShiftHandoverCountdown", true);
+                    if (!string.IsNullOrEmpty(cfg.ShiftFolderPath) && cfg.ShiftFolderPath.StartsWith(@"\") && !cfg.ShiftFolderPath.StartsWith(@"\\"))
+                    {
+                        cfg.ShiftFolderPath = @"\" + cfg.ShiftFolderPath;
+                    }
+                    if (!string.IsNullOrEmpty(cfg.SupervisorFolderPath) && cfg.SupervisorFolderPath.StartsWith(@"\") && !cfg.SupervisorFolderPath.StartsWith(@"\\"))
+                    {
+                        cfg.SupervisorFolderPath = @"\" + cfg.SupervisorFolderPath;
+                    }
+                }
+            }
+            catch { }
+            return cfg;
+        }
+
+        public void Save()
+        {
+            try
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("{");
+                sb.AppendLine("  \"AutoHideEnabled\": " + AutoHideEnabled.ToString().ToLower() + ",");
+                sb.AppendLine("  \"TimeoutSeconds\": " + TimeoutSeconds + ",");
+                sb.AppendLine("  \"RestoreOnMouseMove\": " + RestoreOnMouseMove.ToString().ToLower() + ",");
+                sb.AppendLine("  \"RestoreOnDesktopClick\": " + RestoreOnDesktopClick.ToString().ToLower() + ",");
+                sb.AppendLine("  \"DesktopDoubleClickToggle\": " + DesktopDoubleClickToggle.ToString().ToLower() + ",");
+                sb.AppendLine("  \"RestoreOnDesktopRightClick\": " + RestoreOnDesktopRightClick.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ZenAmbientModeEnabled\": " + ZenAmbientModeEnabled.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ZenAmbientTimeoutSeconds\": " + ZenAmbientTimeoutSeconds + ",");
+                sb.AppendLine("  \"ShowWidget\": " + ShowWidget.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ClockOnlyWhenIconsHidden\": " + ClockOnlyWhenIconsHidden.ToString().ToLower() + ",");
+                sb.AppendLine("  \"WidgetPinnedToDesktop\": " + WidgetPinnedToDesktop.ToString().ToLower() + ",");
+                sb.AppendLine("  \"WidgetAlwaysOnTop\": " + WidgetAlwaysOnTop.ToString().ToLower() + ",");
+                sb.AppendLine("  \"Theme\": \"" + Escape(Theme) + "\",");
+                sb.AppendLine("  \"City\": \"" + Escape(City) + "\",");
+                sb.AppendLine("  \"ShowSeconds\": " + ShowSeconds.ToString().ToLower() + ",");
+                sb.AppendLine("  \"WidgetPosition\": \"" + Escape(WidgetPosition) + "\",");
+                sb.AppendLine("  \"LockWidgetPosition\": " + LockWidgetPosition.ToString().ToLower() + ",");
+                sb.AppendLine("  \"WidgetX\": " + WidgetX.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"WidgetY\": " + WidgetY.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"StartWithWindows\": " + StartWithWindows.ToString().ToLower() + ",");
+                sb.AppendLine("  \"WidgetOpacity\": " + WidgetOpacity.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"WidgetScale\": " + WidgetScale.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"WidgetFontScale\": " + WidgetFontScale.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"CompactMode\": " + CompactMode.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowFinance\": " + ShowFinance.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowCrypto\": " + ShowCrypto.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowUsd\": " + ShowUsd.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowEur\": " + ShowEur.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowGramGold\": " + ShowGramGold.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowOunceGold\": " + ShowOunceGold.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowBist\": " + ShowBist.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowBtc\": " + ShowBtc.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowEth\": " + ShowEth.ToString().ToLower() + ",");
+                sb.AppendLine("  \"CustomParities\": \"" + Escape(CustomParities) + "\",");
+                sb.AppendLine("  \"FinanceApiUrl\": \"" + Escape(FinanceApiUrl) + "\",");
+                sb.AppendLine("  \"BistApiUrl\": \"" + Escape(BistApiUrl) + "\",");
+                sb.AppendLine("  \"CryptoBtcUrl\": \"" + Escape(CryptoBtcUrl) + "\",");
+                sb.AppendLine("  \"CryptoEthUrl\": \"" + Escape(CryptoEthUrl) + "\",");
+                sb.AppendLine("  \"ShowMatchTracker\": " + ShowMatchTracker.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowUpcomingMatch\": " + ShowUpcomingMatch.ToString().ToLower() + ",");
+                sb.AppendLine("  \"MatchClockThemeEnabled\": " + MatchClockThemeEnabled.ToString().ToLower() + ",");
+                sb.AppendLine("  \"TrackTurkey\": " + TrackTurkey.ToString().ToLower() + ",");
+                sb.AppendLine("  \"TrackGalatasaray\": " + TrackGalatasaray.ToString().ToLower() + ",");
+                sb.AppendLine("  \"TrackFenerbahce\": " + TrackFenerbahce.ToString().ToLower() + ",");
+                sb.AppendLine("  \"TrackBesiktas\": " + TrackBesiktas.ToString().ToLower() + ",");
+                sb.AppendLine("  \"TrackTrabzonspor\": " + TrackTrabzonspor.ToString().ToLower() + ",");
+                sb.AppendLine("  \"MatchApiUrl\": \"" + Escape(MatchApiUrl) + "\",");
+                sb.AppendLine("  \"ZenVictoryFlagEnabled\": " + ZenVictoryFlagEnabled.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ZenVictoryTeam\": \"" + Escape(ZenVictoryTeam) + "\",");
+                sb.AppendLine("  \"FlagSide\": \"" + Escape(FlagSide) + "\",");
+                sb.AppendLine("  \"LockFlagPosition\": " + LockFlagPosition.ToString().ToLower() + ",");
+                sb.AppendLine("  \"FlagX\": " + FlagX.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"FlagY\": " + FlagY.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"ShowSystemMonitor\": " + ShowSystemMonitor.ToString().ToLower() + ",");
+                sb.AppendLine("  \"GameModeEnabled\": " + GameModeEnabled.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowWallpaperOnHide\": " + ShowWallpaperOnHide.ToString().ToLower() + ",");
+                sb.AppendLine("  \"CustomWallpaperPath\": \"" + Escape(CustomWallpaperPath) + "\",");
+                sb.AppendLine("  \"ShowWeatherWallpaperEffects\": " + ShowWeatherWallpaperEffects.ToString().ToLower() + ",");
+                sb.AppendLine("  \"HideTaskbarOnHide\": false,");
+                sb.AppendLine("  \"HideTaskbarAlways\": false,");
+                sb.AppendLine("  \"ShowMatchLiveScores\": " + ShowMatchLiveScores.ToString().ToLower() + ",");
+                sb.AppendLine("  \"GoalEffectStyle\": \"" + Escape(GoalEffectStyle) + "\",");
+                sb.AppendLine("  \"ShowMediaPlayer\": " + ShowMediaPlayer.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowPrayerTimes\": " + ShowPrayerTimes.ToString().ToLower() + ",");
+                sb.AppendLine("  \"PrayerCity\": \"" + Escape(PrayerCity) + "\",");
+                sb.AppendLine("  \"ShowDailyVerse\": " + ShowDailyVerse.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowDailyHadith\": " + ShowDailyHadith.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowDailyQuote\": " + ShowDailyQuote.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowNationalHolidays\": " + ShowNationalHolidays.ToString().ToLower() + ",");
+                sb.AppendLine("  \"CustomParticleEffect\": \"" + Escape(CustomParticleEffect) + "\",");
+                sb.AppendLine("  \"DynamicWallpaperEnabled\": " + DynamicWallpaperEnabled.ToString().ToLower() + ",");
+                sb.AppendLine("  \"WallpaperMorning\": \"" + Escape(WallpaperMorning) + "\",");
+                sb.AppendLine("  \"WallpaperNoon\": \"" + Escape(WallpaperNoon) + "\",");
+                sb.AppendLine("  \"WallpaperEvening\": \"" + Escape(WallpaperEvening) + "\",");
+                sb.AppendLine("  \"WallpaperNight\": \"" + Escape(WallpaperNight) + "\",");
+                sb.AppendLine("  \"ShowZenNotes\": " + ShowZenNotes.ToString().ToLower() + ",");
+                sb.AppendLine("  \"LockZenNotesPosition\": " + LockZenNotesPosition.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ZenNotesX\": " + ZenNotesX.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"ZenNotesY\": " + ZenNotesY.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"ZenNotesOnlyWhenIconsHidden\": " + ZenNotesOnlyWhenIconsHidden.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ZenNotesOpacity\": " + ZenNotesOpacity.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"ShowZenDock\": " + ShowZenDock.ToString().ToLower() + ",");
+                sb.AppendLine("  \"DockOnlyWhenIconsHidden\": " + DockOnlyWhenIconsHidden.ToString().ToLower() + ",");
+                sb.AppendLine("  \"LockDockPosition\": " + LockDockPosition.ToString().ToLower() + ",");
+                sb.AppendLine("  \"DockX\": " + DockX.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"DockY\": " + DockY.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"LockInspirationPosition\": " + LockInspirationPosition.ToString().ToLower() + ",");
+                sb.AppendLine("  \"QuoteX\": " + QuoteX.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"QuoteY\": " + QuoteY.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"VerseX\": " + VerseX.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"VerseY\": " + VerseY.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"HadithX\": " + HadithX.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"HadithY\": " + HadithY.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"LockHolidayPosition\": " + LockHolidayPosition.ToString().ToLower() + ",");
+                sb.AppendLine("  \"HolidayX\": " + HolidayX.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"HolidayY\": " + HolidayY.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"LockMediaPosition\": " + LockMediaPosition.ToString().ToLower() + ",");
+                sb.AppendLine("  \"MediaX\": " + MediaX.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"MediaY\": " + MediaY.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"ShiftHandoverCountdown\": " + ShiftHandoverCountdown.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShowShiftWidget\": " + ShowShiftWidget.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShiftOnlyWhenIconsHidden\": " + ShiftOnlyWhenIconsHidden.ToString().ToLower() + ",");
+                sb.AppendLine("  \"LockShiftWidgetPosition\": " + LockShiftWidgetPosition.ToString().ToLower() + ",");
+                sb.AppendLine("  \"ShiftWidgetX\": " + ShiftWidgetX.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"ShiftWidgetY\": " + ShiftWidgetY.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"ShiftWidgetOpacity\": " + ShiftWidgetOpacity.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"ShiftWidgetScale\": " + ShiftWidgetScale.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"InspirationWidgetScale\": " + InspirationWidgetScale.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"HolidayWidgetScale\": " + HolidayWidgetScale.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"NotesWidgetScale\": " + NotesWidgetScale.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"NowPlayingWidgetScale\": " + NowPlayingWidgetScale.ToString(CultureInfo.InvariantCulture) + ",");
+                sb.AppendLine("  \"ShiftFolderPath\": \"" + Escape(ShiftFolderPath) + "\",");
+                sb.AppendLine("  \"SupervisorFolderPath\": \"" + Escape(SupervisorFolderPath) + "\",");
+                sb.AppendLine("  \"TextColor\": \"" + Escape(TextColor) + "\"");
+                sb.AppendLine("}");
+                File.WriteAllText(ConfigPath, sb.ToString(), Encoding.UTF8);
+            }
+            catch { }
+        }
+
+        private static string Escape(string s)
+        {
+            if (s == null) return "";
+            bool isUnc = s.StartsWith(@"\\");
+            while (s.Contains(@"\\"))
+            {
+                s = s.Replace(@"\\", @"\");
+            }
+            if (isUnc) s = @"\" + s;
+            return s.Replace(@"\", @"\\").Replace("\"", "\\\"");
+        }
+
+        private static bool GetBool(string json, string key, bool def)
+        {
+            var m = Regex.Match(json, "\"" + key + "\"\\s*:\\s*(true|false)", RegexOptions.IgnoreCase);
+            return m.Success ? bool.Parse(m.Groups[1].Value) : def;
+        }
+
+        private static int GetInt(string json, string key, int def)
+        {
+            var m = Regex.Match(json, "\"" + key + "\"\\s*:\\s*(-?[0-9]+)");
+            return m.Success ? int.Parse(m.Groups[1].Value) : def;
+        }
+
+        private static double GetDouble(string json, string key, double def)
+        {
+            var m = Regex.Match(json, "\"" + key + "\"\\s*:\\s*(-?[0-9\\.]+)");
+            return m.Success ? double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) : def;
+        }
+
+        private static string GetString(string json, string key, string def)
+        {
+            var m = Regex.Match(json, "\"" + key + "\"\\s*:\\s*\"((?:\\\\\"|[^\"])*)\"");
+            if (m.Success)
+            {
+                string val = m.Groups[1].Value;
+                while (val.Contains("\\\\"))
+                {
+                    val = val.Replace("\\\\", "\\");
+                }
+                val = val.Replace("\\\"", "\"");
+                return val;
+            }
+            return def;
+        }
+    }
+
+    // ==========================================
+    // WIN32 YARDIMCILARI & DESKTOP KONTROLÜ
+    // ==========================================
+    public static class Win32
+    {
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr FindWindowEx(IntPtr parent, IntPtr childAfter, string className, string title);
+
+        [DllImport("user32.dll")]
+        public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+        public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        public static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        public static extern bool RedrawWindow(IntPtr hWnd, IntPtr lprcUpdate, IntPtr hrgnUpdate, uint flags);
+
+        public const uint RDW_INVALIDATE = 0x0001;
+        public const uint RDW_UPDATENOW = 0x0100;
+        public const uint RDW_ALLCHILDREN = 0x0080;
+
+        [DllImport("user32.dll")]
+        public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr WindowFromPoint(POINT Point);
+
+        [DllImport("user32.dll")]
+        public static extern bool GetCursorPos(out POINT lpPoint);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetDesktopWindow();
+
+        [DllImport("user32.dll", ExactSpelling = true)]
+        public static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
+
+        public const uint GA_PARENT = 1;
+        public const uint GA_ROOT = 2;
+        public const uint GA_ROOTOWNER = 3;
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern uint RegisterWindowMessage(string lpString);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        public const int HWND_BROADCAST = 0xffff;
+
+        [DllImport("user32.dll")]
+        public static extern int GetDoubleClickTime();
+
+        [DllImport("user32.dll")]
+        public static extern short GetAsyncKeyState(int vKey);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool BringWindowToTop(IntPtr hWnd);
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+        public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+        public const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+
+        public const int DWMSBT_AUTO = 0;
+        public const int DWMSBT_NONE = 1;
+        public const int DWMSBT_MAINWINDOW = 2; // Windows 11 Mica
+        public const int DWMSBT_TRANSIENTWINDOW = 3; // Windows 11 Acrylic / Cam
+        public const int DWMSBT_TABBEDWINDOW = 4; // Windows 11 Mica Alt
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern bool SystemParametersInfo(uint uAction, uint uParam, StringBuilder lpvParam, uint fuWinIni);
+
+        [DllImport("user32.dll")]
+        public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll")]
+        public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        public const uint SPI_GETDESKWALLPAPER = 0x0073;
+        public const int GWL_EXSTYLE = -20;
+        public const int WS_EX_TOOLWINDOW = 0x00000080;
+        public const int WS_EX_NOACTIVATE = 0x08000000;
+
+        public static readonly List<IntPtr> WallpaperWindowHandles = new List<IntPtr>();
+        public static readonly List<IntPtr> InspirationWindowHandles = new List<IntPtr>();
+
+        public const int SW_HIDE = 0;
+        public const int SW_SHOWNOACTIVATE = 4;
+        public const int SW_SHOW = 5;
+        public static readonly IntPtr HWND_TOP = new IntPtr(0);
+        public static readonly IntPtr HWND_BOTTOM = new IntPtr(1);
+        public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        public static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
+        public const uint SWP_NOSIZE = 0x0001;
+        public const uint SWP_NOMOVE = 0x0002;
+        public const uint SWP_NOACTIVATE = 0x0010;
+        public const uint SWP_SHOWWINDOW = 0x0040;
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool IsWindow(IntPtr hWnd);
+
+        [DllImport("psapi.dll")]
+        public static extern bool EmptyWorkingSet(IntPtr hProcess);
+
+        [DllImport("kernel32.dll")]
+        public static extern bool SetProcessWorkingSetSize(IntPtr proc, int min, int max);
+
+        [DllImport("user32.dll")]
+        public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll", ExactSpelling = true)]
+        public static extern IntPtr GetShellWindow();
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+        public const int DWMWA_CLOAKED = 14;
+
+        [DllImport("user32.dll")]
+        public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+        public const byte VK_LWIN = 0x5B;
+        public const byte VK_D = 0x44;
+        public const uint KEYEVENTF_KEYUP = 0x0002;
+
+        public const int VK_LBUTTON = 0x01;
+        public const int VK_MBUTTON = 0x04;
+
+        public const uint SWP_NOZORDER = 0x0004;
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct WINDOWPOS
+        {
+            public IntPtr hwnd;
+            public IntPtr hwndInsertAfter;
+            public int x;
+            public int y;
+            public int cx;
+            public int cy;
+            public uint flags;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct LASTINPUTINFO
+        {
+            public uint cbSize;
+            public uint dwTime;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
+        private static IntPtr _cachedDesktopDefView = IntPtr.Zero;
+        private static IntPtr _cachedDesktopListView = IntPtr.Zero;
+
+        public static IntPtr GetDesktopDefView()
+        {
+            if (_cachedDesktopDefView != IntPtr.Zero && IsWindow(_cachedDesktopDefView))
+            {
+                return _cachedDesktopDefView;
+            }
+
+            IntPtr progman = FindWindow("Progman", null);
+            if (progman != IntPtr.Zero)
+            {
+                IntPtr defView = FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null);
+                if (defView != IntPtr.Zero)
+                {
+                    _cachedDesktopDefView = defView;
+                    return defView;
+                }
+            }
+
+            IntPtr workerw = IntPtr.Zero;
+            do
+            {
+                workerw = FindWindowEx(IntPtr.Zero, workerw, "WorkerW", null);
+                if (workerw != IntPtr.Zero)
+                {
+                    IntPtr defView = FindWindowEx(workerw, IntPtr.Zero, "SHELLDLL_DefView", null);
+                    if (defView != IntPtr.Zero)
+                    {
+                        _cachedDesktopDefView = defView;
+                        return defView;
+                    }
+                }
+            } while (workerw != IntPtr.Zero);
+
+            IntPtr foundDefView = IntPtr.Zero;
+            EnumWindows(delegate(IntPtr hwnd, IntPtr lp)
+            {
+                string cls = GetClassNameString(hwnd);
+                if (cls == "WorkerW" || cls == "Progman")
+                {
+                    IntPtr s = FindWindowEx(hwnd, IntPtr.Zero, "SHELLDLL_DefView", null);
+                    if (s != IntPtr.Zero)
+                    {
+                        foundDefView = s;
+                        return false;
+                    }
+                }
+                return true;
+            }, IntPtr.Zero);
+
+            if (foundDefView != IntPtr.Zero)
+            {
+                _cachedDesktopDefView = foundDefView;
+            }
+            return foundDefView;
+        }
+
+        public static IntPtr GetDesktopListView()
+        {
+            if (_cachedDesktopListView != IntPtr.Zero && IsWindow(_cachedDesktopListView))
+            {
+                return _cachedDesktopListView;
+            }
+
+            IntPtr defView = GetDesktopDefView();
+            if (defView != IntPtr.Zero)
+            {
+                IntPtr lv = FindWindowEx(defView, IntPtr.Zero, "SysListView32", null);
+                if (lv != IntPtr.Zero)
+                {
+                    _cachedDesktopListView = lv;
+                    return lv;
+                }
+
+                IntPtr found = IntPtr.Zero;
+                EnumChildWindows(defView, delegate(IntPtr child, IntPtr lp)
+                {
+                    string cls = GetClassNameString(child);
+                    if (cls == "SysListView32")
+                    {
+                        found = child;
+                        return false;
+                    }
+                    return true;
+                }, IntPtr.Zero);
+
+                if (found != IntPtr.Zero)
+                {
+                    _cachedDesktopListView = found;
+                    return found;
+                }
+            }
+
+            return IntPtr.Zero;
+        }
+
+        public static bool AreIconsVisible()
+        {
+            IntPtr lv = GetDesktopListView();
+            if (lv != IntPtr.Zero)
+            {
+                return IsWindowVisible(lv);
+            }
+
+            IntPtr defView = GetDesktopDefView();
+            if (defView != IntPtr.Zero)
+            {
+                bool anyVisible = false;
+                EnumChildWindows(defView, delegate(IntPtr child, IntPtr lp)
+                {
+                    if (IsWindowVisible(child))
+                    {
+                        anyVisible = true;
+                        return false;
+                    }
+                    return true;
+                }, IntPtr.Zero);
+                return anyVisible;
+            }
+
+            return true;
+        }
+
+        public static void SetIconsVisibility(bool visible)
+        {
+            IntPtr defView = GetDesktopDefView();
+            if (defView != IntPtr.Zero)
+            {
+                // KRİTİK: SHELLDLL_DefView her zaman AÇIK (SW_SHOW) kalmalıdır!
+                // Asla SHELLDLL_DefView penceresine SW_HIDE verilmez; aksi halde Windows Gezgini
+                // masaüstünün kapandığını varsayıp Başlat / Görev Çubuğunu (Shell_TrayWnd) yok edebilir!
+                if (!IsWindowVisible(defView))
+                {
+                    ShowWindow(defView, SW_SHOW);
+                }
+
+                IntPtr lv = GetDesktopListView();
+                if (lv != IntPtr.Zero)
+                {
+                    ShowWindow(lv, visible ? SW_SHOW : SW_HIDE);
+                }
+                else
+                {
+                    // SysListView32 bulunamazsa defView'in alt çocuk pencerelerini gizle/göster (defView'i ASLA gizleme)
+                    EnumChildWindows(defView, delegate(IntPtr child, IntPtr lp)
+                    {
+                        ShowWindow(child, visible ? SW_SHOW : SW_HIDE);
+                        return true;
+                    }, IntPtr.Zero);
+                }
+
+                try
+                {
+                    RedrawWindow(defView, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+                }
+                catch { }
+            }
+
+            // Simgeler gizlendiğinde veya gösterildiğinde görev çubuğunun daima görünür ve en üstte kalmasını sağla
+            EnsureTaskbarVisible();
+        }
+
+        public static void SetTaskbarVisibility(bool visible)
+        {
+            try
+            {
+                // Başlat ve görev çubuğu hiçbir zaman gizlenmez - daima görünür ve en üst katmanda tutulur.
+                int cmd = SW_SHOWNOACTIVATE;
+                uint flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW;
+
+                // 1. Ana Monitör Görev ve Başlat Çubuğu (Shell_TrayWnd)
+                IntPtr tray = FindWindow("Shell_TrayWnd", null);
+                if (tray != IntPtr.Zero)
+                {
+                    ShowWindow(tray, cmd);
+                    SetWindowPos(tray, HWND_TOPMOST, 0, 0, 0, 0, flags);
+                }
+
+                // 2. Çift ve Çoklu Monitör İkincil Görev Çubukları (Shell_SecondaryTrayWnd)
+                var secList = new List<IntPtr>();
+                IntPtr sec = IntPtr.Zero;
+                while ((sec = FindWindowEx(IntPtr.Zero, sec, "Shell_SecondaryTrayWnd", null)) != IntPtr.Zero)
+                {
+                    secList.Add(sec);
+                }
+
+                foreach (var h in secList)
+                {
+                    ShowWindow(h, cmd);
+                    SetWindowPos(h, HWND_TOPMOST, 0, 0, 0, 0, flags);
+                }
+
+                // 3. Varsa bağımsız Başlat Butonu (Windows 7 / Legacy uyumluluğu)
+                IntPtr startBtn = FindWindowEx(IntPtr.Zero, IntPtr.Zero, "Button", "Start");
+                if (startBtn != IntPtr.Zero)
+                {
+                    ShowWindow(startBtn, cmd);
+                    SetWindowPos(startBtn, HWND_TOPMOST, 0, 0, 0, 0, flags);
+                }
+            }
+            catch { }
+        }
+
+        public static void EnsureTaskbarVisible()
+        {
+            SetTaskbarVisibility(true);
+        }
+
+        public static uint GetIdleTimeMs()
+        {
+            var lii = new LASTINPUTINFO();
+            lii.cbSize = (uint)Marshal.SizeOf(lii);
+            if (GetLastInputInfo(ref lii))
+            {
+                return (uint)Environment.TickCount - lii.dwTime;
+            }
+            return 0;
+        }
+
+        public static void SimulateWinD()
+        {
+            try
+            {
+                keybd_event(VK_LWIN, 0, 0, UIntPtr.Zero);
+                keybd_event(VK_D, 0, 0, UIntPtr.Zero);
+                keybd_event(VK_D, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+                keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            }
+            catch { }
+        }
+
+        public static void MinimizeAllWindows()
+        {
+            try
+            {
+                Type shellType = Type.GetTypeFromProgID("Shell.Application");
+                if (shellType != null)
+                {
+                    object shell = Activator.CreateInstance(shellType);
+                    shellType.InvokeMember("ToggleDesktop", System.Reflection.BindingFlags.InvokeMethod, null, shell, null);
+                    return;
+                }
+            }
+            catch { }
+
+            SimulateWinD();
+        }
+
+        public static bool AreAppWindowsOpen()
+        {
+            bool hasOpenApp = false;
+            IntPtr shellWnd = GetShellWindow();
+            IntPtr desktopWnd = GetDesktopWindow();
+            uint currentPid = 0;
+            try { currentPid = (uint)System.Diagnostics.Process.GetCurrentProcess().Id; } catch { }
+
+            EnumWindows(delegate(IntPtr hWnd, IntPtr lParam)
+            {
+                if (!IsWindowVisible(hWnd)) return true;
+                if (IsIconic(hWnd)) return true; // Zaten simge durumuna küçültülmüş
+
+                if (hWnd == desktopWnd || hWnd == shellWnd) return true;
+
+                if (currentPid != 0)
+                {
+                    uint pid = 0;
+                    GetWindowThreadProcessId(hWnd, out pid);
+                    if (pid == currentPid) return true; // Desktop Zen pencerelerini yoksay
+                }
+
+                int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+                if ((exStyle & WS_EX_TOOLWINDOW) != 0) return true; // Tool pencerelerini (widget, tooltip vb.) yoksay
+
+                // DWM Cloaked kontrolü (arka planda askıda olan UWP / Windows Store pencereleri)
+                int cloaked = 0;
+                try
+                {
+                    DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, ref cloaked, sizeof(int));
+                }
+                catch { }
+                if (cloaked != 0) return true;
+
+                var sbCls = new StringBuilder(128);
+                GetClassName(hWnd, sbCls, 128);
+                string cls = sbCls.ToString();
+                if (cls == "Progman" || cls == "WorkerW" || cls == "Shell_TrayWnd" || 
+                    cls == "Shell_SecondaryTrayWnd" || cls == "Windows.UI.Core.CoreWindow" ||
+                    cls == "DV2ControlHost" || cls == "SideBar_HTMLHostWindow")
+                {
+                    return true;
+                }
+
+                var sbTitle = new StringBuilder(256);
+                GetWindowText(hWnd, sbTitle, 256);
+                string title = sbTitle.ToString().Trim();
+                if (string.IsNullOrEmpty(title)) return true;
+
+                // Gerçek, görünür bir uygulama penceresi bulundu!
+                hasOpenApp = true;
+                return false; // Arama sonlandırılır
+            }, IntPtr.Zero);
+
+            return hasOpenApp;
+        }
+
+        public static string GetClassNameString(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero) return "";
+            var sb = new StringBuilder(256);
+            GetClassName(hWnd, sb, 256);
+            return sb.ToString();
+        }
+
+        public static bool IsPointOverDesktop(POINT pt)
+        {
+            IntPtr hwnd = WindowFromPoint(pt);
+            if (hwnd == IntPtr.Zero) return false;
+
+            // İlham kartları pencereleri (Günün Âyeti & Günün Hadîsi) masaüstü arka planı değildir
+            if (InspirationWindowHandles.Contains(hwnd)) return false;
+            IntPtr root = GetAncestor(hwnd, GA_ROOT);
+            if (root != IntPtr.Zero && InspirationWindowHandles.Contains(root)) return false;
+
+            if (hwnd == GetDesktopWindow()) return true;
+
+            // Desktop Zen özel duvar kâğıdı pencereleri
+            if (WallpaperWindowHandles.Contains(hwnd)) return true;
+            if (root != IntPtr.Zero && WallpaperWindowHandles.Contains(root)) return true;
+
+            // Görev çubuğu ve bildirim alanlarını hariç tut
+            string cname = GetClassNameString(hwnd);
+            if (cname == "Shell_TrayWnd" || cname == "Shell_SecondaryTrayWnd" || cname == "TrayNotifyWnd") return false;
+            string rootCname = root != IntPtr.Zero ? GetClassNameString(root) : "";
+            if (rootCname == "Shell_TrayWnd" || rootCname == "Shell_SecondaryTrayWnd") return false;
+
+            // Windows masaüstü sınıfları
+            if (cname == "SysListView32" || cname == "SHELLDLL_DefView" || cname == "Progman" || cname == "WorkerW")
+                return true;
+
+            if (rootCname == "Progman" || rootCname == "WorkerW")
+                return true;
+
+            return false;
+        }
+
+        public static bool IsCursorOverDesktop()
+        {
+            POINT pt;
+            if (GetCursorPos(out pt))
+            {
+                return IsPointOverDesktop(pt);
+            }
+            return false;
+        }
+    }
+
+    // ==========================================
+    // CANLI HAVA DURUMU SERVİSİ
+    // ==========================================
+    public class WeatherData
+    {
+        public int Temperature;
+        public string ConditionText;
+        public string ConditionType; // clear, partly_cloudy, overcast, rain, snow, thunder, fog
+        public string City;
+    }
+
+    public static class WeatherService
+    {
+        static WeatherService()
+        {
+            try
+            {
+                ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072 | (SecurityProtocolType)768 | SecurityProtocolType.Tls;
+            }
+            catch { }
+        }
+
+        public static void FetchWeatherAsync(string cityName, Action<WeatherData> onResult)
+        {
+            var thread = new Thread(delegate()
+            {
+                try
+                {
+                    string safeCity = Uri.EscapeDataString(cityName);
+                    string geoUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + safeCity + "&count=1&language=tr&format=json";
+                    var req = (HttpWebRequest)WebRequest.Create(geoUrl);
+                    req.UserAgent = "ModernAutoHideIcons/2.0";
+                    req.Timeout = 6000;
+
+                    string lat = "", lon = "", foundCity = cityName;
+                    using (var resp = (HttpWebResponse)req.GetResponse())
+                    using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                    {
+                        string json = reader.ReadToEnd();
+                        var latM = Regex.Match(json, "\"latitude\"\\s*:\\s*([0-9\\.\\-]+)");
+                        var lonM = Regex.Match(json, "\"longitude\"\\s*:\\s*([0-9\\.\\-]+)");
+                        var nameM = Regex.Match(json, "\"name\"\\s*:\\s*\"([^\"]+)\"");
+                        if (latM.Success && lonM.Success)
+                        {
+                            lat = latM.Groups[1].Value;
+                            lon = lonM.Groups[1].Value;
+                            if (nameM.Success) foundCity = nameM.Groups[1].Value;
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(lat) && !string.IsNullOrEmpty(lon))
+                    {
+                        string wUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current=temperature_2m,weather_code&timezone=auto";
+                        var wreq = (HttpWebRequest)WebRequest.Create(wUrl);
+                        wreq.UserAgent = "ModernAutoHideIcons/2.0";
+                        wreq.Timeout = 6000;
+
+                        using (var wresp = (HttpWebResponse)wreq.GetResponse())
+                        using (var wreader = new StreamReader(wresp.GetResponseStream(), Encoding.UTF8))
+                        {
+                            string wjson = wreader.ReadToEnd();
+                            var tempM = Regex.Match(wjson, "\"temperature_2m\"\\s*:\\s*([0-9\\.\\-]+)");
+                            var codeM = Regex.Match(wjson, "\"weather_code\"\\s*:\\s*([0-9]+)");
+
+                            if (tempM.Success && codeM.Success)
+                            {
+                                double temp = double.Parse(tempM.Groups[1].Value, CultureInfo.InvariantCulture);
+                                int code = int.Parse(codeM.Groups[1].Value);
+
+                                var wd = new WeatherData();
+                                wd.Temperature = (int)Math.Round(temp);
+                                wd.City = foundCity;
+                                MapCode(code, wd);
+                                if (onResult != null) onResult(wd);
+                                return;
+                            }
+                        }
+                    }
+                }
+                catch { }
+
+                // Hata veya internet yoksa varsayılan
+                var fallback = new WeatherData();
+                fallback.Temperature = 18;
+                fallback.ConditionText = "Parçalı Bulutlu";
+                fallback.ConditionType = "partly_cloudy";
+                fallback.City = cityName;
+                if (onResult != null) onResult(fallback);
+            });
+            thread.IsBackground = true;
+            thread.Start();
+        }
+
+        private static void MapCode(int code, WeatherData wd)
+        {
+            if (code == 0) { wd.ConditionText = "Açık"; wd.ConditionType = "clear"; }
+            else if (code == 1) { wd.ConditionText = "Çoğunlukla Açık"; wd.ConditionType = "clear"; }
+            else if (code == 2) { wd.ConditionText = "Parçalı Bulutlu"; wd.ConditionType = "partly_cloudy"; }
+            else if (code == 3) { wd.ConditionText = "Bulutlu"; wd.ConditionType = "overcast"; }
+            else if (code == 45 || code == 48) { wd.ConditionText = "Sisli"; wd.ConditionType = "fog"; }
+            else if (code >= 51 && code <= 55) { wd.ConditionText = "Çisenti"; wd.ConditionType = "rain"; }
+            else if (code >= 61 && code <= 65) { wd.ConditionText = "Yağmurlu"; wd.ConditionType = "rain"; }
+            else if (code >= 71 && code <= 77) { wd.ConditionText = "Karlı"; wd.ConditionType = "snow"; }
+            else if (code >= 80 && code <= 82) { wd.ConditionText = "Sağanak Yağış"; wd.ConditionType = "rain"; }
+            else if (code >= 85 && code <= 86) { wd.ConditionText = "Kar Sağanağı"; wd.ConditionType = "snow"; }
+            else if (code >= 95) { wd.ConditionText = "Gök Gürültülü Fırtına"; wd.ConditionType = "thunder"; }
+            else { wd.ConditionText = "Açık"; wd.ConditionType = "clear"; }
+        }
+    }
+
+    // ==========================================
+    // CANLI FİNANS MODELLERİ VE SERVİSİ
+    // ==========================================
+    public class FinanceItem
+    {
+        public string Price = "--";
+        public string Change = "%0,00";
+        public bool IsUp = true;
+    }
+
+    public class CustomFinanceItem : FinanceItem
+    {
+        public string Symbol = "";
+        public string Title = "";
+    }
+
+    public class FinanceData
+    {
+        public FinanceItem Usd = new FinanceItem();
+        public FinanceItem Eur = new FinanceItem();
+        public FinanceItem GramGold = new FinanceItem();
+        public FinanceItem OunceGold = new FinanceItem();
+        public FinanceItem Bist = new FinanceItem();
+        public FinanceItem Btc = new FinanceItem();
+        public FinanceItem Eth = new FinanceItem();
+        public List<CustomFinanceItem> CustomItems = new List<CustomFinanceItem>();
+        public string LastUpdate = "--:--";
+        public bool IsSuccess = false;
+        public string ErrorMessage = "";
+    }
+
+    public static class FinanceCache
+    {
+        private static string CachePath
+        {
+            get { return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "finance_cache.json"); }
+        }
+
+        public static FinanceData Load()
+        {
+            try
+            {
+                if (File.Exists(CachePath))
+                {
+                    string json = File.ReadAllText(CachePath, Encoding.UTF8);
+                    var data = new FinanceData();
+                    data.Usd.Price = GetString(json, "UsdPrice", "--");
+                    data.Usd.Change = GetString(json, "UsdChange", "%0,00");
+                    data.Usd.IsUp = GetBool(json, "UsdUp", true);
+
+                    data.Eur.Price = GetString(json, "EurPrice", "--");
+                    data.Eur.Change = GetString(json, "EurChange", "%0,00");
+                    data.Eur.IsUp = GetBool(json, "EurUp", true);
+
+                    data.GramGold.Price = GetString(json, "GramGoldPrice", "--");
+                    data.GramGold.Change = GetString(json, "GramGoldChange", "%0,00");
+                    data.GramGold.IsUp = GetBool(json, "GramGoldUp", true);
+
+                    data.OunceGold.Price = GetString(json, "OunceGoldPrice", "--");
+                    data.OunceGold.Change = GetString(json, "OunceGoldChange", "%0,00");
+                    data.OunceGold.IsUp = GetBool(json, "OunceGoldUp", true);
+
+                    data.Bist.Price = GetString(json, "BistPrice", "--");
+                    data.Bist.Change = GetString(json, "BistChange", "%0,00");
+                    data.Bist.IsUp = GetBool(json, "BistUp", true);
+
+                    data.Btc.Price = GetString(json, "BtcPrice", "--");
+                    data.Btc.Change = GetString(json, "BtcChange", "%0,00");
+                    data.Btc.IsUp = GetBool(json, "BtcUp", true);
+
+                    data.Eth.Price = GetString(json, "EthPrice", "--");
+                    data.Eth.Change = GetString(json, "EthChange", "%0,00");
+                    data.Eth.IsUp = GetBool(json, "EthUp", true);
+
+                    var matches = Regex.Matches(json, @"\{\s*""Symbol"":\s*""([^""]*)"",\s*""Title"":\s*""([^""]*)"",\s*""Price"":\s*""([^""]*)"",\s*""Change"":\s*""([^""]*)"",\s*""IsUp"":\s*(true|false)\s*\}");
+                    foreach (Match match in matches)
+                    {
+                        var it = new CustomFinanceItem();
+                        it.Symbol = match.Groups[1].Value;
+                        it.Title = match.Groups[2].Value;
+                        it.Price = match.Groups[3].Value;
+                        it.Change = match.Groups[4].Value;
+                        it.IsUp = bool.Parse(match.Groups[5].Value);
+                        data.CustomItems.Add(it);
+                    }
+
+                    data.LastUpdate = GetString(json, "LastUpdate", "--:--");
+                    data.IsSuccess = true;
+                    return data;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        public static void Save(FinanceData data)
+        {
+            try
+            {
+                if (data == null) return;
+                var sb = new StringBuilder();
+                sb.AppendLine("{");
+                sb.AppendLine("  \"UsdPrice\": \"" + Escape(data.Usd.Price) + "\",");
+                sb.AppendLine("  \"UsdChange\": \"" + Escape(data.Usd.Change) + "\",");
+                sb.AppendLine("  \"UsdUp\": " + data.Usd.IsUp.ToString().ToLower() + ",");
+                sb.AppendLine("  \"EurPrice\": \"" + Escape(data.Eur.Price) + "\",");
+                sb.AppendLine("  \"EurChange\": \"" + Escape(data.Eur.Change) + "\",");
+                sb.AppendLine("  \"EurUp\": " + data.Eur.IsUp.ToString().ToLower() + ",");
+                sb.AppendLine("  \"GramGoldPrice\": \"" + Escape(data.GramGold.Price) + "\",");
+                sb.AppendLine("  \"GramGoldChange\": \"" + Escape(data.GramGold.Change) + "\",");
+                sb.AppendLine("  \"GramGoldUp\": " + data.GramGold.IsUp.ToString().ToLower() + ",");
+                sb.AppendLine("  \"OunceGoldPrice\": \"" + Escape(data.OunceGold.Price) + "\",");
+                sb.AppendLine("  \"OunceGoldChange\": \"" + Escape(data.OunceGold.Change) + "\",");
+                sb.AppendLine("  \"OunceGoldUp\": " + data.OunceGold.IsUp.ToString().ToLower() + ",");
+                sb.AppendLine("  \"BistPrice\": \"" + Escape(data.Bist.Price) + "\",");
+                sb.AppendLine("  \"BistChange\": \"" + Escape(data.Bist.Change) + "\",");
+                sb.AppendLine("  \"BistUp\": " + data.Bist.IsUp.ToString().ToLower() + ",");
+                sb.AppendLine("  \"BtcPrice\": \"" + Escape(data.Btc.Price) + "\",");
+                sb.AppendLine("  \"BtcChange\": \"" + Escape(data.Btc.Change) + "\",");
+                sb.AppendLine("  \"BtcUp\": " + data.Btc.IsUp.ToString().ToLower() + ",");
+                sb.AppendLine("  \"EthPrice\": \"" + Escape(data.Eth.Price) + "\",");
+                sb.AppendLine("  \"EthChange\": \"" + Escape(data.Eth.Change) + "\",");
+                sb.AppendLine("  \"EthUp\": " + data.Eth.IsUp.ToString().ToLower() + ",");
+                if (data.CustomItems != null && data.CustomItems.Count > 0)
+                {
+                    sb.AppendLine("  \"CustomItems\": [");
+                    for (int i = 0; i < data.CustomItems.Count; i++)
+                    {
+                        var it = data.CustomItems[i];
+                        string comma = (i < data.CustomItems.Count - 1) ? "," : "";
+                        sb.AppendLine("    { \"Symbol\": \"" + Escape(it.Symbol) + "\", \"Title\": \"" + Escape(it.Title) + "\", \"Price\": \"" + Escape(it.Price) + "\", \"Change\": \"" + Escape(it.Change) + "\", \"IsUp\": " + it.IsUp.ToString().ToLower() + " }" + comma);
+                    }
+                    sb.AppendLine("  ],");
+                }
+                sb.AppendLine("  \"LastUpdate\": \"" + Escape(data.LastUpdate) + "\"");
+                sb.AppendLine("}");
+                File.WriteAllText(CachePath, sb.ToString(), Encoding.UTF8);
+            }
+            catch { }
+        }
+
+        private static string Escape(string s) { return s != null ? s.Replace("\\", "\\\\").Replace("\"", "\\\"") : ""; }
+        private static bool GetBool(string json, string key, bool def)
+        {
+            var m = Regex.Match(json, "\"" + key + "\"\\s*:\\s*(true|false)", RegexOptions.IgnoreCase);
+            return m.Success ? bool.Parse(m.Groups[1].Value) : def;
+        }
+        private static string GetString(string json, string key, string def)
+        {
+            var m = Regex.Match(json, "\"" + key + "\"\\s*:\\s*\"([^\"]*)\"");
+            return m.Success ? m.Groups[1].Value : def;
+        }
+    }
+
+    public static class FinanceService
+    {
+        public static void FetchAsync(Config cfg, Action<FinanceData> onResult)
+        {
+            var thread = new Thread(delegate()
+            {
+                var data = new FinanceData();
+                bool currencySuccess = false;
+                bool bistSuccess = false;
+                string currencyGoldJson = null;
+
+                // 1. Dolar, Euro, Gram Altın, Ons Altın
+                try
+                {
+                    string url = string.IsNullOrEmpty(cfg.FinanceApiUrl) ? FinanceEndpoints.DefaultCurrencyGoldUrl : cfg.FinanceApiUrl;
+                    var req = (HttpWebRequest)WebRequest.Create(url);
+                    req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
+                    req.Timeout = 5000;
+                    using (var resp = (HttpWebResponse)req.GetResponse())
+                    using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                    {
+                        currencyGoldJson = reader.ReadToEnd();
+                        string json = currencyGoldJson;
+                        
+                        // USD
+                        var usdM = Regex.Match(json, "\"USD\"\\s*:\\s*\\{[^}]*\"Selling\"\\s*:\\s*\"([^\"]+)\"[^}]*\"Change\"\\s*:\\s*\"([^\"]+)\"");
+                        if (usdM.Success)
+                        {
+                            data.Usd.Price = FormatNumber(usdM.Groups[1].Value, "", " ₺", 2);
+                            data.Usd.Change = FormatChange(usdM.Groups[2].Value, out data.Usd.IsUp);
+                        }
+
+                        // EUR
+                        var eurM = Regex.Match(json, "\"EUR\"\\s*:\\s*\\{[^}]*\"Selling\"\\s*:\\s*\"([^\"]+)\"[^}]*\"Change\"\\s*:\\s*\"([^\"]+)\"");
+                        if (eurM.Success)
+                        {
+                            data.Eur.Price = FormatNumber(eurM.Groups[1].Value, "", " ₺", 2);
+                            data.Eur.Change = FormatChange(eurM.Groups[2].Value, out data.Eur.IsUp);
+                        }
+
+                        // Gram Altın
+                        var gaM = Regex.Match(json, "\"gram-altin\"\\s*:\\s*\\{[^}]*\"Selling\"\\s*:\\s*\"([^\"]+)\"[^}]*\"Change\"\\s*:\\s*\"([^\"]+)\"");
+                        if (gaM.Success)
+                        {
+                            data.GramGold.Price = FormatNumber(gaM.Groups[1].Value, "", " ₺", 0);
+                            data.GramGold.Change = FormatChange(gaM.Groups[2].Value, out data.GramGold.IsUp);
+                        }
+
+                        // Ons Altın
+                        var onsM = Regex.Match(json, "\"ons\"\\s*:\\s*\\{[^}]*\"Selling\"\\s*:\\s*\"([^\"]+)\"[^}]*\"Change\"\\s*:\\s*\"([^\"]+)\"");
+                        if (onsM.Success)
+                        {
+                            data.OunceGold.Price = FormatNumber(onsM.Groups[1].Value, "$", "", 0);
+                            data.OunceGold.Change = FormatChange(onsM.Groups[2].Value, out data.OunceGold.IsUp);
+                        }
+
+                        currencySuccess = true;
+                    }
+                }
+                catch { }
+
+                // 2. BIST 100
+                try
+                {
+                    string bUrl = string.IsNullOrEmpty(cfg.BistApiUrl) ? FinanceEndpoints.DefaultBistUrl : cfg.BistApiUrl;
+                    var req = (HttpWebRequest)WebRequest.Create(bUrl);
+                    req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
+                    req.Timeout = 5000;
+                    using (var resp = (HttpWebResponse)req.GetResponse())
+                    using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                    {
+                        string json = reader.ReadToEnd();
+                        var pM = Regex.Match(json, "\"regularMarketPrice\"\\s*:\\s*([0-9\\.]+)");
+                        var cM = Regex.Match(json, "\"chartPreviousClose\"\\s*:\\s*([0-9\\.]+)");
+                        if (!cM.Success) cM = Regex.Match(json, "\"previousClose\"\\s*:\\s*([0-9\\.]+)");
+
+                        if (pM.Success)
+                        {
+                            double price = double.Parse(pM.Groups[1].Value, CultureInfo.InvariantCulture);
+                            double prev = cM.Success ? double.Parse(cM.Groups[1].Value, CultureInfo.InvariantCulture) : price;
+                            double chg = prev > 0 ? ((price - prev) / prev) * 100.0 : 0.0;
+                            data.Bist.Price = Math.Round(price).ToString("#,##0", CultureInfo.InvariantCulture).Replace(",", ".");
+                            data.Bist.IsUp = chg >= 0;
+                            data.Bist.Change = (chg >= 0 ? "▲ %" : "▼ %") + Math.Abs(chg).ToString("0.00", CultureInfo.InvariantCulture).Replace(".", ",");
+                            bistSuccess = true;
+                        }
+                    }
+                }
+                catch { }
+
+                // 3. Kripto Para (BTC & ETH)
+                if (cfg.ShowCrypto || cfg.ShowBtc)
+                {
+                    try
+                    {
+                        string btcUrl = string.IsNullOrEmpty(cfg.CryptoBtcUrl) ? FinanceEndpoints.DefaultBtcUrl : cfg.CryptoBtcUrl;
+                        var req = (HttpWebRequest)WebRequest.Create(btcUrl);
+                        req.UserAgent = "Mozilla/5.0";
+                        req.Timeout = 4000;
+                        using (var resp = (HttpWebResponse)req.GetResponse())
+                        using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                        {
+                            string j = reader.ReadToEnd();
+                            var pM = Regex.Match(j, "\"lastPrice\"\\s*:\\s*\"([0-9\\.]+)\"");
+                            var cM = Regex.Match(j, "\"priceChangePercent\"\\s*:\\s*\"([^\"]+)\"");
+                            if (pM.Success)
+                            {
+                                double p = double.Parse(pM.Groups[1].Value, CultureInfo.InvariantCulture);
+                                data.Btc.Price = "$" + Math.Round(p).ToString("#,##0", CultureInfo.InvariantCulture).Replace(",", ".");
+                                data.Btc.Change = FormatChange(cM.Success ? cM.Groups[1].Value : "0", out data.Btc.IsUp);
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                if (cfg.ShowCrypto || cfg.ShowEth)
+                {
+                    try
+                    {
+                        string ethUrl = string.IsNullOrEmpty(cfg.CryptoEthUrl) ? FinanceEndpoints.DefaultEthUrl : cfg.CryptoEthUrl;
+                        var req = (HttpWebRequest)WebRequest.Create(ethUrl);
+                        req.UserAgent = "Mozilla/5.0";
+                        req.Timeout = 4000;
+                        using (var resp = (HttpWebResponse)req.GetResponse())
+                        using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                        {
+                            string j = reader.ReadToEnd();
+                            var pM = Regex.Match(j, "\"lastPrice\"\\s*:\\s*\"([0-9\\.]+)\"");
+                            var cM = Regex.Match(j, "\"priceChangePercent\"\\s*:\\s*\"([^\"]+)\"");
+                            if (pM.Success)
+                            {
+                                double p = double.Parse(pM.Groups[1].Value, CultureInfo.InvariantCulture);
+                                data.Eth.Price = "$" + Math.Round(p).ToString("#,##0", CultureInfo.InvariantCulture).Replace(",", ".");
+                                data.Eth.Change = FormatChange(cM.Success ? cM.Groups[1].Value : "0", out data.Eth.IsUp);
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                // 4. İsteğe Bağlı Özel Pariteler (Kısa Adı ile Kripto / Döviz)
+                if (!string.IsNullOrEmpty(cfg.CustomParities))
+                {
+                    string[] customSyms = cfg.CustomParities.Split(new char[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string rawSym in customSyms)
+                    {
+                        string sym = rawSym.Trim().ToUpperInvariant();
+                        if (string.IsNullOrEmpty(sym)) continue;
+
+                        bool found = false;
+                        // 1. Truncgil içinde var mı? (örn: GBP, CHF, JPY, CAD, RUB, CEYREK)
+                        if (currencySuccess && !string.IsNullOrEmpty(currencyGoldJson))
+                        {
+                            string pattern = "\"" + Regex.Escape(sym) + "\"\\s*:\\s*\\{[^}]*\"Selling\"\\s*:\\s*\"([^\"]+)\"[^}]*\"Change\"\\s*:\\s*\"([^\"]+)\"";
+                            var tm = Regex.Match(currencyGoldJson, pattern, RegexOptions.IgnoreCase);
+                            if (!tm.Success)
+                            {
+                                pattern = "\"" + Regex.Escape(sym) + "\"\\s*:\\s*\\{[^}]*\"Change\"\\s*:\\s*\"([^\"]+)\"[^}]*\"Selling\"\\s*:\\s*\"([^\"]+)\"";
+                                tm = Regex.Match(currencyGoldJson, pattern, RegexOptions.IgnoreCase);
+                                if (tm.Success)
+                                {
+                                    var cItem = new CustomFinanceItem { Symbol = sym, Title = sym + " / TRY" };
+                                    cItem.Price = FormatNumber(tm.Groups[2].Value, "", " ₺", 2);
+                                    cItem.Change = FormatChange(tm.Groups[1].Value, out cItem.IsUp);
+                                    data.CustomItems.Add(cItem);
+                                    found = true;
+                                }
+                            }
+                            else
+                            {
+                                var cItem = new CustomFinanceItem { Symbol = sym, Title = sym + " / TRY" };
+                                cItem.Price = FormatNumber(tm.Groups[1].Value, "", " ₺", 2);
+                                cItem.Change = FormatChange(tm.Groups[2].Value, out cItem.IsUp);
+                                data.CustomItems.Add(cItem);
+                                found = true;
+                            }
+                        }
+
+                        // 2. Truncgil'de yoksa veya kripto ise Binance'den sorgula (örn: SOL, AVAX, DOGE, XRP, BNB, ADA)
+                        if (!found)
+                        {
+                            try
+                            {
+                                string tickerSym = sym.EndsWith("USDT") ? sym : (sym + "USDT");
+                                var req = (HttpWebRequest)WebRequest.Create("https://api.binance.com/api/v3/ticker/24hr?symbol=" + tickerSym);
+                                req.UserAgent = "Mozilla/5.0";
+                                req.Timeout = 4000;
+                                using (var resp = (HttpWebResponse)req.GetResponse())
+                                using (var r = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                                {
+                                    string j = r.ReadToEnd();
+                                    var pM = Regex.Match(j, "\"lastPrice\"\\s*:\\s*\"([0-9\\.]+)\"");
+                                    var cM = Regex.Match(j, "\"priceChangePercent\"\\s*:\\s*\"([^\"]+)\"");
+                                    if (pM.Success)
+                                    {
+                                        string baseSym = sym.EndsWith("USDT") ? sym.Substring(0, sym.Length - 4) : sym;
+                                        var cItem = new CustomFinanceItem { Symbol = baseSym, Title = baseSym + " / USDT" };
+                                        cItem.Price = FormatCryptoPrice(pM.Groups[1].Value);
+                                        cItem.Change = FormatCryptoChange(cM.Success ? cM.Groups[1].Value : "0", out cItem.IsUp);
+                                        data.CustomItems.Add(cItem);
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                }
+
+                data.IsSuccess = (currencySuccess || bistSuccess || data.CustomItems.Count > 0);
+                if (data.IsSuccess)
+                {
+                    data.LastUpdate = DateTime.Now.ToString("HH:mm");
+                    FinanceCache.Save(data);
+                }
+                else
+                {
+                    data.ErrorMessage = "Veri alınamadı";
+                }
+
+                if (onResult != null)
+                {
+                    try { onResult(data); } catch { }
+                }
+            });
+            thread.IsBackground = true;
+            thread.Start();
+        }
+
+        private static string FormatCryptoPrice(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return "--";
+            double val;
+            if (double.TryParse(raw.Replace(",", "."), NumberStyles.Any, CultureInfo.InvariantCulture, out val))
+            {
+                if (val >= 1000)
+                    return "$" + Math.Round(val).ToString("#,##0", CultureInfo.InvariantCulture).Replace(",", ".");
+                if (val >= 1)
+                    return "$" + val.ToString("0.00", CultureInfo.InvariantCulture).Replace(".", ",");
+                if (val >= 0.001)
+                    return "$" + val.ToString("0.0000", CultureInfo.InvariantCulture).Replace(".", ",");
+                return "$" + val.ToString("0.000000", CultureInfo.InvariantCulture).Replace(".", ",");
+            }
+            return "$" + raw;
+        }
+
+        private static string FormatCryptoChange(string raw, out bool isUp)
+        {
+            isUp = true;
+            if (string.IsNullOrEmpty(raw)) return "▲ %0,00";
+            double val;
+            if (double.TryParse(raw.Replace(",", "."), NumberStyles.Any, CultureInfo.InvariantCulture, out val))
+            {
+                isUp = val >= 0;
+                return (isUp ? "▲ %" : "▼ %") + Math.Abs(val).ToString("0.00", CultureInfo.InvariantCulture).Replace(".", ",");
+            }
+            return FormatChange(raw, out isUp);
+        }
+
+        private static string FormatChange(string raw, out bool isUp)
+        {
+            isUp = true;
+            if (string.IsNullOrEmpty(raw)) return "▲ %0,00";
+            raw = raw.Replace("%", "").Trim();
+            if (raw.StartsWith("-"))
+            {
+                isUp = false;
+                raw = raw.Substring(1).Trim();
+            }
+            else if (raw.StartsWith("+"))
+            {
+                raw = raw.Substring(1).Trim();
+            }
+            double val;
+            if (double.TryParse(raw.Replace(",", "."), NumberStyles.Any, CultureInfo.InvariantCulture, out val))
+            {
+                string formatted = Math.Abs(val).ToString("0.00", CultureInfo.InvariantCulture).Replace(".", ",");
+                return (isUp ? "▲ %" : "▼ %") + formatted;
+            }
+            return (isUp ? "▲ %" : "▼ %") + raw.Replace(".", ",");
+        }
+
+        private static string FormatNumber(string raw, string prefix, string suffix, int decimals)
+        {
+            if (string.IsNullOrEmpty(raw)) return "--";
+            string clean = Regex.Replace(raw, @"[^0-9,\.]", "");
+            if (clean.Contains(".") && clean.Contains(","))
+            {
+                clean = clean.Replace(".", "").Replace(",", ".");
+            }
+            else if (clean.Contains(","))
+            {
+                clean = clean.Replace(",", ".");
+            }
+            double val;
+            if (double.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out val))
+            {
+                string numStr = (decimals == 0) ? Math.Round(val).ToString("#,##0", CultureInfo.InvariantCulture).Replace(",", ".")
+                                                : val.ToString("0." + new string('0', decimals), CultureInfo.InvariantCulture).Replace(".", ",");
+                return prefix + numStr + suffix;
+            }
+            return prefix + raw + suffix;
+        }
+
+        public static bool IsBistMarketOpen()
+        {
+            DateTime now = DateTime.Now;
+            bool isWeekday = (now.DayOfWeek >= DayOfWeek.Monday && now.DayOfWeek <= DayOfWeek.Friday);
+            TimeSpan time = now.TimeOfDay;
+            return isWeekday && (time >= new TimeSpan(10, 0, 0) && time < new TimeSpan(18, 0, 0));
+        }
+    }
+
+    // ==========================================
+    // FUTBOL MAÇ TAKİP MODÜLÜ (GS, FB, BJK, TS, TR)
+    // ==========================================
+    public class MatchItem
+    {
+        public string HomeTeam;
+        public string AwayTeam;
+        public DateTime MatchDate;
+        public string Tournament;
+        public int HomeScore = 0;
+        public int AwayScore = 0;
+        public bool HasScore = false;
+        public string Minute = "";
+        public string Goals = "";
+        public string HomeGoals = "";
+        public string AwayGoals = "";
+        public bool IsLive = false;
+        public bool IsFinished = false;
+        public DateTime? FinishTime = null;
+    }
+
+    public class MatchDisplayInfo
+    {
+        public bool HasMatch;
+        public bool IsToday;
+        public bool IsLive;
+        public bool IsFinished;
+        public string Title;
+        public string Detail;
+        public string FullText;
+        public string TodayTeamKey; // "galatasaray", "trabzonspor", "besiktas", "fenerbahce", "turkiye"
+        public DateTime MatchDate;
+        public MatchItem TodayMatchItem;
+        public List<MatchItem> AllUpcoming = new List<MatchItem>();
+    }
+
+    public static class MatchService
+    {
+        private static readonly string[] MonitoredTeams = new string[] {
+            "galatasaray", "fenerbahçe", "fenerbahce", "beşiktaş", "besiktas", "trabzonspor", "türkiye", "turkiye"
+        };
+        private static readonly Dictionary<string, DateTime> _recordedFinishTimes = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+
+        public static bool IsMatchFinished(MatchItem m, DateTime now)
+        {
+            if (m == null) return false;
+            if (m.IsFinished) return true;
+            if (now > m.MatchDate.AddMinutes(115)) return true;
+            return false;
+        }
+
+        public static DateTime GetMatchFinishTime(MatchItem m, DateTime now)
+        {
+            if (m == null) return DateTime.MinValue;
+            if (m.FinishTime.HasValue) return m.FinishTime.Value;
+
+            // Standart futbol maçı devre arası ve uzatmalar dahil ortalama 105 - 115 dakika sürer
+            DateTime estimated = m.MatchDate.AddMinutes(115);
+            if (m.IsFinished && now < estimated)
+            {
+                DateTime earlyEstimate = m.MatchDate.AddMinutes(105);
+                return (now > earlyEstimate) ? earlyEstimate : now;
+            }
+            return estimated;
+        }
+
+        public static bool IsClockThemeActive(MatchDisplayInfo matchInfo, DateTime now)
+        {
+            if (matchInfo == null || !matchInfo.IsToday || matchInfo.TodayMatchItem == null)
+                return false;
+
+            var m = matchInfo.TodayMatchItem;
+
+            // Maç henüz bitmediyse (başlamadıysa veya şu an canlı oynanıyorsa) saat kulüp renklerinde kalır
+            if (!IsMatchFinished(m, now))
+            {
+                return true;
+            }
+
+            // KULLANICI İSTEĞİ: "oynanan maç bittikten 1 saat sonra saat rengini normale al"
+            // Bitiş saatinden 1 saat sonrasına kadar kulüp renkleri korunur, süre dolunca normale döner
+            DateTime finishTime = GetMatchFinishTime(m, now);
+            DateTime revertTime = finishTime.AddHours(1);
+
+            return now < revertTime;
+        }
+
+        // KULLANICI KURALI:
+        // "maç bittiginde seçili takım kazandıgında yukarıdan aşağıya bayrak insin, 1 saat sonra bayragı da kaldır"
+        public static bool GetActiveVictoryInfo(Config cfg, DateTime now, out string winningTeam, out string scoreText)
+        {
+            winningTeam = null;
+            scoreText = null;
+
+            if (cfg == null || !cfg.ZenVictoryFlagEnabled) return false;
+
+            try
+            {
+                var list = LoadMatches(cfg);
+                if (list == null || list.Count == 0) return false;
+
+                DateTime today = now.Date;
+
+                // Kullanıcının ayarlardan seçtiği zafer takımı
+                string specificTeam = (!string.IsNullOrEmpty(cfg.ZenVictoryTeam) && cfg.ZenVictoryTeam != "auto")
+                    ? cfg.ZenVictoryTeam.ToLowerInvariant()
+                    : null;
+
+                for (int i = list.Count - 1; i >= 0; i--)
+                {
+                    var m = list[i];
+                    if (m.MatchDate.Date != today) continue;
+                    if (!IsMonitored(m, cfg)) continue;
+
+                    // Eğer ayarlarda belirli bir takım seçilmişse o takımın maçı olmalı
+                    if (!string.IsNullOrEmpty(specificTeam))
+                    {
+                        string hk = DetectTeamKeyByName(m.HomeTeam);
+                        string ak = DetectTeamKeyByName(m.AwayTeam);
+                        if (hk != specificTeam && ak != specificTeam) continue;
+                    }
+
+                    // KULLANICI ŞARTI: "maç bittiginde"
+                    if (!IsMatchFinished(m, now)) continue;
+
+                    // KULLANICI ŞARTI: "seçili takım kazandıgında"
+                    string winnerKey = null;
+                    if (m.HomeScore > m.AwayScore)
+                    {
+                        winnerKey = DetectTeamKeyByName(m.HomeTeam);
+                    }
+                    else if (m.AwayScore > m.HomeScore)
+                    {
+                        winnerKey = DetectTeamKeyByName(m.AwayTeam);
+                    }
+                    else
+                    {
+                        // Beraberlik veya mağlubiyet durumunda zafer bayrağı açılmaz
+                        continue;
+                    }
+
+                    if (string.IsNullOrEmpty(winnerKey)) continue;
+
+                    // Eğer belirli bir takım seçilmişse kazananın o takım olması şart
+                    if (!string.IsNullOrEmpty(specificTeam) && winnerKey != specificTeam)
+                    {
+                        continue;
+                    }
+
+                    // Eğer "auto" ise kazanan takımın takip edilen takımlardan biri olması şart
+                    if (string.IsNullOrEmpty(specificTeam) && !IsTeamTracked(winnerKey, cfg))
+                    {
+                        continue;
+                    }
+
+                    // KULLANICI ŞARTI: "1 saat sonra bayragı da kaldır"
+                    DateTime finishTime = GetMatchFinishTime(m, now);
+                    DateTime removeTime = finishTime.AddHours(1);
+
+                    if (now < removeTime)
+                    {
+                        winningTeam = winnerKey;
+                        scoreText = "⚽ " + m.HomeScore + " - " + m.AwayScore + " MAÇ SONUCU";
+                        return true;
+                    }
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+        public static bool IsTeamTracked(string teamKey, Config cfg)
+        {
+            if (string.IsNullOrEmpty(teamKey) || cfg == null) return false;
+            switch (teamKey.ToLowerInvariant())
+            {
+                case "galatasaray": return cfg.TrackGalatasaray;
+                case "fenerbahce": return cfg.TrackFenerbahce;
+                case "besiktas": return cfg.TrackBesiktas;
+                case "trabzonspor": return cfg.TrackTrabzonspor;
+                case "turkiye": return cfg.TrackTurkey;
+                default: return true;
+            }
+        }
+
+        public static string MatchesPath
+        {
+            get
+            {
+                string p1 = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "matches.json");
+                if (System.IO.File.Exists(p1)) return p1;
+                try
+                {
+                    string asmDir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                    string p2 = System.IO.Path.Combine(asmDir, "matches.json");
+                    if (System.IO.File.Exists(p2)) return p2;
+                }
+                catch { }
+                string p3 = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "matches.json");
+                if (System.IO.File.Exists(p3)) return p3;
+                return p1;
+            }
+        }
+
+        public static MatchDisplayInfo GetCurrentMatchInfo(Config cfg)
+        {
+            var info = new MatchDisplayInfo();
+            if (!cfg.ShowMatchTracker) return info;
+
+            try
+            {
+                var list = LoadMatches(cfg);
+                if (list == null || list.Count == 0) return info;
+
+                var monitoredList = new List<MatchItem>();
+                foreach (var m in list)
+                {
+                    if (IsMonitored(m, cfg)) monitoredList.Add(m);
+                }
+
+                DateTime now = DateTime.Now;
+                DateTime today = now.Date;
+
+                // 1. Bugün maç var mı? (Birden fazla maç varsa şu an canlı/aktif veya yaklaşan maça öncelik ver)
+                MatchItem todayMatch = null;
+                var todayMatches = new List<MatchItem>();
+                foreach (var m in monitoredList)
+                {
+                    if (m.MatchDate.Date == today)
+                    {
+                        todayMatches.Add(m);
+                    }
+                }
+
+                if (todayMatches.Count > 0)
+                {
+                    // 1. Öncelik: Şu an CANLI oynanmakta olan maç
+                    foreach (var m in todayMatches)
+                    {
+                        if (m.IsLive && !m.IsFinished)
+                        {
+                            todayMatch = m;
+                            break;
+                        }
+                    }
+
+                    // 2. Öncelik: Henüz başlamamış bugünkü en yakın maç
+                    if (todayMatch == null)
+                    {
+                        foreach (var m in todayMatches)
+                        {
+                            if (!m.IsFinished && m.MatchDate >= now)
+                            {
+                                todayMatch = m;
+                                break;
+                            }
+                        }
+                    }
+
+                    // 3. Öncelik: Bütün bugünkü maçlar bittiyse en son oynanan
+                    if (todayMatch == null)
+                    {
+                        todayMatch = todayMatches[todayMatches.Count - 1];
+                    }
+                }
+
+                if (todayMatch != null)
+                {
+                    info.HasMatch = true;
+                    info.IsToday = true;
+                    info.TodayTeamKey = DetectTeamKey(todayMatch, cfg);
+                    info.MatchDate = todayMatch.MatchDate;
+                    info.TodayMatchItem = todayMatch;
+                    info.AllUpcoming = monitoredList;
+
+                    if (cfg.ShowMatchLiveScores && todayMatch.IsLive)
+                    {
+                        info.IsLive = true;
+                        string minStr = !string.IsNullOrEmpty(todayMatch.Minute) ? todayMatch.Minute : "CANLI";
+                        string scoreStr = todayMatch.HomeScore + " - " + todayMatch.AwayScore;
+                        info.Title = "CANLI " + minStr;
+                        info.Detail = todayMatch.HomeTeam + " " + scoreStr + " " + todayMatch.AwayTeam + (!string.IsNullOrEmpty(todayMatch.Goals) ? (" (⚽ " + FormatGoalsString(todayMatch.Goals) + ")") : "");
+                        info.FullText = "🔴 CANLI " + minStr + " · " + todayMatch.HomeTeam + " " + scoreStr + " " + todayMatch.AwayTeam + BuildMatchTag(todayMatch.Tournament, todayMatch.Goals);
+                    }
+                    else if (todayMatch.IsFinished || now > todayMatch.MatchDate.AddMinutes(115))
+                    {
+                        info.IsFinished = true;
+                        string scoreStr = todayMatch.HomeScore + " - " + todayMatch.AwayScore;
+                        info.Title = "MAÇ SONUCU";
+                        info.Detail = todayMatch.HomeTeam + " " + scoreStr + " " + todayMatch.AwayTeam + (!string.IsNullOrEmpty(todayMatch.Goals) ? (" (⚽ " + FormatGoalsString(todayMatch.Goals) + ")") : "");
+                        info.FullText = "⚽ MAÇ SONUCU · " + todayMatch.HomeTeam + " " + scoreStr + " " + todayMatch.AwayTeam + BuildMatchTag(todayMatch.Tournament, todayMatch.Goals);
+                    }
+                    else
+                    {
+                        info.Title = "BUGÜN " + todayMatch.MatchDate.ToString("HH:mm");
+                        info.Detail = todayMatch.HomeTeam + " - " + todayMatch.AwayTeam;
+                        info.FullText = "⚽ BUGÜN " + todayMatch.MatchDate.ToString("HH:mm") + " · " + todayMatch.HomeTeam + " - " + todayMatch.AwayTeam + BuildMatchTag(todayMatch.Tournament, null);
+                    }
+                    return info;
+                }
+
+                // 2. Bugün yoksa ve en yakındaki maçı göster seçeneği açıksa:
+                if (cfg.ShowUpcomingMatch)
+                {
+                    MatchItem nextMatch = null;
+                    TimeSpan minDiff = TimeSpan.MaxValue;
+
+                    foreach (var m in monitoredList)
+                    {
+                        if (m.MatchDate >= now)
+                        {
+                            TimeSpan diff = m.MatchDate - now;
+                            if (diff < minDiff)
+                            {
+                                minDiff = diff;
+                                nextMatch = m;
+                            }
+                        }
+                    }
+
+                    if (nextMatch != null)
+                    {
+                        info.HasMatch = true;
+                        info.IsToday = false;
+                        int days = (int)Math.Ceiling(minDiff.TotalDays);
+                        string dayStr = days <= 1 ? "Yarın" : (days.ToString() + " gün kaldı");
+                        string dateStr = nextMatch.MatchDate.ToString("dd MMM ddd HH:mm", new CultureInfo("tr-TR"));
+                        info.Title = "En Yakın Maç: " + dateStr;
+                        info.Detail = nextMatch.HomeTeam + " - " + nextMatch.AwayTeam;
+                        string tourClean = CleanTournament(nextMatch.Tournament);
+                        string tag = !string.IsNullOrEmpty(tourClean) ? (" (" + dayStr + " · " + tourClean + ")") : (" (" + dayStr + ")");
+                        info.FullText = "⚽ Sonraki Maç: " + dateStr + " · " + nextMatch.HomeTeam + " - " + nextMatch.AwayTeam + tag;
+                        info.AllUpcoming = monitoredList;
+                        info.MatchDate = nextMatch.MatchDate;
+                        info.TodayTeamKey = DetectTeamKey(nextMatch, cfg);
+                        return info;
+                    }
+                }
+            }
+            catch { }
+
+            return info;
+        }
+
+        public static string CleanTournament(string tour)
+        {
+            if (string.IsNullOrEmpty(tour)) return "";
+            string t = tour.Trim();
+            bool isDerbi = t.IndexOf("derbi", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            // Kullanıcı talebi: "Trendyol Süper Lig" yazmana gerek yok -> tamamen filtrele
+            t = Regex.Replace(t, @"(?i)trendyol\s*s[uü]per\s*lig", "").Trim();
+            t = Regex.Replace(t, @"(?i)s[uü]per\s*lig", "").Trim();
+            t = Regex.Replace(t, @"(?i)derbi", "").Trim();
+            t = t.Trim('(', ')', ' ', '-', '·');
+
+            if (isDerbi)
+            {
+                if (string.IsNullOrEmpty(t)) return "Derbi";
+                return t + " · Derbi";
+            }
+
+            return t;
+        }
+
+        public static string BuildMatchTag(string tournament, string goals)
+        {
+            string tourClean = CleanTournament(tournament);
+
+            var parts = new List<string>();
+            if (!string.IsNullOrEmpty(goals))
+            {
+                string g = FormatGoalsString(goals);
+                if (!g.StartsWith("⚽")) g = "⚽ " + g;
+                parts.Add(g);
+            }
+            if (!string.IsNullOrEmpty(tourClean))
+            {
+                if (!parts.Contains(tourClean))
+                {
+                    parts.Add(tourClean);
+                }
+            }
+
+            if (parts.Count == 0) return "";
+            return " (" + string.Join(" · ", parts.ToArray()) + ")";
+        }
+
+        // KULLANICI KURALI: "gol atanların ismi ilgili takımın altında yazsın 2 ismi varsa ilk ismin baş harfini yaz"
+        public static string FormatPlayerName(string fullName)
+        {
+            if (string.IsNullOrWhiteSpace(fullName)) return "";
+            string[] parts = fullName.Trim().Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length <= 1) return fullName.Trim();
+
+            var culture = new CultureInfo("tr-TR");
+            var sb = new StringBuilder();
+            for (int i = 0; i < parts.Length - 1; i++)
+            {
+                string p = parts[i].Trim();
+                if (p.Length > 0)
+                {
+                    string initial = p.Substring(0, 1).ToUpper(culture);
+                    sb.Append(initial).Append(". ");
+                }
+            }
+            sb.Append(parts[parts.Length - 1].Trim());
+            return sb.ToString();
+        }
+
+        public static string FormatGoalScorerEntry(string entry)
+        {
+            if (string.IsNullOrWhiteSpace(entry)) return "";
+            string trimmed = entry.Trim();
+            if (trimmed.StartsWith("⚽")) trimmed = trimmed.Substring(1).Trim();
+
+            string minPrefix = "";
+            string rest = trimmed;
+            var mMin = Regex.Match(trimmed, @"^(\d+['′]?(?:\+\d+['′]?)?)\s+(.*)$");
+            if (mMin.Success)
+            {
+                minPrefix = mMin.Groups[1].Value.Trim();
+                if (!minPrefix.Contains("'") && !minPrefix.Contains("′")) minPrefix += "'";
+                rest = mMin.Groups[2].Value.Trim();
+            }
+
+            string suffix = "";
+            var mSuffix = Regex.Match(rest, @"^(.*?)\s*(\((?:P|Pen|Pen\.|K\.K\.|KK|OG|o\.g\.)\))$", RegexOptions.IgnoreCase);
+            if (mSuffix.Success)
+            {
+                rest = mSuffix.Groups[1].Value.Trim();
+                suffix = mSuffix.Groups[2].Value.Trim();
+            }
+
+            string formattedName = FormatPlayerName(rest);
+
+            var sb = new StringBuilder();
+            if (!string.IsNullOrEmpty(minPrefix)) sb.Append(minPrefix).Append(" ");
+            sb.Append(formattedName);
+            if (!string.IsNullOrEmpty(suffix)) sb.Append(" ").Append(suffix);
+            return sb.ToString();
+        }
+
+        public static string FormatGoalsString(string rawGoals)
+        {
+            if (string.IsNullOrWhiteSpace(rawGoals)) return "";
+            string g = rawGoals.Trim();
+            if (g.StartsWith("⚽")) g = g.Substring(1).Trim();
+            string[] parts = g.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            var list = new List<string>();
+            foreach (var p in parts)
+            {
+                string f = FormatGoalScorerEntry(p);
+                if (!string.IsNullOrEmpty(f)) list.Add(f);
+            }
+            return string.Join(", ", list.ToArray());
+        }
+
+        public static void ResolveHomeAndAwayGoals(MatchItem m, out string homeGoals, out string awayGoals)
+        {
+            homeGoals = "";
+            awayGoals = "";
+            if (m == null) return;
+
+            if (!string.IsNullOrWhiteSpace(m.HomeGoals) || !string.IsNullOrWhiteSpace(m.AwayGoals))
+            {
+                homeGoals = FormatGoalsString(m.HomeGoals);
+                awayGoals = FormatGoalsString(m.AwayGoals);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(m.Goals)) return;
+
+            var allList = new List<string>();
+            string clean = m.Goals.Trim();
+            if (clean.StartsWith("⚽")) clean = clean.Substring(1).Trim();
+            string[] rawParts = clean.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var rp in rawParts)
+            {
+                string f = FormatGoalScorerEntry(rp.Trim());
+                if (!string.IsNullOrEmpty(f)) allList.Add(f);
+            }
+
+            if (allList.Count == 0) return;
+
+            if (m.HomeScore > 0 && m.AwayScore == 0)
+            {
+                homeGoals = string.Join(", ", allList.ToArray());
+            }
+            else if (m.HomeScore == 0 && m.AwayScore > 0)
+            {
+                awayGoals = string.Join(", ", allList.ToArray());
+            }
+            else if (m.HomeScore > 0 && m.AwayScore > 0 && allList.Count == (m.HomeScore + m.AwayScore))
+            {
+                var hList = allList.GetRange(0, m.HomeScore);
+                var aList = allList.GetRange(m.HomeScore, m.AwayScore);
+                homeGoals = string.Join(", ", hList.ToArray());
+                awayGoals = string.Join(", ", aList.ToArray());
+            }
+            else
+            {
+                if (m.HomeScore >= m.AwayScore)
+                    homeGoals = string.Join(", ", allList.ToArray());
+                else
+                    awayGoals = string.Join(", ", allList.ToArray());
+            }
+        }
+
+        public static string FormatMatchItem(MatchItem m)
+        {
+            if (m == null) return "";
+            DateTime now = DateTime.Now;
+            if (m.IsLive)
+            {
+                string minStr = !string.IsNullOrEmpty(m.Minute) ? m.Minute : "CANLI";
+                string scoreStr = m.HomeScore + " - " + m.AwayScore;
+                return "🔴 CANLI " + minStr + " · " + m.HomeTeam + " " + scoreStr + " " + m.AwayTeam + BuildMatchTag(m.Tournament, m.Goals);
+            }
+            if (m.IsFinished || (m.MatchDate.Date == now.Date && now > m.MatchDate.AddMinutes(115)))
+            {
+                string scoreStr = m.HomeScore + " - " + m.AwayScore;
+                return "⚽ MAÇ SONUCU · " + m.HomeTeam + " " + scoreStr + " " + m.AwayTeam + BuildMatchTag(m.Tournament, m.Goals);
+            }
+            if (m.MatchDate.Date == now.Date)
+            {
+                return "⚽ BUGÜN " + m.MatchDate.ToString("HH:mm") + " · " + m.HomeTeam + " - " + m.AwayTeam + BuildMatchTag(m.Tournament, null);
+            }
+            string dateStr = m.MatchDate.ToString("dd MMM ddd HH:mm", new CultureInfo("tr-TR"));
+            return "⚽ " + dateStr + " · " + m.HomeTeam + " - " + m.AwayTeam + BuildMatchTag(m.Tournament, null);
+        }
+
+        public static bool IsMonitored(MatchItem m, Config cfg)
+        {
+            if (m == null || cfg == null) return false;
+            string h = (m.HomeTeam ?? "").ToLower();
+            string a = (m.AwayTeam ?? "").ToLower();
+
+            if (cfg.TrackTurkey && (h.Contains("türkiye") || h.Contains("turkiye") || a.Contains("türkiye") || a.Contains("turkiye"))) return true;
+            if (cfg.TrackGalatasaray && (h.Contains("galatasaray") || a.Contains("galatasaray"))) return true;
+            if (cfg.TrackFenerbahce && (h.Contains("fenerbahçe") || h.Contains("fenerbahce") || a.Contains("fenerbahçe") || a.Contains("fenerbahce"))) return true;
+            if (cfg.TrackBesiktas && (h.Contains("beşiktaş") || h.Contains("besiktas") || a.Contains("beşiktaş") || a.Contains("besiktas"))) return true;
+            if (cfg.TrackTrabzonspor && (h.Contains("trabzonspor") || a.Contains("trabzonspor"))) return true;
+
+            return false;
+        }
+
+        public static string DetectTeamKey(MatchItem m, Config cfg)
+        {
+            if (m == null || cfg == null) return null;
+            string h = (m.HomeTeam ?? "").ToLower();
+            string a = (m.AwayTeam ?? "").ToLower();
+
+            // 1. Milli Takım her zaman en yüksek önceliğe sahiptir
+            if (cfg.TrackTurkey && (h.Contains("türkiye") || h.Contains("turkiye") || a.Contains("türkiye") || a.Contains("turkiye")))
+                return "turkiye";
+
+            // 2. Kulüplerde ev sahibi takım önceliği
+            if (cfg.TrackGalatasaray && h.Contains("galatasaray")) return "galatasaray";
+            if (cfg.TrackTrabzonspor && h.Contains("trabzonspor")) return "trabzonspor";
+            if (cfg.TrackBesiktas && (h.Contains("beşiktaş") || h.Contains("besiktas"))) return "besiktas";
+            if (cfg.TrackFenerbahce && (h.Contains("fenerbahçe") || h.Contains("fenerbahce"))) return "fenerbahce";
+
+            // 3. Deplasman takımı
+            if (cfg.TrackGalatasaray && a.Contains("galatasaray")) return "galatasaray";
+            if (cfg.TrackTrabzonspor && a.Contains("trabzonspor")) return "trabzonspor";
+            if (cfg.TrackBesiktas && (a.Contains("beşiktaş") || a.Contains("besiktas"))) return "besiktas";
+            if (cfg.TrackFenerbahce && (a.Contains("fenerbahçe") || a.Contains("fenerbahce"))) return "fenerbahce";
+
+            return null;
+        }
+
+        public static string DetectTeamKeyByName(string teamName)
+        {
+            if (string.IsNullOrEmpty(teamName)) return null;
+            string s = teamName.ToLowerInvariant();
+            if (s.Contains("türkiye") || s.Contains("turkiye")) return "turkiye";
+            if (s.Contains("galatasaray")) return "galatasaray";
+            if (s.Contains("fenerbahçe") || s.Contains("fenerbahce")) return "fenerbahce";
+            if (s.Contains("beşiktaş") || s.Contains("besiktas")) return "besiktas";
+            if (s.Contains("trabzonspor")) return "trabzonspor";
+            return null;
+        }
+
+        private static DateTime _lastEspnFetchTime = DateTime.MinValue;
+        private static bool _isFetchingEspn = false;
+        private static readonly object _matchesLock = new object();
+        private static List<MatchItem> _cachedMatches = null;
+        private static DateTime _lastMatchesReadTime = DateTime.MinValue;
+
+        private static string NormalizeTeamName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return "";
+            string s = name.ToLowerInvariant();
+            s = s.Replace("ı", "i").Replace("ğ", "g").Replace("ü", "u").Replace("ş", "s").Replace("ö", "o").Replace("ç", "c");
+            return s.Trim();
+        }
+
+        private static bool IsTeamMatch(string name1, string name2)
+        {
+            if (string.IsNullOrEmpty(name1) || string.IsNullOrEmpty(name2)) return false;
+            string n1 = NormalizeTeamName(name1);
+            string n2 = NormalizeTeamName(name2);
+            if (n1.Contains(n2) || n2.Contains(n1)) return true;
+            string[] w1 = n1.Split(new char[] { ' ', '-', '.' }, StringSplitOptions.RemoveEmptyEntries);
+            string[] w2 = n2.Split(new char[] { ' ', '-', '.' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (string a in w1)
+            {
+                if (a.Length < 4) continue;
+                foreach (string b in w2)
+                {
+                    if (b.Length < 4) continue;
+                    if (a == b || a.Contains(b) || b.Contains(a)) return true;
+                }
+            }
+            return false;
+        }
+
+        private static void TriggerEspnLiveFetchIfNeeded(Config cfg)
+        {
+            if (_isFetchingEspn) return;
+            DateTime now = DateTime.Now;
+            if ((now - _lastEspnFetchTime).TotalSeconds < 20.0) return;
+
+            _lastEspnFetchTime = now;
+            ThreadPool.QueueUserWorkItem(delegate(object state)
+            {
+                RefreshFromEspnBackground(cfg);
+            });
+        }
+
+        private static void RefreshFromEspnBackground(Config cfg)
+        {
+            if (_isFetchingEspn) return;
+            _isFetchingEspn = true;
+            try
+            {
+                try
+                {
+                    ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072 | (SecurityProtocolType)768 | SecurityProtocolType.Tls;
+                }
+                catch { }
+
+                var urls = new List<string>();
+                urls.Add("https://site.api.espn.com/apis/site/v2/sports/soccer/tur.1/scoreboard");
+
+                lock (_matchesLock)
+                {
+                    if (_cachedMatches != null)
+                    {
+                        DateTime today = DateTime.Now.Date;
+                        foreach (var m in _cachedMatches)
+                        {
+                            if (m.MatchDate.Date == today)
+                            {
+                                string tour = (m.Tournament ?? "").ToLowerInvariant();
+                                if (tour.Contains("şampiyon") || tour.Contains("sampiyon") || tour.Contains("champions"))
+                                {
+                                    if (!urls.Contains("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard"))
+                                        urls.Add("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard");
+                                }
+                                else if (tour.Contains("konferans") || tour.Contains("conference"))
+                                {
+                                    if (!urls.Contains("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa.conf/scoreboard"))
+                                        urls.Add("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa.conf/scoreboard");
+                                }
+                                else if (tour.Contains("avrupa") || tour.Contains("europa"))
+                                {
+                                    if (!urls.Contains("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard"))
+                                        urls.Add("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard");
+                                }
+                                else if (tour.Contains("uluslar") || tour.Contains("nations"))
+                                {
+                                    if (!urls.Contains("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/scoreboard"))
+                                        urls.Add("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/scoreboard");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                bool anyChange = false;
+                foreach (string url in urls)
+                {
+                    try
+                    {
+                        var req = (HttpWebRequest)WebRequest.Create(url);
+                        req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
+                        req.Timeout = 4000;
+                        string json = null;
+                        using (var resp = (HttpWebResponse)req.GetResponse())
+                        using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                        {
+                            json = reader.ReadToEnd();
+                        }
+
+                        if (!string.IsNullOrEmpty(json))
+                        {
+                            var serializer = new JavaScriptSerializer();
+                            serializer.MaxJsonLength = int.MaxValue;
+                            var root = serializer.Deserialize<Dictionary<string, object>>(json);
+                            if (root != null && root.ContainsKey("events"))
+                            {
+                                var events = root["events"] as ArrayList;
+                                if (events != null)
+                                {
+                                    foreach (Dictionary<string, object> evt in events)
+                                    {
+                                        var comps = evt["competitions"] as ArrayList;
+                                        if (comps == null || comps.Count == 0) continue;
+                                        var comp = comps[0] as Dictionary<string, object>;
+                                        if (comp == null) continue;
+
+                                        var competitors = comp["competitors"] as ArrayList;
+                                        if (competitors == null || competitors.Count < 2) continue;
+
+                                        string espnHome = "", espnAway = "";
+                                        string espnHomeId = "", espnAwayId = "";
+                                        int espnHomeScore = 0, espnAwayScore = 0;
+
+                                        foreach (Dictionary<string, object> c in competitors)
+                                        {
+                                            string ha = c.ContainsKey("homeAway") ? c["homeAway"].ToString() : "";
+                                            int score = 0;
+                                            if (c.ContainsKey("score")) int.TryParse(c["score"].ToString(), out score);
+                                            var team = c["team"] as Dictionary<string, object>;
+                                            string displayName = (team != null && team.ContainsKey("displayName")) ? team["displayName"].ToString() : "";
+                                            string cid = (c.ContainsKey("id") ? c["id"].ToString() : (team != null && team.ContainsKey("id") ? team["id"].ToString() : ""));
+
+                                            if (ha == "home") { espnHome = displayName; espnHomeScore = score; espnHomeId = cid; }
+                                            else if (ha == "away") { espnAway = displayName; espnAwayScore = score; espnAwayId = cid; }
+                                        }
+
+                                        var status = comp["status"] as Dictionary<string, object>;
+                                        string clock = "";
+                                        string state = "";
+                                        string detail = "";
+                                        if (status != null)
+                                        {
+                                            if (status.ContainsKey("displayClock")) clock = status["displayClock"].ToString();
+                                            var type = status["type"] as Dictionary<string, object>;
+                                            if (type != null)
+                                            {
+                                                if (type.ContainsKey("state")) state = type["state"].ToString();
+                                                if (type.ContainsKey("detail")) detail = type["detail"].ToString();
+                                            }
+                                        }
+
+                                        var details = comp["details"] as ArrayList;
+                                        var goalList = new List<string>();
+                                        var homeGoalList = new List<string>();
+                                        var awayGoalList = new List<string>();
+                                        if (details != null)
+                                        {
+                                            foreach (Dictionary<string, object> d in details)
+                                            {
+                                                var type = d["type"] as Dictionary<string, object>;
+                                                string typeText = (type != null && type.ContainsKey("text")) ? type["text"].ToString() : "";
+                                                if (typeText.IndexOf("Goal", StringComparison.OrdinalIgnoreCase) >= 0)
+                                                {
+                                                    var clk = d["clock"] as Dictionary<string, object>;
+                                                    string min = (clk != null && clk.ContainsKey("displayValue")) ? clk["displayValue"].ToString() : "";
+                                                    var athletes = d["athletesInvolved"] as ArrayList;
+                                                    string player = "";
+                                                    if (athletes != null && athletes.Count > 0)
+                                                    {
+                                                        var ath = athletes[0] as Dictionary<string, object>;
+                                                        if (ath != null && ath.ContainsKey("displayName")) player = ath["displayName"].ToString();
+                                                    }
+                                                    bool penalty = false;
+                                                    if (d.ContainsKey("penaltyKick")) bool.TryParse(d["penaltyKick"].ToString(), out penalty);
+                                                    bool ownGoal = false;
+                                                    if (d.ContainsKey("ownGoal")) bool.TryParse(d["ownGoal"].ToString(), out ownGoal);
+
+                                                    if (!string.IsNullOrEmpty(player))
+                                                    {
+                                                        string extra = penalty ? " (P)" : (ownGoal ? " (K.K.)" : "");
+                                                        string entry = min + " " + player + extra;
+                                                        goalList.Add(entry);
+
+                                                        string tid = "";
+                                                        if (d.ContainsKey("team"))
+                                                        {
+                                                            var tObj = d["team"] as Dictionary<string, object>;
+                                                            if (tObj != null && tObj.ContainsKey("id")) tid = tObj["id"].ToString();
+                                                            else if (d["team"] != null) tid = d["team"].ToString();
+                                                        }
+
+                                                        if (!string.IsNullOrEmpty(espnHomeId) && tid == espnHomeId)
+                                                            homeGoalList.Add(entry);
+                                                        else if (!string.IsNullOrEmpty(espnAwayId) && tid == espnAwayId)
+                                                            awayGoalList.Add(entry);
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        lock (_matchesLock)
+                                        {
+                                            if (_cachedMatches != null)
+                                            {
+                                                foreach (var m in _cachedMatches)
+                                                {
+                                                    if (IsTeamMatch(m.HomeTeam, espnHome) && IsTeamMatch(m.AwayTeam, espnAway))
+                                                    {
+                                                        string newGoals = string.Join(", ", goalList.ToArray());
+                                                        string newHomeGoals = string.Join(", ", homeGoalList.ToArray());
+                                                        string newAwayGoals = string.Join(", ", awayGoalList.ToArray());
+                                                        string newMin = !string.IsNullOrEmpty(clock) ? clock : detail;
+                                                        if (state == "in" && string.IsNullOrEmpty(newMin)) newMin = "CANLI";
+
+                                                        bool isLiveMatch = (state == "in");
+                                                        bool isFinishedMatch = (state == "post");
+
+                                                        if (m.HomeScore != espnHomeScore || m.AwayScore != espnAwayScore ||
+                                                            m.Minute != newMin || m.Goals != newGoals ||
+                                                            m.IsLive != isLiveMatch || m.IsFinished != isFinishedMatch)
+                                                        {
+                                                            m.HomeScore = espnHomeScore;
+                                                            m.AwayScore = espnAwayScore;
+                                                            m.HasScore = true;
+                                                            m.Minute = newMin;
+                                                            m.Goals = newGoals;
+                                                            if (homeGoalList.Count > 0 || awayGoalList.Count > 0)
+                                                            {
+                                                                m.HomeGoals = newHomeGoals;
+                                                                m.AwayGoals = newAwayGoals;
+                                                            }
+                                                            m.IsLive = isLiveMatch;
+                                                            m.IsFinished = isFinishedMatch;
+                                                            if (m.IsFinished && !m.FinishTime.HasValue)
+                                                            {
+                                                                m.FinishTime = DateTime.Now;
+                                                            }
+                                                            anyChange = true;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                if (anyChange)
+                {
+                    SaveCachedMatchesToFile();
+                }
+            }
+            catch { }
+            finally
+            {
+                _isFetchingEspn = false;
+            }
+        }
+
+        private static void SaveCachedMatchesToFile()
+        {
+            try
+            {
+                string path = MatchesPath;
+                if (!File.Exists(path)) return;
+                string json = File.ReadAllText(path, Encoding.UTF8);
+
+                lock (_matchesLock)
+                {
+                    if (_cachedMatches == null) return;
+                    var blocks = Regex.Matches(json, @"\{[^{}]+\}");
+                    foreach (Match mb in blocks)
+                    {
+                        string block = mb.Value;
+                        var mHome = Regex.Match(block, @"""HomeTeam""\s*:\s*""([^""]+)""");
+                        var mAway = Regex.Match(block, @"""AwayTeam""\s*:\s*""([^""]+)""");
+                        if (!mHome.Success || !mAway.Success) continue;
+
+                        string h = mHome.Groups[1].Value;
+                        string a = mAway.Groups[1].Value;
+
+                        MatchItem target = null;
+                        foreach (var m in _cachedMatches)
+                        {
+                            if (string.Equals(m.HomeTeam, h, StringComparison.OrdinalIgnoreCase) &&
+                                string.Equals(m.AwayTeam, a, StringComparison.OrdinalIgnoreCase))
+                            {
+                                target = m;
+                                break;
+                            }
+                        }
+
+                        if (target == null) continue;
+
+                        string newBlock = block;
+
+                        if (Regex.IsMatch(newBlock, @"""HomeScore""\s*:\s*\d+"))
+                            newBlock = Regex.Replace(newBlock, @"""HomeScore""\s*:\s*\d+", @"""HomeScore"": " + target.HomeScore);
+                        else
+                            newBlock = newBlock.Insert(newBlock.LastIndexOf('}'), ",\n    \"HomeScore\": " + target.HomeScore);
+
+                        if (Regex.IsMatch(newBlock, @"""AwayScore""\s*:\s*\d+"))
+                            newBlock = Regex.Replace(newBlock, @"""AwayScore""\s*:\s*\d+", @"""AwayScore"": " + target.AwayScore);
+                        else
+                            newBlock = newBlock.Insert(newBlock.LastIndexOf('}'), ",\n    \"AwayScore\": " + target.AwayScore);
+
+                        if (!string.IsNullOrEmpty(target.Minute))
+                        {
+                            if (Regex.IsMatch(newBlock, @"""Minute""\s*:\s*""[^""]*"""))
+                                newBlock = Regex.Replace(newBlock, @"""Minute""\s*:\s*""[^""]*""", @"""Minute"": """ + target.Minute + @"""");
+                            else
+                                newBlock = newBlock.Insert(newBlock.LastIndexOf('}'), ",\n    \"Minute\": \"" + target.Minute + "\"");
+                        }
+
+                        if (!string.IsNullOrEmpty(target.Goals))
+                        {
+                            if (Regex.IsMatch(newBlock, @"""Goals""\s*:\s*""[^""]*"""))
+                                newBlock = Regex.Replace(newBlock, @"""Goals""\s*:\s*""[^""]*""", @"""Goals"": """ + target.Goals + @"""");
+                            else
+                                newBlock = newBlock.Insert(newBlock.LastIndexOf('}'), ",\n    \"Goals\": \"" + target.Goals + "\"");
+                        }
+
+                        if (!string.IsNullOrEmpty(target.HomeGoals))
+                        {
+                            if (Regex.IsMatch(newBlock, @"""HomeGoals""\s*:\s*""[^""]*"""))
+                                newBlock = Regex.Replace(newBlock, @"""HomeGoals""\s*:\s*""[^""]*""", @"""HomeGoals"": """ + target.HomeGoals + @"""");
+                            else
+                                newBlock = newBlock.Insert(newBlock.LastIndexOf('}'), ",\n    \"HomeGoals\": \"" + target.HomeGoals + "\"");
+                        }
+
+                        if (!string.IsNullOrEmpty(target.AwayGoals))
+                        {
+                            if (Regex.IsMatch(newBlock, @"""AwayGoals""\s*:\s*""[^""]*"""))
+                                newBlock = Regex.Replace(newBlock, @"""AwayGoals""\s*:\s*""[^""]*""", @"""AwayGoals"": """ + target.AwayGoals + @"""");
+                            else
+                                newBlock = newBlock.Insert(newBlock.LastIndexOf('}'), ",\n    \"AwayGoals\": \"" + target.AwayGoals + "\"");
+                        }
+
+                        if (Regex.IsMatch(newBlock, @"""IsLive""\s*:\s*(true|false)", RegexOptions.IgnoreCase))
+                            newBlock = Regex.Replace(newBlock, @"""IsLive""\s*:\s*(true|false)", @"""IsLive"": " + (target.IsLive ? "true" : "false"), RegexOptions.IgnoreCase);
+                        else if (target.IsLive)
+                            newBlock = newBlock.Insert(newBlock.LastIndexOf('}'), ",\n    \"IsLive\": true");
+
+                        if (Regex.IsMatch(newBlock, @"""IsFinished""\s*:\s*(true|false)", RegexOptions.IgnoreCase))
+                            newBlock = Regex.Replace(newBlock, @"""IsFinished""\s*:\s*(true|false)", @"""IsFinished"": " + (target.IsFinished ? "true" : "false"), RegexOptions.IgnoreCase);
+                        else if (target.IsFinished)
+                            newBlock = newBlock.Insert(newBlock.LastIndexOf('}'), ",\n    \"IsFinished\": true");
+
+                        if (block != newBlock)
+                        {
+                            json = json.Replace(block, newBlock);
+                        }
+                    }
+                }
+
+                File.WriteAllText(path, json, Encoding.UTF8);
+            }
+            catch { }
+        }
+
+        public static List<MatchItem> LoadMatches(Config cfg)
+        {
+            DateTime now = DateTime.Now;
+            TriggerEspnLiveFetchIfNeeded(cfg);
+
+            lock (_matchesLock)
+            {
+                if (_cachedMatches != null && (now - _lastMatchesReadTime).TotalSeconds < 3.0)
+                {
+                    return new List<MatchItem>(_cachedMatches);
+                }
+            }
+
+            var list = new List<MatchItem>();
+            string json = null;
+
+            if (!string.IsNullOrEmpty(cfg.MatchApiUrl))
+            {
+                try
+                {
+                    var req = (HttpWebRequest)WebRequest.Create(cfg.MatchApiUrl);
+                    req.Timeout = 3000;
+                    using (var resp = req.GetResponse())
+                    using (var r = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                    {
+                        json = r.ReadToEnd();
+                    }
+                }
+                catch { }
+            }
+
+            if (string.IsNullOrEmpty(json) && File.Exists(MatchesPath))
+            {
+                try { json = File.ReadAllText(MatchesPath, Encoding.UTF8); } catch { }
+            }
+
+            if (!string.IsNullOrEmpty(json))
+            {
+                var blocks = Regex.Matches(json, @"\{[^{}]+\}");
+                foreach (Match mb in blocks)
+                {
+                    try
+                    {
+                        string block = mb.Value;
+                        var mHome = Regex.Match(block, @"""HomeTeam""\s*:\s*""([^""]+)""");
+                        var mAway = Regex.Match(block, @"""AwayTeam""\s*:\s*""([^""]+)""");
+                        var mDate = Regex.Match(block, @"""Date""\s*:\s*""([^""]+)""");
+                        if (!mHome.Success || !mAway.Success || !mDate.Success) continue;
+
+                        var item = new MatchItem();
+                        item.HomeTeam = mHome.Groups[1].Value;
+                        item.AwayTeam = mAway.Groups[1].Value;
+
+                        DateTime dt;
+                        if (DateTime.TryParse(mDate.Groups[1].Value, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt) ||
+                            DateTime.TryParse(mDate.Groups[1].Value, new CultureInfo("tr-TR"), DateTimeStyles.None, out dt))
+                        {
+                            item.MatchDate = dt;
+
+                            var mTour = Regex.Match(block, @"""Tournament""\s*:\s*""([^""]+)""");
+                            item.Tournament = mTour.Success ? mTour.Groups[1].Value : "Süper Lig";
+
+                            // Canlı skor ve dakika parse et (eğer JSON'da varsa)
+                            var mHomeScore = Regex.Match(block, @"""HomeScore""\s*:\s*(\d+)");
+                            if (mHomeScore.Success) { item.HomeScore = int.Parse(mHomeScore.Groups[1].Value); item.HasScore = true; }
+                            var mAwayScore = Regex.Match(block, @"""AwayScore""\s*:\s*(\d+)");
+                            if (mAwayScore.Success) { item.AwayScore = int.Parse(mAwayScore.Groups[1].Value); item.HasScore = true; }
+                            var mMinute = Regex.Match(block, @"""Minute""\s*:\s*""([^""]+)""");
+                            if (mMinute.Success) { item.Minute = mMinute.Groups[1].Value; }
+                            var mGoals = Regex.Match(block, @"""(?:Goals|GoalScorers|Goller|Gol)""\s*:\s*""([^""]+)""");
+                            if (mGoals.Success) { item.Goals = mGoals.Groups[1].Value; }
+                            var mHomeGoals = Regex.Match(block, @"""(?:HomeGoals|EvGoller|EvGol)""\s*:\s*""([^""]+)""");
+                            if (mHomeGoals.Success) { item.HomeGoals = mHomeGoals.Groups[1].Value; }
+                            var mAwayGoals = Regex.Match(block, @"""(?:AwayGoals|DepGoller|DepGol)""\s*:\s*""([^""]+)""");
+                            if (mAwayGoals.Success) { item.AwayGoals = mAwayGoals.Groups[1].Value; }
+
+                            // IsFinished ve IsLive bayrakları
+                            var mIsFinished = Regex.Match(block, @"""IsFinished""\s*:\s*(true|false)", RegexOptions.IgnoreCase);
+                            if (mIsFinished.Success && string.Equals(mIsFinished.Groups[1].Value, "true", StringComparison.OrdinalIgnoreCase))
+                            {
+                                item.IsFinished = true;
+                            }
+
+                            var mIsLive = Regex.Match(block, @"""IsLive""\s*:\s*(true|false)", RegexOptions.IgnoreCase);
+                            if (mIsLive.Success && string.Equals(mIsLive.Groups[1].Value, "true", StringComparison.OrdinalIgnoreCase))
+                            {
+                                item.IsLive = true;
+                            }
+
+                            // Eğer JSON'da IsFinished belirtilmemişse ancak maç saati + 115 dk geçmişse bitti say
+                            if (!item.IsFinished && now > item.MatchDate.AddMinutes(115))
+                            {
+                                item.IsFinished = true;
+                            }
+
+                            var mFinishTime = Regex.Match(block, @"""(?:FinishTime|FinishedTime)""\s*:\s*""([^""]+)""");
+                            if (mFinishTime.Success)
+                            {
+                                DateTime ft;
+                                if (DateTime.TryParse(mFinishTime.Groups[1].Value, CultureInfo.InvariantCulture, DateTimeStyles.None, out ft) ||
+                                    DateTime.TryParse(mFinishTime.Groups[1].Value, new CultureInfo("tr-TR"), DateTimeStyles.None, out ft))
+                                {
+                                    item.FinishTime = ft;
+                                }
+                            }
+
+                            string matchKey = (item.HomeTeam ?? "") + "_" + (item.AwayTeam ?? "") + "_" + item.MatchDate.ToString("yyyyMMdd_HHmm");
+                            if (item.IsFinished)
+                            {
+                                DateTime recordedFt;
+                                if (_recordedFinishTimes.TryGetValue(matchKey, out recordedFt))
+                                {
+                                    item.FinishTime = recordedFt;
+                                }
+                                else
+                                {
+                                    DateTime ft = item.FinishTime.HasValue ? item.FinishTime.Value
+                                        : (now > item.MatchDate.AddMinutes(115) ? item.MatchDate.AddMinutes(115) : now);
+                                    item.FinishTime = ft;
+                                    _recordedFinishTimes[matchKey] = ft;
+                                }
+                            }
+
+                            // Canlı maç durumu (Bitti değilse ve maç saatindeyse veya IsLive işaretlenmişse)
+                            if (!item.IsFinished && (item.IsLive || (now >= item.MatchDate && now <= item.MatchDate.AddMinutes(115))))
+                            {
+                                item.IsLive = true;
+                                item.HasScore = true;
+                                if (string.IsNullOrEmpty(item.Minute))
+                                {
+                                    int elapsed = (int)(now - item.MatchDate).TotalMinutes;
+                                    if (elapsed <= 0) item.Minute = "1'";
+                                    else if (elapsed <= 45) item.Minute = elapsed + "'";
+                                    else if (elapsed <= 60) item.Minute = "İY";
+                                    else if (elapsed <= 105) item.Minute = (elapsed - 15) + "'";
+                                    else item.Minute = "90+'";
+                                }
+                            }
+
+                            list.Add(item);
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            lock (_matchesLock)
+            {
+                _cachedMatches = list;
+                _lastMatchesReadTime = now;
+            }
+
+            return list;
+        }
+    }
+
+    // ==========================================
+    // DİYANET İŞLERİ BAŞKANLIĞI NAMAZ VAKİTLERİ MODELLERİ VE SERVİSİ
+    // Mimari & Tasarım: Serkan ŞENTÜRK
+    // ==========================================
+    public class PrayerTimesData
+    {
+        public string City = "İstanbul";
+        public string Date = "";
+        public string HijriDate = "";
+        public string Imsak = "--:--";
+        public string Gunes = "--:--";
+        public string Ogle = "--:--";
+        public string Ikindi = "--:--";
+        public string Aksam = "--:--";
+        public string Yatsi = "--:--";
+        public string NextPrayerName = "";
+        public string NextPrayerTime = "";
+        public string TimeRemaining = "";
+        public int NextPrayerIndex = -1; // 0=İmsak, 1=Güneş, 2=Öğle, 3=İkindi, 4=Akşam, 5=Yatsı
+        public bool IsSuccess = false;
+        public string LastUpdate = "--:--";
+    }
+
+    public static class PrayerCache
+    {
+        private static string CachePath
+        {
+            get { return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "prayer_cache.json"); }
+        }
+
+        public static PrayerTimesData Load(string city)
+        {
+            try
+            {
+                if (File.Exists(CachePath))
+                {
+                    string json = File.ReadAllText(CachePath, Encoding.UTF8);
+                    var data = new PrayerTimesData();
+                    data.City = GetString(json, "City", city);
+                    if (!string.Equals(data.City, city, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return null; // Başka şehir seçilmişse yeniden çekilsin
+                    }
+                    data.Date = GetString(json, "Date", "");
+                    data.HijriDate = GetString(json, "HijriDate", "");
+                    data.Imsak = GetString(json, "Imsak", "--:--");
+                    data.Gunes = GetString(json, "Gunes", "--:--");
+                    data.Ogle = GetString(json, "Ogle", "--:--");
+                    data.Ikindi = GetString(json, "Ikindi", "--:--");
+                    data.Aksam = GetString(json, "Aksam", "--:--");
+                    data.Yatsi = GetString(json, "Yatsi", "--:--");
+                    data.LastUpdate = GetString(json, "LastUpdate", "--:--");
+                    data.IsSuccess = true;
+                    PrayerService.CalculateNextPrayer(data);
+                    return data;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        public static void Save(PrayerTimesData data)
+        {
+            if (data == null || !data.IsSuccess) return;
+            try
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("{");
+                sb.AppendLine("  \"City\": \"" + Escape(data.City) + "\",");
+                sb.AppendLine("  \"Date\": \"" + Escape(data.Date) + "\",");
+                sb.AppendLine("  \"HijriDate\": \"" + Escape(data.HijriDate) + "\",");
+                sb.AppendLine("  \"Imsak\": \"" + Escape(data.Imsak) + "\",");
+                sb.AppendLine("  \"Gunes\": \"" + Escape(data.Gunes) + "\",");
+                sb.AppendLine("  \"Ogle\": \"" + Escape(data.Ogle) + "\",");
+                sb.AppendLine("  \"Ikindi\": \"" + Escape(data.Ikindi) + "\",");
+                sb.AppendLine("  \"Aksam\": \"" + Escape(data.Aksam) + "\",");
+                sb.AppendLine("  \"Yatsi\": \"" + Escape(data.Yatsi) + "\",");
+                sb.AppendLine("  \"LastUpdate\": \"" + Escape(data.LastUpdate) + "\"");
+                sb.AppendLine("}");
+                File.WriteAllText(CachePath, sb.ToString(), Encoding.UTF8);
+            }
+            catch { }
+        }
+
+        private static string Escape(string s) { return (s == null) ? "" : s.Replace("\\", "\\\\").Replace("\"", "\\\""); }
+        private static string GetString(string json, string key, string def)
+        {
+            var m = Regex.Match(json, "\"" + key + "\"\\s*:\\s*\"([^\"]*)\"");
+            return m.Success ? m.Groups[1].Value : def;
+        }
+    }
+
+    public static class PrayerService
+    {
+        // Türkiye 81 İl Diyanet İlçe ID Eşleştirmesi (ezanvakti.emushaf.net resmi Diyanet veritabanı)
+        private static readonly Dictionary<string, int> _cityDistrictIds = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "adana", 9146 }, { "adiyaman", 9152 }, { "afyonkarahisar", 9158 }, { "afyon", 9158 }, { "agri", 9168 },
+            { "aksaray", 9180 }, { "amasya", 9193 }, { "ankara", 9206 }, { "antalya", 9225 }, { "ardahan", 9219 },
+            { "artvin", 9229 }, { "aydin", 9235 }, { "balikesir", 9243 }, { "bartin", 9253 }, { "batman", 9260 },
+            { "bayburt", 9266 }, { "bilecik", 9295 }, { "bingol", 9301 }, { "bitlis", 9309 }, { "bolu", 9314 },
+            { "burdur", 9327 }, { "bursa", 9335 }, { "canakkale", 9345 }, { "cankiri", 9349 }, { "corum", 9357 },
+            { "denizli", 9368 }, { "diyarbakir", 9380 }, { "duzce", 9394 }, { "edirne", 9405 }, { "elazig", 9413 },
+            { "erzincan", 9425 }, { "erzurum", 9431 }, { "eskisehir", 9440 }, { "gaziantep", 9470 }, { "giresun", 9484 },
+            { "gumushane", 9495 }, { "hakkari", 9508 }, { "hatay", 9516 }, { "antakya", 9516 }, { "igdir", 9531 },
+            { "isparta", 9553 }, { "istanbul", 9541 }, { "izmir", 9560 }, { "kahramanmaras", 9593 }, { "karabuk", 9602 },
+            { "karaman", 9607 }, { "kars", 9611 }, { "kastamonu", 9617 }, { "kayseri", 9624 }, { "kilis", 9639 },
+            { "kirikkale", 9642 }, { "kirklareli", 9644 }, { "kirsehir", 9647 }, { "kocaeli", 9654 }, { "izmit", 9654 },
+            { "konya", 9676 }, { "kutahya", 9698 }, { "malatya", 9716 }, { "manisa", 9728 }, { "mardin", 9741 },
+            { "mersin", 9578 }, { "icel", 9578 }, { "mugla", 9765 }, { "mus", 9779 }, { "nevsehir", 9789 },
+            { "nigde", 9797 }, { "ordu", 9825 }, { "osmaniye", 9838 }, { "rize", 9860 }, { "sakarya", 9879 },
+            { "adapazari", 9879 }, { "samsun", 9888 }, { "sanliurfa", 9897 }, { "urfa", 9897 }, { "siirt", 9904 },
+            { "sinop", 9920 }, { "sivas", 9912 }, { "sirnak", 9928 }, { "tekirdag", 9939 }, { "tokat", 9948 },
+            { "trabzon", 9954 }, { "tunceli", 9965 }, { "usak", 9970 }, { "van", 9976 }, { "yalova", 9989 },
+            { "yozgat", 10002 }, { "zonguldak", 10015 }
+        };
+
+        private static string NormalizeCity(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "istanbul";
+            return raw.Replace("ı", "i").Replace("İ", "i")
+                      .Replace("ğ", "g").Replace("Ğ", "g")
+                      .Replace("ü", "u").Replace("Ü", "u")
+                      .Replace("ş", "s").Replace("Ş", "s")
+                      .Replace("ö", "o").Replace("Ö", "o")
+                      .Replace("ç", "c").Replace("Ç", "c")
+                      .Trim().ToLowerInvariant();
+        }
+
+        public static void FetchPrayerTimesAsync(string city, Action<PrayerTimesData> callback)
+        {
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                var data = new PrayerTimesData();
+                data.City = string.IsNullOrWhiteSpace(city) ? "İstanbul" : city.Trim();
+
+                bool success = false;
+                string cleanCity = NormalizeCity(data.City);
+
+                // 1. ÖNCELİK: Resmi Diyanet API Servisi (ezanvakti.emushaf.net)
+                int districtId;
+                if (_cityDistrictIds.TryGetValue(cleanCity, out districtId))
+                {
+                    try
+                    {
+                        string url = "https://ezanvakti.emushaf.net/vakitler?ilce=" + districtId;
+                        var req = (HttpWebRequest)WebRequest.Create(url);
+                        req.Timeout = 4000;
+                        req.UserAgent = "DesktopZen/2.0 (Windows)";
+                        using (var resp = req.GetResponse())
+                        using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                        {
+                            string json = reader.ReadToEnd();
+                            if (!string.IsNullOrEmpty(json) && json.Contains("Imsak"))
+                            {
+                                string todayStr = DateTime.Now.ToString("dd.MM.yyyy");
+                                int idx = json.IndexOf(todayStr);
+                                string block = (idx >= 0 && idx < json.Length) ? json.Substring(Math.Max(0, idx - 80), Math.Min(600, json.Length - Math.Max(0, idx - 80))) : json;
+
+                                data.Imsak = ExtractField(block, "Imsak");
+                                data.Gunes = ExtractField(block, "Gunes");
+                                data.Ogle = ExtractField(block, "Ogle");
+                                data.Ikindi = ExtractField(block, "Ikindi");
+                                data.Aksam = ExtractField(block, "Aksam");
+                                data.Yatsi = ExtractField(block, "Yatsi");
+                                data.HijriDate = ExtractField(block, "HicriTarihUzun");
+                                data.Date = todayStr;
+
+                                if (IsValidTime(data.Imsak) && IsValidTime(data.Aksam))
+                                {
+                                    success = true;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                // 2. YEDEK: Diyanet Hesaplama Metodu (Aladhan API Method 13: Diyanet İşleri Başkanlığı)
+                if (!success)
+                {
+                    try
+                    {
+                        string url = "https://api.aladhan.com/v1/timingsByCity?city=" + Uri.EscapeDataString(cleanCity) + "&country=Turkey&method=13";
+                        var req = (HttpWebRequest)WebRequest.Create(url);
+                        req.Timeout = 4500;
+                        req.UserAgent = "DesktopZen/2.0 (Windows)";
+                        using (var resp = req.GetResponse())
+                        using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                        {
+                            string json = reader.ReadToEnd();
+                            if (!string.IsNullOrEmpty(json) && json.Contains("Fajr"))
+                            {
+                                data.Imsak = ExtractField(json, "Fajr");
+                                data.Gunes = ExtractField(json, "Sunrise");
+                                data.Ogle = ExtractField(json, "Dhuhr");
+                                data.Ikindi = ExtractField(json, "Asr");
+                                data.Aksam = ExtractField(json, "Maghrib");
+                                data.Yatsi = ExtractField(json, "Isha");
+                                data.Date = DateTime.Now.ToString("dd.MM.yyyy");
+
+                                var mDay = Regex.Match(json, @"""day""\s*:\s*""?(\d+)""?");
+                                var mYear = Regex.Match(json, @"""year""\s*:\s*""?(\d+)""?");
+                                if (mDay.Success && mYear.Success)
+                                {
+                                    data.HijriDate = mDay.Groups[1].Value + " Hicri " + mYear.Groups[1].Value;
+                                }
+
+                                if (IsValidTime(data.Imsak) && IsValidTime(data.Aksam))
+                                {
+                                    success = true;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                if (success)
+                {
+                    data.IsSuccess = true;
+                    data.LastUpdate = DateTime.Now.ToString("HH:mm");
+                    CalculateNextPrayer(data);
+                    PrayerCache.Save(data);
+                }
+                else
+                {
+                    var fallback = PrayerCache.Load(city);
+                    if (fallback != null)
+                    {
+                        data = fallback;
+                    }
+                }
+
+                if (callback != null)
+                {
+                    callback(data);
+                }
+            });
+        }
+
+        private static string ExtractField(string json, string field)
+        {
+            var m = Regex.Match(json, "\"" + field + "\"\\s*:\\s*\"([0-9]{2}:[0-9]{2})\"");
+            if (m.Success) return m.Groups[1].Value;
+            var m2 = Regex.Match(json, "\"" + field + "\"\\s*:\\s*\"([^\"]+)\"");
+            return m2.Success ? m2.Groups[1].Value : "--:--";
+        }
+
+        private static bool IsValidTime(string t)
+        {
+            return !string.IsNullOrEmpty(t) && Regex.IsMatch(t, @"^\d{2}:\d{2}$");
+        }
+
+        public static void CalculateNextPrayer(PrayerTimesData data)
+        {
+            if (data == null) return;
+            try
+            {
+                DateTime now = DateTime.Now;
+                string[] names = new string[] { "İmsak", "Güneş", "Öğle", "İkindi", "Akşam", "Yatsı" };
+                string[] times = new string[] { data.Imsak, data.Gunes, data.Ogle, data.Ikindi, data.Aksam, data.Yatsi };
+
+                DateTime[] dates = new DateTime[6];
+                bool allParsed = true;
+                for (int i = 0; i < 6; i++)
+                {
+                    TimeSpan ts;
+                    if (TimeSpan.TryParse(times[i], out ts))
+                    {
+                        dates[i] = now.Date.Add(ts);
+                    }
+                    else
+                    {
+                        allParsed = false;
+                        break;
+                    }
+                }
+
+                if (!allParsed) return;
+
+                int nextIdx = -1;
+                for (int i = 0; i < 6; i++)
+                {
+                    if (now < dates[i])
+                    {
+                        nextIdx = i;
+                        break;
+                    }
+                }
+
+                if (nextIdx == -1)
+                {
+                    DateTime nextImsak = dates[0].AddDays(1);
+                    TimeSpan diff = nextImsak - now;
+                    data.NextPrayerIndex = 0;
+                    data.NextPrayerName = "İmsak";
+                    data.NextPrayerTime = times[0];
+                    data.TimeRemaining = FormatDiff(diff);
+                }
+                else
+                {
+                    TimeSpan diff = dates[nextIdx] - now;
+                    data.NextPrayerIndex = nextIdx;
+                    data.NextPrayerName = names[nextIdx];
+                    data.NextPrayerTime = times[nextIdx];
+                    data.TimeRemaining = FormatDiff(diff);
+                }
+            }
+            catch { }
+        }
+
+        private static string FormatDiff(TimeSpan diff)
+        {
+            int h = (int)diff.TotalHours;
+            int m = diff.Minutes;
+            if (h > 0) return h + " sa " + m + " dk";
+            return m + " dk";
+        }
+    }
+
+    // ==========================================
+    // TÜRKİYE RESMÎ VE DÎNÎ TATİLLER SERVİSİ
+    // ==========================================
+    public class TurkeyHolidayItem
+    {
+        public string Name { get; set; }
+        public DateTime Date { get; set; }
+        public int DurationDays { get; set; }
+        public string Category { get; set; } // "Milli" veya "Dini"
+        public string Icon { get; set; } // "🇹🇷" veya "🌙"
+        public string Note { get; set; }
+    }
+
+    public static class TurkeyHolidaysService
+    {
+        private static readonly List<TurkeyHolidayItem> _allHolidays = new List<TurkeyHolidayItem>();
+
+        static TurkeyHolidaysService()
+        {
+            PopulateHolidays();
+        }
+
+        private static void PopulateHolidays()
+        {
+            // Sabit Resmî Tatiller (Her yıl aynı miladi gün)
+            int[] years = new int[] { 2025, 2026, 2027, 2028, 2029, 2030 };
+            foreach (int y in years)
+            {
+                _allHolidays.Add(new TurkeyHolidayItem { Name = "Yılbaşı", Date = new DateTime(y, 1, 1), DurationDays = 1, Category = "Milli", Icon = "🎉", Note = "Resmî Tatil (1 Gün)" });
+                _allHolidays.Add(new TurkeyHolidayItem { Name = "Ulusal Egemenlik ve Çocuk Bayramı", Date = new DateTime(y, 4, 23), DurationDays = 1, Category = "Milli", Icon = "🇹🇷", Note = "23 Nisan Resmî Tatil" });
+                _allHolidays.Add(new TurkeyHolidayItem { Name = "Emek ve Dayanışma Günü", Date = new DateTime(y, 5, 1), DurationDays = 1, Category = "Milli", Icon = "🛠️", Note = "1 Mayıs Resmî Tatil" });
+                _allHolidays.Add(new TurkeyHolidayItem { Name = "Atatürk'ü Anma, Gençlik ve Spor Bayramı", Date = new DateTime(y, 5, 19), DurationDays = 1, Category = "Milli", Icon = "🇹🇷", Note = "19 Mayıs Resmî Tatil" });
+                _allHolidays.Add(new TurkeyHolidayItem { Name = "Demokrasi ve Millî Birlik Günü", Date = new DateTime(y, 7, 15), DurationDays = 1, Category = "Milli", Icon = "🇹🇷", Note = "15 Temmuz Resmî Tatil" });
+                _allHolidays.Add(new TurkeyHolidayItem { Name = "Zafer Bayramı", Date = new DateTime(y, 8, 30), DurationDays = 1, Category = "Milli", Icon = "🇹🇷", Note = "30 Ağustos Zafer Bayramı" });
+                _allHolidays.Add(new TurkeyHolidayItem { Name = "Cumhuriyet Bayramı", Date = new DateTime(y, 10, 29), DurationDays = 1, Category = "Milli", Icon = "🇹🇷", Note = "29 Ekim Cumhuriyet Bayramı" });
+            }
+
+            // Dini Bayramlar (Diyanet İşleri Başkanlığı Takvimi)
+            // 2025
+            _allHolidays.Add(new TurkeyHolidayItem { Name = "Ramazan Bayramı", Date = new DateTime(2025, 3, 30), DurationDays = 3, Category = "Dini", Icon = "🌙", Note = "29 Mart Arife · 3 Gün Bayram" });
+            _allHolidays.Add(new TurkeyHolidayItem { Name = "Kurban Bayramı", Date = new DateTime(2025, 6, 6), DurationDays = 4, Category = "Dini", Icon = "🌙", Note = "5 Haziran Arife · 4 Gün Bayram" });
+
+            // 2026
+            _allHolidays.Add(new TurkeyHolidayItem { Name = "Ramazan Bayramı", Date = new DateTime(2026, 3, 20), DurationDays = 3, Category = "Dini", Icon = "🌙", Note = "19 Mart Arife · 3 Gün Bayram" });
+            _allHolidays.Add(new TurkeyHolidayItem { Name = "Kurban Bayramı", Date = new DateTime(2026, 5, 27), DurationDays = 4, Category = "Dini", Icon = "🌙", Note = "26 Mayıs Arife · 4 Gün Bayram" });
+
+            // 2027
+            _allHolidays.Add(new TurkeyHolidayItem { Name = "Ramazan Bayramı", Date = new DateTime(2027, 3, 10), DurationDays = 3, Category = "Dini", Icon = "🌙", Note = "9 Mart Arife · 3 Gün Bayram" });
+            _allHolidays.Add(new TurkeyHolidayItem { Name = "Kurban Bayramı", Date = new DateTime(2027, 5, 17), DurationDays = 4, Category = "Dini", Icon = "🌙", Note = "16 Mayıs Arife · 4 Gün Bayram" });
+
+            // 2028
+            _allHolidays.Add(new TurkeyHolidayItem { Name = "Ramazan Bayramı", Date = new DateTime(2028, 2, 27), DurationDays = 3, Category = "Dini", Icon = "🌙", Note = "26 Şubat Arife · 3 Gün Bayram" });
+            _allHolidays.Add(new TurkeyHolidayItem { Name = "Kurban Bayramı", Date = new DateTime(2028, 5, 5), DurationDays = 4, Category = "Dini", Icon = "🌙", Note = "4 Mayıs Arife · 4 Gün Bayram" });
+
+            // Tarihe göre sırala
+            _allHolidays.Sort((a, b) => a.Date.CompareTo(b.Date));
+        }
+
+        public static List<TurkeyHolidayItem> GetUpcomingHolidays(DateTime now, int count = 6)
+        {
+            var list = new List<TurkeyHolidayItem>();
+            DateTime today = now.Date;
+            foreach (var h in _allHolidays)
+            {
+                DateTime end = h.Date.AddDays(Math.Max(0, h.DurationDays - 1));
+                if (end >= today)
+                {
+                    list.Add(h);
+                    if (list.Count >= count) break;
+                }
+            }
+            return list;
+        }
+
+        public static TurkeyHolidayItem GetNextHoliday(DateTime now)
+        {
+            var list = GetUpcomingHolidays(now, 1);
+            return list.Count > 0 ? list[0] : null;
+        }
+
+        public static string FormatHolidayCountdown(TurkeyHolidayItem item, DateTime now)
+        {
+            if (item == null) return "";
+            DateTime today = now.Date;
+            int days = (int)(item.Date.Date - today).TotalDays;
+
+            if (days < 0)
+            {
+                int currentDay = Math.Abs(days) + 1;
+                return "🎉 BUGÜN! (" + currentDay + ". Gün)";
+            }
+            else if (days == 0)
+            {
+                return "🎉 BUGÜN! Kutlu olsun!";
+            }
+            else if (days == 1)
+            {
+                string dayName = item.Date.ToString("dddd", new CultureInfo("tr-TR"));
+                return "⏰ Yarın (" + dayName + ")";
+            }
+            else
+            {
+                string dayName = item.Date.ToString("dddd", new CultureInfo("tr-TR"));
+                return "⏳ " + days + " gün kaldı (" + dayName + ")";
+            }
+        }
+    }
+
+    // ==========================================
+    // GÜNÜN ÂYETİ VE HADÎSİ SERVİSİ
+    // ==========================================
+    public class InspirationItem
+    {
+        public string Text { get; set; }
+        public string Source { get; set; }
+        public string Topic { get; set; }
+    }
+
+    public static class DailyVerseAndHadithService
+    {
+        private static readonly List<InspirationItem> _verses = new List<InspirationItem>
+        {
+            new InspirationItem {
+                Text = "Şüphesiz güçlükle beraber bir kolaylık vardır. Gerçekten, güçlükle beraber bir kolaylık vardır.",
+                Source = "İnşirâh Sûresi, 5-6. Âyet",
+                Topic = "Umut & Kolaylık"
+            },
+            new InspirationItem {
+                Text = "Bilesiniz ki, kalpler ancak Allah'ı anmakla huzur ve sükûna kavuşur.",
+                Source = "Ra'd Sûresi, 28. Âyet",
+                Topic = "Huzur & Zikir"
+            },
+            new InspirationItem {
+                Text = "Kim Allah'a tevekkül ederse, O kendisine yeter. Şüphesiz Allah emrini yerine getirendir.",
+                Source = "Talâk Sûresi, 3. Âyet",
+                Topic = "Tevekkül"
+            },
+            new InspirationItem {
+                Text = "Rabbiniz şöyle buyurdu: Bana dua edin, size cevap vereyim (duanızı kabul edeyim).",
+                Source = "Mü'min Sûresi, 60. Âyet",
+                Topic = "Dua & Yakarış"
+            },
+            new InspirationItem {
+                Text = "Ey iman edenler! Sabır ve namaz ile Allah'tan yardım isteyin. Muhakkak ki Allah sabredenlerle beraberdir.",
+                Source = "Bakara Sûresi, 153. Âyet",
+                Topic = "Sabır & Namaz"
+            },
+            new InspirationItem {
+                Text = "İyilikle kötülük bir olmaz. Sen kötülüğü en güzel olan şeyle sav. O zaman göreceksin ki seninle arasında düşmanlık bulunan kimse sımsıcak bir dost oluvermiştir.",
+                Source = "Fussilet Sûresi, 34. Âyet",
+                Topic = "Güzel Ahlâk"
+            },
+            new InspirationItem {
+                Text = "Allah hiç kimseye gücünün yettiğinden fazlasını yüklemez.",
+                Source = "Bakara Sûresi, 286. Âyet",
+                Topic = "Merhamet"
+            },
+            new InspirationItem {
+                Text = "Eğer şükrederseniz, elbette size nimetimi artırırım.",
+                Source = "İbrâhîm Sûresi, 7. Âyet",
+                Topic = "Şükür & Bereket"
+            },
+            new InspirationItem {
+                Text = "Kullarım sana Beni soracak olurlarsa, bilsinler ki Ben şüphesiz onlara çok yakınım. Bana dua edenin duasına icabet ederim.",
+                Source = "Bakara Sûresi, 186. Âyet",
+                Topic = "İlahi Yakınlık"
+            },
+            new InspirationItem {
+                Text = "De ki: Ey nefislerine uyarak haddi aşan kullarım! Allah'ın rahmetinden ümidinizi kesmeyin. Muhakkak ki Allah bütün günahları bağışlar.",
+                Source = "Zümer Sûresi, 53. Âyet",
+                Topic = "Mağfiret & Umut"
+            },
+            new InspirationItem {
+                Text = "O, hanginizin daha güzel amel yapacağını sınamak için ölümü ve hayatı yaratandır. O, mutlak güç sahibidir, çok bağışlayandır.",
+                Source = "Mülk Sûresi, 2. Âyet",
+                Topic = "Hayatın Hikmeti"
+            },
+            new InspirationItem {
+                Text = "Gevşemeyin, hüzünlenmeyin; eğer gerçekten inanıyorsanız üstün gelecek olan sizlersiniz.",
+                Source = "Âl-i İmrân Sûresi, 139. Âyet",
+                Topic = "İnanç & Cesaret"
+            },
+            new InspirationItem {
+                Text = "Şüphesiz Allah, adaleti, iyilik yapmayı ve yakınlara ikramda bulunmayı emreder.",
+                Source = "Nahl Sûresi, 90. Âyet",
+                Topic = "Adalet & İhsan"
+            },
+            new InspirationItem {
+                Text = "İnsan için ancak çalıştığının karşılığı vardır. Ve onun çalışması ileride mutlaka görülecektir.",
+                Source = "Necm Sûresi, 39-40. Âyet",
+                Topic = "Emek & Gayret"
+            },
+            new InspirationItem {
+                Text = "Yeryüzünde böbürlenerek yürüme; çünkü sen ne yeri yarabilirsin, ne de boyca dağlara ulaşabilirsin.",
+                Source = "İsrâ Sûresi, 37. Âyet",
+                Topic = "Tevazu"
+            },
+            new InspirationItem {
+                Text = "Allah, adaleti ayakta tutanları ve adaletle davrananları sever.",
+                Source = "Mâide Sûresi, 42. Âyet",
+                Topic = "Hak & Adalet"
+            },
+            new InspirationItem {
+                Text = "De ki: Rabbim, ilmimi artır.",
+                Source = "Tâhâ Sûresi, 114. Âyet",
+                Topic = "İlim & Hikmet"
+            },
+            new InspirationItem {
+                Text = "Her nerede olursanız olun, O sizinle beraberdir. Allah, yaptıklarınızı hakkıyla görendir.",
+                Source = "Hadîd Sûresi, 4. Âyet",
+                Topic = "Murakabe"
+            },
+            new InspirationItem {
+                Text = "İyilik ve takva üzerinde yardımlaşın, günah ve düşmanlık üzerinde yardımlaşmayın.",
+                Source = "Mâide Sûresi, 2. Âyet",
+                Topic = "Dayanışma"
+            },
+            new InspirationItem {
+                Text = "Biz insanı en güzel biçimde (ahsen-i takvîm) yarattık.",
+                Source = "Tîn Sûresi, 4. Âyet",
+                Topic = "İnsanın Değeri"
+            },
+            new InspirationItem {
+                Text = "Kuşkusuz namaz, insanı hayasızlıktan ve kötülükten alıkoyar.",
+                Source = "Ankebût Sûresi, 45. Âyet",
+                Topic = "Namaz"
+            },
+            new InspirationItem {
+                Text = "Bir işi bitirince hemen diğerine koyul ve yalnız Rabbine yönel.",
+                Source = "İnşirâh Sûresi, 7-8. Âyet",
+                Topic = "İstikamet"
+            },
+            new InspirationItem {
+                Text = "Kim zerre miktarı hayır işlerse onu görür; kim de zerre miktarı kötülük işlerse onu görür.",
+                Source = "Zilzâl Sûresi, 7-8. Âyet",
+                Topic = "Mesuliyet"
+            },
+            new InspirationItem {
+                Text = "Müminler ancak kardeştirler; öyleyse kardeşlerinizin arasını düzeltin ve Allah'a karşı saygılı olun.",
+                Source = "Hucurât Sûresi, 10. Âyet",
+                Topic = "Kardeşlik"
+            },
+            new InspirationItem {
+                Text = "Sen af yolunu tut, iyiliği emret ve cahillerden yüz çevir.",
+                Source = "A'râf Sûresi, 199. Âyet",
+                Topic = "Af & Nezaket"
+            },
+            new InspirationItem {
+                Text = "Biz seni ancak âlemlere rahmet olarak gönderdik.",
+                Source = "Enbiyâ Sûresi, 107. Âyet",
+                Topic = "Rahmet"
+            },
+            new InspirationItem {
+                Text = "Öyleyse yalnız Beni anın ki Ben de sizi anayım. Bana şükredin ve nankörlük etmeyin.",
+                Source = "Bakara Sûresi, 152. Âyet",
+                Topic = "Zikir & Şükür"
+            },
+            new InspirationItem {
+                Text = "Allah sabredenleri sever.",
+                Source = "Âl-i İmrân Sûresi, 146. Âyet",
+                Topic = "Sabır"
+            }
+        };
+
+        private static readonly List<InspirationItem> _hadiths = new List<InspirationItem>
+        {
+            new InspirationItem {
+                Text = "İnsanların en hayırlısı, insanlara faydalı olandır.",
+                Source = "Taberânî, el-Mu'cemü'l-Evsat, 5787; Aclûnî, Keşfü'l-Hafâ, II/463",
+                Topic = "Faydalı İnsan"
+            },
+            new InspirationItem {
+                Text = "Kolaylaştırınız, güçleştirmeyiniz; müjdeleyiniz, nefret ettirmeyiniz.",
+                Source = "Buhârî, İlim 11, Edeb 80; Müslim, Cihâd 6",
+                Topic = "Kolaylık & Müjde"
+            },
+            new InspirationItem {
+                Text = "Ameller niyetlere göredir. Herkes için ancak niyet ettiği şey vardır.",
+                Source = "Buhârî, Bed'ü'l-Vahy 1; Müslim, İmâre 155",
+                Topic = "İhlas & Niyet"
+            },
+            new InspirationItem {
+                Text = "Sizden biriniz, kendisi için arzu ettiğini din kardeşi için de arzu etmedikçe gerçek anlamda iman etmiş olmaz.",
+                Source = "Buhârî, Îmân 7; Müslim, Îmân 71",
+                Topic = "Kardeşlik & Empati"
+            },
+            new InspirationItem {
+                Text = "Kardeşine tebessüm etmen bir sadakadır.",
+                Source = "Tirmizî, Birr ve Sıla 36",
+                Topic = "Tebessüm & Sadaka"
+            },
+            new InspirationItem {
+                Text = "Hiçbir baba, çocuğuna güzel ahlâktan daha değerli bir miras bırakamaz.",
+                Source = "Tirmizî, Birr ve Sıla 33",
+                Topic = "Güzel Ahlâk"
+            },
+            new InspirationItem {
+                Text = "Mümin, insanların canları ve malları konusunda kendisinden emin olduğu kimsedir.",
+                Source = "Tirmizî, Îmân 12; Nesâî, Îmân 8",
+                Topic = "Güvenilirlik"
+            },
+            new InspirationItem {
+                Text = "Kim bir canlının sıkıntısını giderirse, Allah da kıyamet gününde onun bir sıkıntısını giderir.",
+                Source = "Müslim, Zikir 38; Buhârî, Mezâlim 3",
+                Topic = "Yardımlaşma"
+            },
+            new InspirationItem {
+                Text = "Güzel söz sadakadır.",
+                Source = "Buhârî, Cihâd 128; Müslim, Zekât 56",
+                Topic = "Tatlı Dil"
+            },
+            new InspirationItem {
+                Text = "Zenginlik, mal çokluğu değil; asıl zenginlik gönül zenginliğidir.",
+                Source = "Buhârî, Rikâk 15; Müslim, Zekât 120",
+                Topic = "Gönül Zenginliği"
+            },
+            new InspirationItem {
+                Text = "Doğruluktan ayrılmayınız; çünkü doğruluk iyiliğe, iyilik ise cennete götürür.",
+                Source = "Buhârî, Edeb 69; Müslim, Birr 105",
+                Topic = "Doğruluk & Sıdk"
+            },
+            new InspirationItem {
+                Text = "Müminin durumu ne hoştur! Her hâli kendisi için hayırdır. Bir nimete kavuşursa şükreder hayır olur; bir zorluğa uğrarsa sabreder yine hayır olur.",
+                Source = "Müslim, Zühd 64",
+                Topic = "Şükür & Sabır"
+            },
+            new InspirationItem {
+                Text = "Kuvvetli mümin, zayıf müminden daha hayırlı ve Allah katında daha sevimlidir. Bununla beraber her ikisinde de hayır vardır.",
+                Source = "Müslim, Kader 34",
+                Topic = "Gayret & Güç"
+            },
+            new InspirationItem {
+                Text = "Allah güzeldir ve güzelliği sever.",
+                Source = "Müslim, Îmân 147",
+                Topic = "Güzellik & Estetik"
+            },
+            new InspirationItem {
+                Text = "İki nimet vardır ki insanların çoğu bunlar hususunda aldanmıştır: Sağlık ve boş vakit.",
+                Source = "Buhârî, Rikâk 1; Tirmizî, Zühd 1",
+                Topic = "Zaman & Sağlık"
+            },
+            new InspirationItem {
+                Text = "İlim talep etmek (öğrenmek) her Müslümana farzdır.",
+                Source = "İbn Mâce, Mukaddime 17",
+                Topic = "İlim Talebi"
+            },
+            new InspirationItem {
+                Text = "Hediyeleşiniz; zira hediyeleşmek aradaki sevgiyi artırır.",
+                Source = "Buhârî, el-Edebü'l-Müfred, 594",
+                Topic = "Sevgi & Muhabbet"
+            },
+            new InspirationItem {
+                Text = "Gerçek pehlivan rakibini güreşte yenen değil, öfke anında nefsine hâkim olandır.",
+                Source = "Buhârî, Edeb 76; Müslim, Birr 107",
+                Topic = "Öfke Kontrolü"
+            },
+            new InspirationItem {
+                Text = "Temizlik imanın yarısıdır.",
+                Source = "Müslim, Tahâret 1",
+                Topic = "Temizlik"
+            },
+            new InspirationItem {
+                Text = "Allah bir kulunu severse, insanların kalbine de onun sevgisini yerleştirir.",
+                Source = "Buhârî, Bed'ü'l-Halk 6; Müslim, Birr 157",
+                Topic = "İlahi Sevgi"
+            },
+            new InspirationItem {
+                Text = "Bizi aldatan bizden değildir.",
+                Source = "Müslim, Îmân 164",
+                Topic = "Dürüstlük"
+            },
+            new InspirationItem {
+                Text = "Cennet annelerin ayakları altındadır.",
+                Source = "Nesâî, Cihâd 6; Ahmed b. Hanbel, III/429",
+                Topic = "Anne Hakkı"
+            },
+            new InspirationItem {
+                Text = "İnsan ölünce üç şey hariç ameli kesilir: Sadaka-i cariye, faydalanılan ilim ve kendisine dua eden hayırlı evlat.",
+                Source = "Müslim, Vasıyyet 14; Ebû Dâvûd, Vasâyâ 14",
+                Topic = "Kalıcı Hayır"
+            },
+            new InspirationItem {
+                Text = "Hayra vesile olan, o hayrı işleyen gibidir.",
+                Source = "Tirmizî, İlim 14",
+                Topic = "Hayra Öncülük"
+            },
+            new InspirationItem {
+                Text = "Müslüman, elinden ve dilinden diğer insanların emin olduğu kimsedir.",
+                Source = "Buhârî, Îmân 4; Müslim, Îmân 64",
+                Topic = "Eminlik"
+            },
+            new InspirationItem {
+                Text = "Allah'ın en sevdiği amel, az da olsa devamlı olanıdır.",
+                Source = "Buhârî, Îmân 32; Müslim, Müsâfirîn 218",
+                Topic = "İstikrar"
+            },
+            new InspirationItem {
+                Text = "Komşusu açken tok yatan kimse bizden değildir.",
+                Source = "Hâkim, el-Müstedrek, II/15; Taberânî",
+                Topic = "Komşuluk & Vefa"
+            },
+            new InspirationItem {
+                Text = "Sözlerin en doğrusu Allah'ın Kitabı, yolların en güzeli ise Muhammed'in yoludur.",
+                Source = "Müslim, Cum'a 43",
+                Topic = "Rehberlik"
+            }
+        };
+
+        private static readonly List<InspirationItem> _quotes = new List<InspirationItem>
+        {
+            new InspirationItem {
+                Text = "Ne kadar söz varsa düne ait, şimdi yeni şeyler söylemek lâzım.",
+                Source = "Mevlânâ Celâleddîn-i Rûmî",
+                Topic = "Yenilenme & Umut"
+            },
+            new InspirationItem {
+                Text = "İlim ilim bilmektir, ilim kendin bilmektir. Sen kendini bilmezsin, ya nice okumaktır.",
+                Source = "Yûnus Emre",
+                Topic = "Öz Bilinç"
+            },
+            new InspirationItem {
+                Text = "Hayatta en hakiki mürşit ilimdir, fendir.",
+                Source = "Gazi Mustafa Kemal Atatürk",
+                Topic = "Akıl & Bilim"
+            },
+            new InspirationItem {
+                Text = "Bizi yoktan var eden Allah'a hamdolsun; dik duracağız ve asla eğilmeyeceğiz.",
+                Source = "Aliya İzzetbegoviç",
+                Topic = "Onur & Duruş"
+            },
+            new InspirationItem {
+                Text = "Girmeden tefrika bir millete, düşman giremez; Toplu vurdukça yürekler, onu top sindiremez.",
+                Source = "Mehmet Âkif Ersoy",
+                Topic = "Millî Birlik"
+            },
+            new InspirationItem {
+                Text = "Eline, beline, diline sahip ol.",
+                Source = "Hacı Bektaş-ı Velî",
+                Topic = "Erdem & Ahlâk"
+            },
+            new InspirationItem {
+                Text = "Cömertlikte akarsu gibi ol; şefkat ve merhamette güneş gibi ol; başkalarının kusurunu örtmede gece gibi ol.",
+                Source = "Mevlânâ Celâleddîn-i Rûmî",
+                Topic = "Fazilet"
+            },
+            new InspirationItem {
+                Text = "Zafer, 'zafer benimdir' diyebilenindir. Muvaffakiyet ise 'muvaffak olacağım' diye başlayıp sonunda başardım diyebilenindir.",
+                Source = "Gazi Mustafa Kemal Atatürk",
+                Topic = "Azim & Kararlılık"
+            },
+            new InspirationItem {
+                Text = "Kusur arayan göz, kusurdan başka bir şey görmez. Güzellik arayan ise her şeyde bir zarafet bulur.",
+                Source = "Şems-i Tebrîzî",
+                Topic = "Hüsn-i Zan"
+            },
+            new InspirationItem {
+                Text = "Yaratılanı hoş gör, Yaratan'dan ötürü.",
+                Source = "Yûnus Emre",
+                Topic = "Sevgi & Hoşgörü"
+            },
+            new InspirationItem {
+                Text = "Savaş ölünce değil, düşmana benzediğin zaman kaybedilir.",
+                Source = "Aliya İzzetbegoviç",
+                Topic = "İnsanî Duruş"
+            },
+            new InspirationItem {
+                Text = "Bir mum diğer mumu tutuşturmakla ışığından hiçbir şey kaybetmez.",
+                Source = "Mevlânâ Celâleddîn-i Rûmî",
+                Topic = "İyiliği Paylaşmak"
+            },
+            new InspirationItem {
+                Text = "Vatanını en çok seven, görevini en iyi yapandır.",
+                Source = "Gazi Mustafa Kemal Atatürk",
+                Topic = "Vazife Bilinci"
+            },
+            new InspirationItem {
+                Text = "İncinsen de incitme; her ne ararsan kendinde ara.",
+                Source = "Hacı Bektaş-ı Velî",
+                Topic = "Olgunluk"
+            },
+            new InspirationItem {
+                Text = "Yolun ucunun nereye varacağını düşünmek beyhudedir. Sen ilk adımı at, gerisi kendiliğinden gelir.",
+                Source = "Şems-i Tebrîzî",
+                Topic = "Cesaret & Tevekkül"
+            },
+            new InspirationItem {
+                Text = "Gezdim Halep ile Şam'ı, eyledim ilmi talep; Meğer ilim bir hiç imiş, illâ edep illâ edep.",
+                Source = "Yûnus Emre",
+                Topic = "Edep & Saygı"
+            },
+            new InspirationItem {
+                Text = "Dinlenmemek üzere yürümeye karar verenler, asla ve asla yorulmazlar.",
+                Source = "Gazi Mustafa Kemal Atatürk",
+                Topic = "Kararlılık"
+            },
+            new InspirationItem {
+                Text = "Dün akıllıydım, dünyayı değiştirmek istedim. Bugün bilgeyim, kendimi değiştiriyorum.",
+                Source = "Mevlânâ Celâleddîn-i Rûmî",
+                Topic = "İçsel Gelişim"
+            },
+            new InspirationItem {
+                Text = "Âtiyi karanlık görerek azmi bırakmak... Alçak bir ölüm varsa, emînim, budur ancak.",
+                Source = "Mehmet Âkif Ersoy",
+                Topic = "Ümit & Gayret"
+            },
+            new InspirationItem {
+                Text = "Olduğunuz gibi kalın. İlerleyin ama kendiniz kalarak ilerleyin.",
+                Source = "Aliya İzzetbegoviç",
+                Topic = "Kimlik & Şahsiyet"
+            },
+            new InspirationItem {
+                Text = "Her şey vaktini bekler; ne gül vaktinden önce açar, ne güneş vaktinden önce doğar.",
+                Source = "Mevlânâ Celâleddîn-i Rûmî",
+                Topic = "Sabır & Zaman"
+            },
+            new InspirationItem {
+                Text = "Hiçbir şeye ihtiyacımız yok, yalnız bir tek şeye ihtiyacımız vardır; çalışkan olmak!",
+                Source = "Gazi Mustafa Kemal Atatürk",
+                Topic = "Çalışkanlık"
+            },
+            new InspirationItem {
+                Text = "Düzenim bozulur, hayatım alt üst olur diye endişe etme. Nereden biliyorsun hayatın altının üstünden daha iyi olmadığını?",
+                Source = "Şems-i Tebrîzî",
+                Topic = "Değişim & Güven"
+            },
+            new InspirationItem {
+                Text = "Cümleler doğrudur sen doğru isen, doğruluk bulunmaz sen eğri isen.",
+                Source = "Yûnus Emre",
+                Topic = "Doğruluk & Dürüstlük"
+            },
+            new InspirationItem {
+                Text = "İmkânın sınırını görmek için imkânsızı denemek lâzımdır.",
+                Source = "Fatih Sultan Mehmed Han",
+                Topic = "Vizyon & Cesaret"
+            },
+            new InspirationItem {
+                Text = "Kalp denizdir, dil de sahil. Denizde ne varsa sahile o vurur.",
+                Source = "Mevlânâ Celâleddîn-i Rûmî",
+                Topic = "Gönül Aynası"
+            },
+            new InspirationItem {
+                Text = "Geleceğimizi geçmişimizde aramayacağız. Geçmişimizden sadece güç ve ilham alacağız.",
+                Source = "Aliya İzzetbegoviç",
+                Topic = "Geleceğe Bakış"
+            },
+            new InspirationItem {
+                Text = "Büyük başarılar, değerli anaların yetiştirdikleri seçkin evlatlar sayesinde olmuştur.",
+                Source = "Gazi Mustafa Kemal Atatürk",
+                Topic = "Vefa & Saygı"
+            },
+            new InspirationItem {
+                Text = "Oturduğun yeri pak et, kazandığın lokmayı hak et.",
+                Source = "Hacı Bektaş-ı Velî",
+                Topic = "Helal Kazanç"
+            },
+            new InspirationItem {
+                Text = "Gönül almayı bilmeyene ömür emanet edilmez.",
+                Source = "Mevlânâ Celâleddîn-i Rûmî",
+                Topic = "Zarafet & İtina"
+            }
+        };
+
+        public static InspirationItem GetDailyVerse(int offset = 0)
+        {
+            int day = DateTime.Today.DayOfYear + offset;
+            int idx = Math.Abs(day) % _verses.Count;
+            return _verses[idx];
+        }
+
+        public static InspirationItem GetDailyHadith(int offset = 0)
+        {
+            int day = DateTime.Today.DayOfYear + offset;
+            int idx = Math.Abs(day) % _hadiths.Count;
+            return _hadiths[idx];
+        }
+
+        public static InspirationItem GetDailyQuote(int offset = 0)
+        {
+            int day = DateTime.Today.DayOfYear + offset;
+            int idx = Math.Abs(day) % _quotes.Count;
+            return _quotes[idx];
+        }
+    }
+
+    // ==========================================
+    // HAKEM DÜDÜĞÜ SERVİSİ (ÖZEL SES MOTORU)
+    // ==========================================
+    public static class WhistleService
+    {
+        private static byte[] _cachedWhistleWav = null;
+        private static byte[] _cachedFinalWhistleWav = null;
+        private static byte[] _cachedStadiumGoalWav = null;
+        private static readonly object _lock = new object();
+        private static System.Windows.Media.MediaPlayer _activeGoalPlayer = null;
+
+        public static byte[] GetWhistleWav()
+        {
+            lock (_lock)
+            {
+                if (_cachedWhistleWav != null) return _cachedWhistleWav;
+
+                // 1. Dışarıdan özel whistle.wav veya duduk.wav dosyası varsa onu kullan
+                string dir = AppDomain.CurrentDomain.BaseDirectory;
+                string customFile = System.IO.Path.Combine(dir, "whistle.wav");
+                if (!File.Exists(customFile)) customFile = System.IO.Path.Combine(dir, "duduk.wav");
+                if (File.Exists(customFile))
+                {
+                    try
+                    {
+                        _cachedWhistleWav = File.ReadAllBytes(customFile);
+                        return _cachedWhistleWav;
+                    }
+                    catch { }
+                }
+
+                // 2. Yoksa prosedürel olarak sıfır harici dosya ile gerçekçi çift tonlu hakem başlama düdüğü sentezle
+                _cachedWhistleWav = GenerateWhistleWav();
+                return _cachedWhistleWav;
+            }
+        }
+
+        public static byte[] GenerateWhistleWav()
+        {
+            int sampleRate = 44100;
+            using (var ms = new MemoryStream())
+            using (var bw = new BinaryWriter(ms))
+            {
+                double totalSeconds = 1.05;
+                int totalSamples = (int)(sampleRate * totalSeconds);
+                short[] samples = new short[totalSamples];
+
+                Action<int, int, double> writeBlast = delegate(int startSample, int count, double baseFreq)
+                {
+                    double phase1 = 0;
+                    double phase2 = 0;
+                    double trillPhase = 0;
+
+                    for (int i = 0; i < count; i++)
+                    {
+                        int idx = startSample + i;
+                        if (idx >= totalSamples) break;
+
+                        double env = 1.0;
+                        double attack = sampleRate * 0.015;
+                        double release = sampleRate * 0.04;
+                        if (i < attack) env = i / attack;
+                        else if (i > count - release) env = (count - i) / release;
+
+                        // Bezelyeli spor hakem düdüğü frekans titreşimi (~34 Hz)
+                        double trill = Math.Sin(trillPhase) * 180.0;
+                        trillPhase += 2.0 * Math.PI * 34.0 / sampleRate;
+
+                        double f1 = baseFreq + trill;
+                        double f2 = baseFreq * 1.075 + trill * 0.85;
+
+                        phase1 += 2.0 * Math.PI * f1 / sampleRate;
+                        phase2 += 2.0 * Math.PI * f2 / sampleRate;
+
+                        double s = (0.68 * Math.Sin(phase1) + 0.32 * Math.Sin(phase2)) * env;
+                        samples[idx] = (short)(s * 28000);
+                    }
+                };
+
+                // Düdük Ritmi: 1. kısa uyarı üflemesi (0.16s), boşluk (0.07s), 2. uzun güçlü başlama düdüğü (0.75s)
+                int blast1Len = (int)(sampleRate * 0.16);
+                int gapLen = (int)(sampleRate * 0.07);
+                int blast2Start = blast1Len + gapLen;
+                int blast2Len = (int)(sampleRate * 0.75);
+
+                writeBlast(0, blast1Len, 2850.0);
+                writeBlast(blast2Start, blast2Len, 2920.0);
+
+                int dataChunkSize = totalSamples * 2;
+                bw.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+                bw.Write(36 + dataChunkSize);
+                bw.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+                bw.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+                bw.Write(16);
+                bw.Write((short)1); // PCM
+                bw.Write((short)1); // Mono
+                bw.Write(sampleRate);
+                bw.Write(sampleRate * 2);
+                bw.Write((short)2);
+                bw.Write((short)16);
+                bw.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+                bw.Write(dataChunkSize);
+
+                for (int i = 0; i < totalSamples; i++)
+                {
+                    bw.Write(samples[i]);
+                }
+
+                return ms.ToArray();
+            }
+        }
+
+        public static void PlayAsync()
+        {
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    byte[] bytes = GetWhistleWav();
+                    if (bytes != null && bytes.Length > 0)
+                    {
+                        using (var ms = new MemoryStream(bytes))
+                        using (var sp = new System.Media.SoundPlayer(ms))
+                        {
+                            sp.PlaySync();
+                        }
+                    }
+                }
+                catch { }
+            });
+        }
+
+        public static byte[] GetFinalWhistleWav()
+        {
+            lock (_lock)
+            {
+                if (_cachedFinalWhistleWav != null) return _cachedFinalWhistleWav;
+
+                // 1. Dışarıdan özel final_whistle.wav, bitis_duduk.wav veya bitis_dudugu.wav dosyası varsa onu kullan
+                string dir = AppDomain.CurrentDomain.BaseDirectory;
+                string[] candidates = new string[] { "final_whistle.wav", "bitis_duduk.wav", "bitis_dudugu.wav", "match_end.wav" };
+                foreach (var fn in candidates)
+                {
+                    string customFile = System.IO.Path.Combine(dir, fn);
+                    if (File.Exists(customFile))
+                    {
+                        try
+                        {
+                            _cachedFinalWhistleWav = File.ReadAllBytes(customFile);
+                            return _cachedFinalWhistleWav;
+                        }
+                        catch { }
+                    }
+                }
+
+                // 2. Yoksa prosedürel olarak klasik 3 üflemeli (kısa - kısa - uzun) hakem bitiş düdüğü sentezle
+                _cachedFinalWhistleWav = GenerateFinalWhistleWav();
+                return _cachedFinalWhistleWav;
+            }
+        }
+
+        public static byte[] GenerateFinalWhistleWav()
+        {
+            int sampleRate = 44100;
+            using (var ms = new MemoryStream())
+            using (var bw = new BinaryWriter(ms))
+            {
+                // Düdük Ritmi:
+                // 1. Kısa düdük (0.18s)
+                // Ara (0.09s)
+                // 2. Kısa düdük (0.18s)
+                // Ara (0.09s)
+                // 3. Uzun güçlü bitiş düdüğü (1.15s)
+                double totalSeconds = 0.18 + 0.09 + 0.18 + 0.09 + 1.15 + 0.05;
+                int totalSamples = (int)(sampleRate * totalSeconds);
+                short[] samples = new short[totalSamples];
+
+                Action<int, int, double, bool> writeBlast = delegate(int startSample, int count, double baseFreq, bool isFinalLong)
+                {
+                    double phase1 = 0;
+                    double phase2 = 0;
+                    double trillPhase = 0;
+
+                    for (int i = 0; i < count; i++)
+                    {
+                        int idx = startSample + i;
+                        if (idx >= totalSamples) break;
+
+                        double env = 1.0;
+                        double attack = sampleRate * 0.015;
+                        double release = sampleRate * (isFinalLong ? 0.08 : 0.035);
+                        if (i < attack) env = i / attack;
+                        else if (i > count - release) env = (count - i) / release;
+
+                        // Bezelyeli spor hakem düdüğü frekans titreşimi (~34 Hz)
+                        double trill = Math.Sin(trillPhase) * 180.0;
+                        trillPhase += 2.0 * Math.PI * 34.0 / sampleRate;
+
+                        // Uzun bitiş düdüğünün sonuna doğru hafif doğal frekans süzülmesi (pitch glide)
+                        double pitchMod = 0;
+                        if (isFinalLong && i > count - (int)(sampleRate * 0.30))
+                        {
+                            double tGlide = (double)(i - (count - (int)(sampleRate * 0.30))) / (sampleRate * 0.30);
+                            pitchMod = -220.0 * tGlide;
+                        }
+
+                        double f1 = baseFreq + trill + pitchMod;
+                        double f2 = baseFreq * 1.075 + trill * 0.85 + pitchMod;
+
+                        phase1 += 2.0 * Math.PI * f1 / sampleRate;
+                        phase2 += 2.0 * Math.PI * f2 / sampleRate;
+
+                        double s = (0.68 * Math.Sin(phase1) + 0.32 * Math.Sin(phase2)) * env;
+                        samples[idx] = (short)(s * 28000);
+                    }
+                };
+
+                int blast1Len = (int)(sampleRate * 0.18);
+                int gap1Len = (int)(sampleRate * 0.09);
+                int blast2Start = blast1Len + gap1Len;
+                int blast2Len = (int)(sampleRate * 0.18);
+                int gap2Len = (int)(sampleRate * 0.09);
+                int blast3Start = blast2Start + blast2Len + gap2Len;
+                int blast3Len = (int)(sampleRate * 1.15);
+
+                writeBlast(0, blast1Len, 2860.0, false);
+                writeBlast(blast2Start, blast2Len, 2890.0, false);
+                writeBlast(blast3Start, blast3Len, 2950.0, true);
+
+                int dataChunkSize = totalSamples * 2;
+                bw.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+                bw.Write(36 + dataChunkSize);
+                bw.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+                bw.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+                bw.Write(16);
+                bw.Write((short)1); // PCM
+                bw.Write((short)1); // Mono
+                bw.Write(sampleRate);
+                bw.Write(sampleRate * 2);
+                bw.Write((short)2);
+                bw.Write((short)16);
+                bw.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+                bw.Write(dataChunkSize);
+
+                for (int i = 0; i < totalSamples; i++)
+                {
+                    bw.Write(samples[i]);
+                }
+
+                return ms.ToArray();
+            }
+        }
+
+        public static void PlayFinalWhistleAsync()
+        {
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    byte[] bytes = GetFinalWhistleWav();
+                    if (bytes != null && bytes.Length > 0)
+                    {
+                        using (var ms = new MemoryStream(bytes))
+                        using (var sp = new System.Media.SoundPlayer(ms))
+                        {
+                            sp.PlaySync();
+                        }
+                    }
+                }
+                catch { }
+            });
+        }
+
+        public static byte[] GetStadiumGoalWav()
+        {
+            lock (_lock)
+            {
+                if (_cachedStadiumGoalWav != null) return _cachedStadiumGoalWav;
+                _cachedStadiumGoalWav = GenerateStadiumGoalWav();
+                return _cachedStadiumGoalWav;
+            }
+        }
+
+        public static void PlayGoalWhistleAsync()
+        {
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    string dir = AppDomain.CurrentDomain.BaseDirectory;
+                    string[] candidates = new string[] { "gol.mp3", "gol.wav", "goal.mp3", "goal.wav", "stadyum.mp3", "stadyum.wav" };
+                    string foundFile = null;
+                    foreach (var fn in candidates)
+                    {
+                        string p = System.IO.Path.Combine(dir, fn);
+                        if (File.Exists(p))
+                        {
+                            foundFile = p;
+                            break;
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(foundFile))
+                    {
+                        if (System.Windows.Application.Current != null && System.Windows.Application.Current.Dispatcher != null)
+                        {
+                            System.Windows.Application.Current.Dispatcher.BeginInvoke((Action)delegate
+                            {
+                                try
+                                {
+                                    if (_activeGoalPlayer != null)
+                                    {
+                                        try { _activeGoalPlayer.Stop(); _activeGoalPlayer.Close(); } catch { }
+                                    }
+                                    _activeGoalPlayer = new System.Windows.Media.MediaPlayer();
+                                    _activeGoalPlayer.Open(new Uri(foundFile, UriKind.Absolute));
+                                    _activeGoalPlayer.Volume = 1.0;
+                                    _activeGoalPlayer.Play();
+                                    _activeGoalPlayer.MediaEnded += delegate
+                                    {
+                                        try { if (_activeGoalPlayer != null) _activeGoalPlayer.Close(); _activeGoalPlayer = null; } catch { }
+                                    };
+                                }
+                                catch
+                                {
+                                    PlayProceduralStadiumGoal();
+                                }
+                            });
+                            return;
+                        }
+                    }
+
+                    PlayProceduralStadiumGoal();
+                }
+                catch { }
+            });
+        }
+
+        private static void PlayProceduralStadiumGoal()
+        {
+            try
+            {
+                byte[] bytes = GetStadiumGoalWav();
+                if (bytes != null && bytes.Length > 0)
+                {
+                    using (var ms = new MemoryStream(bytes))
+                    using (var sp = new System.Media.SoundPlayer(ms))
+                    {
+                        sp.PlaySync();
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public static byte[] GenerateStadiumGoalWav()
+        {
+            int sampleRate = 44100;
+            using (var ms = new MemoryStream())
+            using (var bw = new BinaryWriter(ms))
+            {
+                double totalSeconds = 3.6;
+                int totalSamples = (int)(sampleRate * totalSeconds);
+                short[] samples = new short[totalSamples];
+
+                // 1. STADYUM HAVALI KORNASI (Akustik Pirinç Korna Sentezi: A3, C#4, E4, A4, C#5)
+                // 3 Ritmik Vuruş: 0.05-0.70s, 0.85-1.50s, 1.65-3.35s
+                double phaseH1 = 0, phaseH2 = 0, phaseH3 = 0, phaseH4 = 0, phaseH5 = 0;
+                double hornFreq1 = 220.0;
+                double hornFreq2 = 277.18;
+                double hornFreq3 = 329.63;
+                double hornFreq4 = 440.0;
+                double hornFreq5 = 554.37;
+
+                // 2. HAKEM BAŞLANGIÇ GOL DÜDÜĞÜ (0.0s - 0.38s)
+                double phaseW1 = 0, phaseW2 = 0, trillPhaseW = 0;
+
+                // 3. STADYUM TARAFTAR GOL COŞKUSU (Filtered Pink/Brown Noise Roar)
+                Random rand = new Random(1905);
+                double b0 = 0, b1 = 0, b2 = 0;
+                double crowdSmooth = 0;
+
+                for (int i = 0; i < totalSamples; i++)
+                {
+                    double t = (double)i / sampleRate;
+
+                    // --- A. Hakem Gol Düdüğü (0.0 - 0.38s) ---
+                    double whistleVal = 0;
+                    if (t < 0.38)
+                    {
+                        double wEnv = 1.0;
+                        if (t < 0.02) wEnv = t / 0.02;
+                        else if (t > 0.30) wEnv = (0.38 - t) / 0.08;
+
+                        double trill = Math.Sin(trillPhaseW) * 190.0;
+                        trillPhaseW += 2.0 * Math.PI * 36.0 / sampleRate;
+
+                        double f1 = 2950.0 + trill;
+                        double f2 = 3200.0 + trill * 0.9;
+                        phaseW1 += 2.0 * Math.PI * f1 / sampleRate;
+                        phaseW2 += 2.0 * Math.PI * f2 / sampleRate;
+
+                        whistleVal = (0.65 * Math.Sin(phaseW1) + 0.35 * Math.Sin(phaseW2)) * wEnv * 0.32;
+                    }
+
+                    // --- B. Stadyum Havalı Kornası (Tek ve Kesintisiz Stadyum Kornası) ---
+                    double hornEnv = 0;
+                    if (t >= 0.10 && t <= 2.90)
+                    {
+                        double p = t - 0.10;
+                        if (p < 0.05) hornEnv = p / 0.05;
+                        else if (p > 2.30) hornEnv = (2.80 - p) / 0.50;
+                        else hornEnv = 1.0;
+                    }
+
+                    double hornVal = 0;
+                    if (hornEnv > 0)
+                    {
+                        phaseH1 += 2.0 * Math.PI * hornFreq1 / sampleRate;
+                        phaseH2 += 2.0 * Math.PI * hornFreq2 / sampleRate;
+                        phaseH3 += 2.0 * Math.PI * hornFreq3 / sampleRate;
+                        phaseH4 += 2.0 * Math.PI * hornFreq4 / sampleRate;
+                        phaseH5 += 2.0 * Math.PI * hornFreq5 / sampleRate;
+
+                        double raw = 0.32 * Math.Sin(phaseH1) +
+                                     0.26 * Math.Sin(phaseH2) +
+                                     0.22 * Math.Sin(phaseH3) +
+                                     0.15 * Math.Sin(phaseH4) +
+                                     0.10 * Math.Sin(phaseH5);
+
+                        hornVal = Math.Tanh(raw * 2.2) * hornEnv * 0.65;
+                    }
+
+                    // --- C. Stadyum Uğultusu & Tezahürat (Crowd Roar) ---
+                    double white = rand.NextDouble() * 2.0 - 1.0;
+                    b0 = 0.99765 * b0 + white * 0.0990460;
+                    b1 = 0.96300 * b1 + white * 0.2965164;
+                    b2 = 0.57000 * b2 + white * 1.0526913;
+                    double pink = (b0 + b1 + b2 + white * 0.1848) * 0.12;
+
+                    crowdSmooth = crowdSmooth * 0.88 + pink * 0.12;
+
+                    double crowdEnv = 1.0;
+                    if (t < 0.35) crowdEnv = t / 0.35;
+                    else if (t > 2.8) crowdEnv = (3.6 - t) / 0.8;
+
+                    double crowdVal = crowdSmooth * crowdEnv * 0.38;
+
+                    // --- Miksaj ve Master Sınırlandırma ---
+                    double mixed = Math.Tanh(whistleVal + hornVal + crowdVal);
+                    samples[i] = (short)(mixed * 29000);
+                }
+
+                int dataChunkSize = totalSamples * 2;
+                bw.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+                bw.Write(36 + dataChunkSize);
+                bw.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+                bw.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+                bw.Write(16);
+                bw.Write((short)1);
+                bw.Write((short)1);
+                bw.Write(sampleRate);
+                bw.Write(sampleRate * 2);
+                bw.Write((short)2);
+                bw.Write((short)16);
+                bw.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+                bw.Write(dataChunkSize);
+
+                for (int i = 0; i < totalSamples; i++)
+                {
+                    bw.Write(samples[i]);
+                }
+
+                return ms.ToArray();
+            }
+        }
+    }
+
+    // ==========================================
+    // SEKEN TAKIM FUTBOL TOPU ÜRETİCİSİ (WPF VECTOR)
+    // ==========================================
+    public static class SoccerBallFactory
+    {
+        public static void GetTeamColors(string teamKey, out System.Windows.Media.Color primary, out System.Windows.Media.Color secondary, out System.Windows.Media.Color badgeBg, out System.Windows.Media.Color badgeBorder)
+        {
+            if (teamKey == "galatasaray")
+            {
+                primary = System.Windows.Media.Color.FromRgb(253, 185, 18);   // Sarı #FDB912
+                secondary = System.Windows.Media.Color.FromRgb(200, 16, 46);  // Kırmızı #C8102E
+                badgeBg = System.Windows.Media.Color.FromArgb(45, 200, 16, 46);
+                badgeBorder = System.Windows.Media.Color.FromArgb(190, 253, 185, 18);
+            }
+            else if (teamKey == "fenerbahce")
+            {
+                primary = System.Windows.Media.Color.FromRgb(254, 213, 0);   // Sarı #FED500
+                secondary = System.Windows.Media.Color.FromRgb(0, 45, 114);  // Lacivert #002D72
+                badgeBg = System.Windows.Media.Color.FromArgb(45, 0, 45, 114);
+                badgeBorder = System.Windows.Media.Color.FromArgb(190, 254, 213, 0);
+            }
+            else if (teamKey == "besiktas")
+            {
+                primary = System.Windows.Media.Color.FromRgb(255, 255, 255); // Beyaz
+                secondary = System.Windows.Media.Color.FromRgb(25, 25, 25);  // Siyah
+                badgeBg = System.Windows.Media.Color.FromArgb(45, 25, 25, 25);
+                badgeBorder = System.Windows.Media.Color.FromArgb(180, 255, 255, 255);
+            }
+            else if (teamKey == "trabzonspor")
+            {
+                primary = System.Windows.Media.Color.FromRgb(163, 0, 43);    // Bordo #A3002B
+                secondary = System.Windows.Media.Color.FromRgb(56, 189, 248);// Mavi #38BDF8
+                badgeBg = System.Windows.Media.Color.FromArgb(45, 163, 0, 43);
+                badgeBorder = System.Windows.Media.Color.FromArgb(190, 56, 189, 248);
+            }
+            else if (teamKey == "turkiye")
+            {
+                primary = System.Windows.Media.Color.FromRgb(227, 10, 23);   // Kırmızı #E30A17
+                secondary = System.Windows.Media.Color.FromRgb(255, 255, 255);// Beyaz
+                badgeBg = System.Windows.Media.Color.FromArgb(45, 227, 10, 23);
+                badgeBorder = System.Windows.Media.Color.FromArgb(190, 255, 255, 255);
+            }
+            else
+            {
+                primary = System.Windows.Media.Color.FromRgb(250, 250, 250);
+                secondary = System.Windows.Media.Color.FromRgb(30, 30, 30);
+                badgeBg = System.Windows.Media.Color.FromArgb(40, 20, 20, 20);
+                badgeBorder = System.Windows.Media.Color.FromArgb(140, 120, 120, 120);
+            }
+        }
+
+        public static FrameworkElement CreateBallElement(string teamKey, double size)
+        {
+            System.Windows.Media.Color c1, c2, bBg, bBrd;
+            GetTeamColors(teamKey, out c1, out c2, out bBg, out bBrd);
+
+            var viewbox = new Viewbox
+            {
+                Width = size,
+                Height = size,
+                Stretch = Stretch.Uniform
+            };
+
+            var canvas = new Canvas
+            {
+                Width = 100,
+                Height = 100,
+                Clip = new EllipseGeometry(new Rect(0, 0, 100, 100))
+            };
+
+            // 1. Top Ana Gövdesi (Primary Color)
+            var baseEllipse = new Ellipse
+            {
+                Width = 100,
+                Height = 100,
+                Fill = new SolidColorBrush(c1)
+            };
+            canvas.Children.Add(baseEllipse);
+
+            // 2. Orta Pentagon & Çevre Yamalar (Secondary Color)
+            string centerSvg = "M 50,30 L 69,44 L 62,67 L 38,67 L 31,44 Z";
+            string outerPatchesSvg = "M 50,30 L 50,0 A 50,50 0 0,0 20,9 L 31,44 Z " +
+                                     "M 69,44 L 98,35 A 50,50 0 0,0 80,9 L 50,30 Z " +
+                                     "M 62,67 L 98,65 A 50,50 0 0,1 65,98 L 38,67 Z " +
+                                     "M 31,44 L 2,35 A 50,50 0 0,1 20,9 L 50,30 Z " +
+                                     "M 38,67 L 35,98 A 50,50 0 0,1 2,65 L 31,44 Z";
+
+            var secBrush = new SolidColorBrush(c2);
+            var seamPen = new SolidColorBrush(System.Windows.Media.Color.FromArgb(140, 20, 20, 20));
+
+            var pathCenter = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse(centerSvg),
+                Fill = secBrush,
+                Stroke = seamPen,
+                StrokeThickness = 2.5
+            };
+            canvas.Children.Add(pathCenter);
+
+            var pathOuter = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse(outerPatchesSvg),
+                Fill = secBrush,
+                Stroke = seamPen,
+                StrokeThickness = 2.5
+            };
+            canvas.Children.Add(pathOuter);
+
+            // 3. Dikiş Çizgileri
+            string seamsSvg = "M 50,30 L 50,0 M 69,44 L 98,35 M 62,67 L 98,65 M 38,67 L 50,100 M 31,44 L 2,35";
+            var pathSeams = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse(seamsSvg),
+                Stroke = seamPen,
+                StrokeThickness = 2.5
+            };
+            canvas.Children.Add(pathSeams);
+
+            // 4. 3D Küre Işık Efekti
+            var gloss = new Ellipse { Width = 100, Height = 100 };
+            var radGrad = new RadialGradientBrush
+            {
+                Center = new System.Windows.Point(0.35, 0.35),
+                GradientOrigin = new System.Windows.Point(0.35, 0.35),
+                RadiusX = 0.65,
+                RadiusY = 0.65
+            };
+            radGrad.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(130, 255, 255, 255), 0.0));
+            radGrad.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 255, 255, 255), 0.50));
+            radGrad.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 0, 0, 0), 0.75));
+            radGrad.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(85, 0, 0, 0), 1.0));
+            gloss.Fill = radGrad;
+            canvas.Children.Add(gloss);
+
+            // 5. İnce Dış Çerçeve
+            var outerRing = new Ellipse
+            {
+                Width = 100,
+                Height = 100,
+                Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(90, 0, 0, 0)),
+                StrokeThickness = 2.0
+            };
+            canvas.Children.Add(outerRing);
+
+            viewbox.Child = canvas;
+            return viewbox;
+        }
+
+        public static Grid CreateBouncingBallContainer(string teamKey, out FrameworkElement ballElement, out Ellipse shadowElement)
+        {
+            var container = new Grid
+            {
+                Width = 38,
+                Height = 46,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                ClipToBounds = false
+            };
+
+            // Gölge
+            var shadow = new Ellipse
+            {
+                Width = 20,
+                Height = 4.5,
+                Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(100, 0, 0, 0)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Margin = new Thickness(0, 0, 0, 2),
+                RenderTransformOrigin = new System.Windows.Point(0.5, 0.5)
+            };
+            var shadowScale = new ScaleTransform(1.0, 1.0);
+            shadow.RenderTransform = shadowScale;
+            container.Children.Add(shadow);
+            shadowElement = shadow;
+
+            // Top
+            var ball = CreateBallElement(teamKey, 26);
+            ball.HorizontalAlignment = HorizontalAlignment.Center;
+            ball.VerticalAlignment = VerticalAlignment.Bottom;
+            ball.Margin = new Thickness(0, 0, 0, 3);
+
+            var ballTransformGroup = new TransformGroup();
+            var ballTranslate = new TranslateTransform(0, 0);
+            var ballRotate = new RotateTransform(0, 13, 13);
+            ballTransformGroup.Children.Add(ballRotate);
+            ballTransformGroup.Children.Add(ballTranslate);
+            ball.RenderTransform = ballTransformGroup;
+            container.Children.Add(ball);
+            ballElement = ball;
+
+            // Sekme Animasyonu (Yukarı sıçrama ve yerçekimi inişi)
+            var bounceDuration = TimeSpan.FromMilliseconds(380);
+
+            var bounceAnim = new DoubleAnimation
+            {
+                From = 0.0,
+                To = -16.0,
+                Duration = bounceDuration,
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            };
+            ballTranslate.BeginAnimation(TranslateTransform.YProperty, bounceAnim);
+
+            var rotateAnim = new DoubleAnimation
+            {
+                From = -18.0,
+                To = 18.0,
+                Duration = bounceDuration,
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+            };
+            ballRotate.BeginAnimation(RotateTransform.AngleProperty, rotateAnim);
+
+            // Gölge Dinamik Boyut ve Opaklık Animasyonu
+            var shadowScaleAnim = new DoubleAnimation
+            {
+                From = 1.0,
+                To = 0.40,
+                Duration = bounceDuration,
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            };
+            shadowScale.BeginAnimation(ScaleTransform.ScaleXProperty, shadowScaleAnim);
+
+            var shadowOpacityAnim = new DoubleAnimation
+            {
+                From = 0.65,
+                To = 0.15,
+                Duration = bounceDuration,
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            };
+            shadow.BeginAnimation(UIElement.OpacityProperty, shadowOpacityAnim);
+
+            return container;
+        }
+
+        public static Grid CreateTsubasaNetBurstContainer(string teamKey)
+        {
+            var container = new Grid
+            {
+                Width = 96,
+                Height = 48,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0),
+                ClipToBounds = false
+            };
+
+            System.Windows.Media.Color pColor, sColor, badgeBg, badgeBrd;
+            GetTeamColors(teamKey, out pColor, out sColor, out badgeBg, out badgeBrd);
+
+            var canvas = new Canvas
+            {
+                Width = 96,
+                Height = 48,
+                ClipToBounds = false
+            };
+
+            // 1. ANİME HIZ & DARBE ÇİZGİLERİ (Sağa Doğru Fırlayan Rüzgar/Hız Çizgileri - Manga Effect)
+            var speedLines = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse("M 73,24 L 95,24 M 71,19 L 93,12 M 71,29 L 93,36 M 68,14 L 88,6 M 68,34 L 88,42 M 65,10 L 82,2 M 65,38 L 82,46"),
+                Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(220, 255, 255, 255)),
+                StrokeThickness = 1.6,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round
+            };
+            var speedLineOpacityAnim = new DoubleAnimation
+            {
+                From = 0.4,
+                To = 1.0,
+                Duration = TimeSpan.FromMilliseconds(90),
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            speedLines.BeginAnimation(UIElement.OpacityProperty, speedLineOpacityAnim);
+            canvas.Children.Add(speedLines);
+
+            // 2. DARBE PATLAMA YILDIZI & ŞOK DALGASI (Topun Ağın Arkasından Çıkardığı Şok Sıçraması)
+            var shockStar = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse("M 72,13 L 78,8 L 76,16 L 85,15 L 79,22 L 88,24 L 79,27 L 85,34 L 76,32 L 78,41 L 72,35 Z"),
+                Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(220, 235, 248, 255)),
+                Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(200, 56, 189, 248)),
+                StrokeThickness = 1.0,
+                RenderTransformOrigin = new System.Windows.Point(0.8, 0.5)
+            };
+            var shockScale = new ScaleTransform(1.0, 1.0);
+            shockStar.RenderTransform = shockScale;
+            var shockAnim = new DoubleAnimation
+            {
+                From = 0.85,
+                To = 1.30,
+                Duration = TimeSpan.FromMilliseconds(110),
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            };
+            shockScale.BeginAnimation(ScaleTransform.ScaleXProperty, shockAnim);
+            shockScale.BeginAnimation(ScaleTransform.ScaleYProperty, shockAnim);
+            canvas.Children.Add(shockStar);
+
+            // 3. FIRLAYAN ÇİM VE ENERJİ PARÇACIKLARI (Debris & Turf flying out)
+            var debris = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse("M 77,35 L 79,34 L 80,36 L 78,37 Z M 83,38 L 85,37 L 86,39 L 84,40 Z M 80,14 L 82,13 L 83,15 L 81,16 Z M 75,20 L 77,19 L 77,21 L 75,21 Z M 86,25 L 88,24 L 89,26 L 87,27 Z"),
+                Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(34, 197, 94)),
+                RenderTransformOrigin = new System.Windows.Point(0.5, 0.5)
+            };
+            var debrisTrans = new TranslateTransform(0, 0);
+            debris.RenderTransform = debrisTrans;
+            var debrisAnim = new DoubleAnimation
+            {
+                From = -0.8,
+                To = 1.5,
+                Duration = TimeSpan.FromMilliseconds(65),
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            debrisTrans.BeginAnimation(TranslateTransform.XProperty, debrisAnim);
+            canvas.Children.Add(debris);
+
+            // 4. KALE DİREĞİ (Sol Tarafta Dik Duran Beyaz Kale Direği & Üst/Alt Köşeler)
+            var goalPost = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse("M 8,3 L 8,45 M 8,3 L 22,5 M 8,45 L 22,44"),
+                Stroke = System.Windows.Media.Brushes.White,
+                StrokeThickness = 3.6,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round
+            };
+            canvas.Children.Add(goalPost);
+
+            var postShade = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse("M 9.8,4 L 9.8,44"),
+                Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(140, 148, 163, 184)),
+                StrokeThickness = 1.2
+            };
+            canvas.Children.Add(postShade);
+
+            // 5. YANDAN HAVALANAN 2D KALE AĞLARI - ARKA KATMAN (Bulging Net Mesh behind the ball)
+            // Direkten başlayıp topun arkasındaki zirve noktaya (73, 24) doğru koni şeklinde gerilen ağlar
+            string backNetSvg =
+                "M 8,3 C 24,7 42,9 54,11 C 63,12 73,17 73,24 " +
+                "M 8,13 C 25,15 42,15 55,16 C 64,17 72,20 73,24 " +
+                "M 8,24 C 26,24 44,24 56,24 L 73,24 " +
+                "M 8,35 C 25,33 42,33 55,32 C 64,31 72,28 73,24 " +
+                "M 8,45 C 24,41 42,39 54,37 C 63,36 73,31 73,24 " +
+                "M 15,5 Q 17,24 15,43 " +
+                "M 24,7 Q 28,24 24,41 " +
+                "M 34,9 Q 39,24 34,39 " +
+                "M 44,10 Q 51,24 44,38";
+
+            var backNetPath = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse(backNetSvg),
+                Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(195, 240, 248, 255)),
+                StrokeThickness = 1.3,
+                RenderTransformOrigin = new System.Windows.Point(0.5, 0.5)
+            };
+
+            var netTransform = new TransformGroup();
+            var netScale = new ScaleTransform(1.0, 1.0);
+            var netShake = new TranslateTransform(0, 0);
+            netTransform.Children.Add(netScale);
+            netTransform.Children.Add(netShake);
+            backNetPath.RenderTransform = netTransform;
+
+            var netShakeAnim = new DoubleAnimation
+            {
+                From = -1.0,
+                To = 1.0,
+                Duration = TimeSpan.FromMilliseconds(70),
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            netShake.BeginAnimation(TranslateTransform.YProperty, netShakeAnim);
+
+            var netScaleAnim = new DoubleAnimation
+            {
+                From = 0.98,
+                To = 1.03,
+                Duration = TimeSpan.FromMilliseconds(130),
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            netScale.BeginAnimation(ScaleTransform.ScaleXProperty, netScaleAnim);
+            canvas.Children.Add(backNetPath);
+
+            // 6. TAKIM RENK PARILTISI / SÜRTÜNME HALKASI (Glow around the impact pocket)
+            var glow = new Ellipse
+            {
+                Width = 32,
+                Height = 32,
+                Fill = new RadialGradientBrush
+                {
+                    GradientStops = new GradientStopCollection
+                    {
+                        new GradientStop(System.Windows.Media.Color.FromArgb(110, pColor.R, pColor.G, pColor.B), 0.0),
+                        new GradientStop(System.Windows.Media.Color.FromArgb(0, pColor.R, pColor.G, pColor.B), 1.0)
+                    }
+                },
+                RenderTransformOrigin = new System.Windows.Point(0.5, 0.5)
+            };
+            Canvas.SetLeft(glow, 40);
+            Canvas.SetTop(glow, 8);
+            canvas.Children.Add(glow);
+
+            // 7. AĞLARIN İÇİNDE HIZLICA DÖNEN FUTBOL TOPU (Tsubasa Shot: Ultra-Fast Spinning Ball Inside the Net)
+            var ball = CreateBallElement(teamKey, 26);
+            Canvas.SetLeft(ball, 43);
+            Canvas.SetTop(ball, 11);
+            ball.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
+
+            var ballTransformGroup = new TransformGroup();
+            var ballRotate = new RotateTransform(0);
+            var ballJitter = new TranslateTransform(0, 0);
+            ballTransformGroup.Children.Add(ballRotate);
+            ballTransformGroup.Children.Add(ballJitter);
+            ball.RenderTransform = ballTransformGroup;
+
+            // Ultra Hızlı Dönüş (Kullanıcı talebi: Top ağların içinde dönsün hızlıca - 100ms tam tur!)
+            var ballSpinAnim = new DoubleAnimation
+            {
+                From = 0.0,
+                To = 360.0,
+                Duration = TimeSpan.FromMilliseconds(100),
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            ballRotate.BeginAnimation(RotateTransform.AngleProperty, ballSpinAnim);
+
+            // Titreşim ve Sürtünme Çarpması (High speed impact friction)
+            var ballJitterAnim = new DoubleAnimation
+            {
+                From = -1.2,
+                To = 1.2,
+                Duration = TimeSpan.FromMilliseconds(45),
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            ballJitter.BeginAnimation(TranslateTransform.XProperty, ballJitterAnim);
+            canvas.Children.Add(ball);
+
+            // 8. TOPUN ÖNÜNDEN GEÇEN VE TOPU AĞA HAPSEDEN ÖN AĞ İPLERİ (Front Net Strands - Ball is inside!)
+            string frontNetSvg =
+                "M 52,11 Q 61,24 52,37 " +
+                "M 60,13 Q 68,24 60,35 " +
+                "M 67,16 Q 73,24 67,32 " +
+                "M 44,18 Q 58,19 73,24 " +
+                "M 44,24 L 73,24 " +
+                "M 44,30 Q 58,29 73,24";
+
+            var frontNetPath = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse(frontNetSvg),
+                Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 255, 255, 255)),
+                StrokeThickness = 1.4,
+                RenderTransformOrigin = new System.Windows.Point(0.5, 0.5),
+                RenderTransform = netTransform // Arka ağ ile tam senkronize titrer
+            };
+            canvas.Children.Add(frontNetPath);
+
+            container.Children.Add(canvas);
+            return container;
+        }
+
+        public static FrameworkElement CreateGoalBannerVisual(string teamKey, string effectStyle, out FrameworkElement ballElement, out Ellipse shadowElement)
+        {
+            if (effectStyle == "bouncing_ball")
+            {
+                return CreateBouncingBallContainer(teamKey, out ballElement, out shadowElement);
+            }
+            else
+            {
+                ballElement = null;
+                shadowElement = null;
+                return CreateTsubasaNetBurstContainer(teamKey);
+            }
+        }
+
+        public static FrameworkElement CreateTeamEmblem(string teamKey, double size = 34)
+        {
+            var container = new Border
+            {
+                Width = size,
+                Height = size,
+                CornerRadius = new CornerRadius(size / 2.0),
+                ClipToBounds = true,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 14, 0),
+                Effect = new DropShadowEffect
+                {
+                    Color = Colors.Black,
+                    BlurRadius = 5,
+                    ShadowDepth = 1.5,
+                    Opacity = 0.35
+                }
+            };
+
+            var grid = new Grid
+            {
+                Width = size,
+                Height = size
+            };
+
+            if (teamKey == "turkiye")
+            {
+                container.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(227, 10, 23));
+                container.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(190, 255, 255, 255));
+                container.BorderThickness = new Thickness(1.5);
+
+                var vb = new Viewbox
+                {
+                    Width = size * 0.68,
+                    Height = size * 0.68,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                var path = new System.Windows.Shapes.Path
+                {
+                    Data = Geometry.Parse("M 80.4,30.7 A 36,36 0 1,0 80.4,69.3 A 28.8,28.8 0 1,1 80.4,30.7 Z M 68,50 L 74.9,47.7 L 74.9,40.5 L 79.2,44.4 L 86.1,44.1 L 81.8,50 L 86.1,55.9 L 79.2,55.6 L 74.9,59.5 L 74.9,52.3 Z"),
+                    Fill = System.Windows.Media.Brushes.White,
+                    Stretch = Stretch.Uniform
+                };
+                vb.Child = path;
+                grid.Children.Add(vb);
+            }
+            else if (teamKey == "galatasaray")
+            {
+                // Sarı-Kırmızı İki Renkli Dikey Zemin
+                var bg = new LinearGradientBrush
+                {
+                    StartPoint = new System.Windows.Point(0, 0.5),
+                    EndPoint = new System.Windows.Point(1, 0.5),
+                    GradientStops = new GradientStopCollection
+                    {
+                        new GradientStop(System.Windows.Media.Color.FromRgb(253, 185, 18), 0.0),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(253, 185, 18), 0.50),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(200, 16, 46), 0.50),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(200, 16, 46), 1.0)
+                    }
+                };
+                container.Background = bg;
+                container.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(253, 185, 18));
+                container.BorderThickness = new Thickness(1.5);
+
+                var txt = new TextBlock
+                {
+                    Text = "GS",
+                    FontSize = size * 0.40,
+                    FontWeight = FontWeights.ExtraBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Arial Black, Segoe UI, sans-serif"),
+                    Foreground = System.Windows.Media.Brushes.White,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 3, ShadowDepth = 1, Opacity = 0.85 }
+                };
+                grid.Children.Add(txt);
+            }
+            else if (teamKey == "fenerbahce")
+            {
+                // Sarı-Lacivert İki Renkli Dikey Zemin
+                var bg = new LinearGradientBrush
+                {
+                    StartPoint = new System.Windows.Point(0, 0.5),
+                    EndPoint = new System.Windows.Point(1, 0.5),
+                    GradientStops = new GradientStopCollection
+                    {
+                        new GradientStop(System.Windows.Media.Color.FromRgb(254, 213, 0), 0.0),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(254, 213, 0), 0.50),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(0, 45, 114), 0.50),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(0, 45, 114), 1.0)
+                    }
+                };
+                container.Background = bg;
+                container.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(254, 213, 0));
+                container.BorderThickness = new Thickness(1.5);
+
+                var txt = new TextBlock
+                {
+                    Text = "FB",
+                    FontSize = size * 0.40,
+                    FontWeight = FontWeights.ExtraBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Arial Black, Segoe UI, sans-serif"),
+                    Foreground = System.Windows.Media.Brushes.White,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 3, ShadowDepth = 1, Opacity = 0.85 }
+                };
+                grid.Children.Add(txt);
+            }
+            else if (teamKey == "besiktas")
+            {
+                // Siyah-Beyaz-Kırmızı Şeritli Zemin
+                var bg = new LinearGradientBrush
+                {
+                    StartPoint = new System.Windows.Point(0, 0.5),
+                    EndPoint = new System.Windows.Point(1, 0.5),
+                    GradientStops = new GradientStopCollection
+                    {
+                        new GradientStop(System.Windows.Media.Color.FromRgb(15, 15, 18), 0.0),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(15, 15, 18), 0.42),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(227, 10, 23), 0.42),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(227, 10, 23), 0.58),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(255, 255, 255), 0.58),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(255, 255, 255), 1.0)
+                    }
+                };
+                container.Background = bg;
+                container.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(190, 220, 220, 220));
+                container.BorderThickness = new Thickness(1.5);
+
+                var txt = new TextBlock
+                {
+                    Text = "BJK",
+                    FontSize = size * 0.33,
+                    FontWeight = FontWeights.ExtraBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Arial Black, Segoe UI, sans-serif"),
+                    Foreground = System.Windows.Media.Brushes.White,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 3, ShadowDepth = 1, Opacity = 0.95 }
+                };
+                grid.Children.Add(txt);
+            }
+            else if (teamKey == "trabzonspor")
+            {
+                // Bordo-Mavi İki Renkli Dikey Zemin
+                var bg = new LinearGradientBrush
+                {
+                    StartPoint = new System.Windows.Point(0, 0.5),
+                    EndPoint = new System.Windows.Point(1, 0.5),
+                    GradientStops = new GradientStopCollection
+                    {
+                        new GradientStop(System.Windows.Media.Color.FromRgb(163, 0, 43), 0.0),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(163, 0, 43), 0.50),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(56, 189, 248), 0.50),
+                        new GradientStop(System.Windows.Media.Color.FromRgb(56, 189, 248), 1.0)
+                    }
+                };
+                container.Background = bg;
+                container.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
+                container.BorderThickness = new Thickness(1.5);
+
+                var txt = new TextBlock
+                {
+                    Text = "TS",
+                    FontSize = size * 0.40,
+                    FontWeight = FontWeights.ExtraBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Arial Black, Segoe UI, sans-serif"),
+                    Foreground = System.Windows.Media.Brushes.White,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 3, ShadowDepth = 1, Opacity = 0.85 }
+                };
+                grid.Children.Add(txt);
+            }
+
+            container.Child = grid;
+            return container;
+        }
+    }
+
+    // ==========================================
+    // SİSTEM MONİTÖRÜ (CPU & RAM)
+    // ==========================================
+    public static class SystemMonitor
+    {
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetSystemTimes(out long lpIdleTime, out long lpKernelTime, out long lpUserTime);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        private class MEMORYSTATUSEX
+        {
+            public uint dwLength;
+            public uint dwMemoryLoad;
+            public ulong ullTotalPhys;
+            public ulong ullAvailPhys;
+            public ulong ullTotalPageFile;
+            public ulong ullAvailPageFile;
+            public ulong ullTotalVirtual;
+            public ulong ullAvailVirtual;
+            public ulong ullAvailExtendedVirtual;
+            public MEMORYSTATUSEX() { dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX)); }
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GlobalMemoryStatusEx([In, Out] MEMORYSTATUSEX lpBuffer);
+
+        private static long _prevIdle = 0;
+        private static long _prevKernel = 0;
+        private static long _prevUser = 0;
+        private static int _lastCpu = 0;
+
+        public static int GetCpuUsage()
+        {
+            try
+            {
+                long idle, kernel, user;
+                if (GetSystemTimes(out idle, out kernel, out user))
+                {
+                    if (_prevIdle != 0)
+                    {
+                        long uDiff = user - _prevUser;
+                        long kDiff = kernel - _prevKernel;
+                        long iDiff = idle - _prevIdle;
+                        long total = uDiff + kDiff;
+                        if (total > 0)
+                        {
+                            long cpu = (total - iDiff) * 100 / total;
+                            if (cpu < 0) cpu = 0;
+                            if (cpu > 100) cpu = 100;
+                            _lastCpu = (int)cpu;
+                        }
+                    }
+                    _prevIdle = idle;
+                    _prevKernel = kernel;
+                    _prevUser = user;
+                }
+            }
+            catch { }
+            return _lastCpu;
+        }
+
+        public static int GetRamUsage(out double usedGb, out double totalGb)
+        {
+            usedGb = 0;
+            totalGb = 0;
+            try
+            {
+                var mem = new MEMORYSTATUSEX();
+                if (GlobalMemoryStatusEx(mem))
+                {
+                    totalGb = (double)mem.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
+                    usedGb = (double)(mem.ullTotalPhys - mem.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0);
+                    return (int)mem.dwMemoryLoad;
+                }
+            }
+            catch { }
+            return 0;
+        }
+    }
+
+    // ==========================================
+    // OYUN / TAM EKRAN ALGILAMA SERVİSİ
+    // ==========================================
+    public static class GameModeService
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetDesktopWindow();
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetShellWindow();
+
+        public static bool IsFullscreenAppActive()
+        {
+            try
+            {
+                IntPtr fg = GetForegroundWindow();
+                if (fg == IntPtr.Zero || fg == GetDesktopWindow() || fg == GetShellWindow()) return false;
+                RECT r;
+                if (GetWindowRect(fg, out r))
+                {
+                    int screenW = (int)SystemParameters.PrimaryScreenWidth;
+                    int screenH = (int)SystemParameters.PrimaryScreenHeight;
+                    if (r.Left <= 0 && r.Top <= 0 && r.Right >= screenW && r.Bottom >= screenH)
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch { }
+            return false;
+        }
+    }
+
+    // ==========================================
+    // AKILLI RAM VE BELLEK OPTİMİZASYON YÖNETİCİSİ
+    // Mimari & Tasarım: Serkan ŞENTÜRK
+    // ==========================================
+    public static class MemoryOptimizer
+    {
+        private static DateTime _lastTrim = DateTime.MinValue;
+        private static readonly object _lock = new object();
+
+        public static void TrimWorkingSet(bool force = false)
+        {
+            lock (_lock)
+            {
+                if (!force && (DateTime.Now - _lastTrim).TotalSeconds < 10) return;
+                _lastTrim = DateTime.Now;
+
+                try
+                {
+                    // 1. Artık kullanılmayan nesneleri ve LOH bellek havuzunu topla
+                    GC.Collect(2, GCCollectionMode.Forced, true, true);
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect(2, GCCollectionMode.Forced, true, true);
+
+                    // 2. Windows Bellek Yöneticisine fiziksel RAM'deki boş sayfaları iade et
+                    IntPtr hProc = Process.GetCurrentProcess().Handle;
+                    Win32.EmptyWorkingSet(hProc);
+                    Win32.SetProcessWorkingSetSize(hProc, -1, -1);
+                }
+                catch { }
+            }
+        }
+    }
+
+    // ==========================================
+    // CANLI SES ÇIKIŞI & PEAK METRE (WASAPI CORE AUDIO)
+    // ==========================================
+    [ComImport]
+    [Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+    internal class MMDeviceEnumeratorComObject { }
+
+    [Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    internal interface IMMDeviceEnumerator
+    {
+        int EnumAudioEndpoints(int dataFlow, int stateMask, out IntPtr devices);
+        int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice endpoint);
+    }
+
+    [Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    internal interface IMMDevice
+    {
+        int Activate(ref Guid id, int clsCtx, IntPtr activationParams, [MarshalAs(UnmanagedType.IUnknown)] out object interfacePointer);
+    }
+
+    [Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    internal interface IAudioMeterInformation
+    {
+        int GetPeakValue(out float peak);
+    }
+
+    public static class AudioMeterService
+    {
+        private static IMMDeviceEnumerator _enumerator;
+        private static IMMDevice _device;
+        private static IAudioMeterInformation _meter;
+        private static DateTime _lastSoundTime = DateTime.MinValue;
+        private static readonly object _lock = new object();
+
+        private static bool Init()
+        {
+            try
+            {
+                if (_meter != null) return true;
+                if (_enumerator == null)
+                {
+                    _enumerator = (IMMDeviceEnumerator)(new MMDeviceEnumeratorComObject());
+                }
+                if (_enumerator == null) return false;
+
+                IMMDevice dev;
+                int hr = _enumerator.GetDefaultAudioEndpoint(0, 1, out dev); // 0 = eRender (çıkış/hoparlör), 1 = eMultimedia
+                if (hr != 0 || dev == null) return false;
+                _device = dev;
+
+                Guid iid = typeof(IAudioMeterInformation).GUID;
+                object o;
+                hr = _device.Activate(ref iid, 1, IntPtr.Zero, out o); // 1 = CLSCTX_INPROC_SERVER
+                if (hr != 0 || o == null) return false;
+
+                _meter = (IAudioMeterInformation)o;
+                return true;
+            }
+            catch
+            {
+                _meter = null;
+                _device = null;
+                return false;
+            }
+        }
+
+        public static float GetPeak()
+        {
+            lock (_lock)
+            {
+                try
+                {
+                    if (!Init()) return 0f;
+                    float peak = 0f;
+                    int hr = _meter.GetPeakValue(out peak);
+                    if (hr != 0)
+                    {
+                        // Cihaz değişmiş olabilir (kulaklık takıldı/çıkarıldı), sıfırla ve yeniden dene
+                        _meter = null;
+                        _device = null;
+                        if (Init())
+                        {
+                            _meter.GetPeakValue(out peak);
+                        }
+                    }
+
+                    if (peak > 0.0005f)
+                    {
+                        _lastSoundTime = DateTime.Now;
+                    }
+                    return peak;
+                }
+                catch
+                {
+                    _meter = null;
+                    _device = null;
+                    return 0f;
+                }
+            }
+        }
+
+        public static bool IsAudioPlaying(double holdSeconds = 2.5)
+        {
+            float peak = GetPeak();
+            if (peak > 0.0005f) return true;
+            return (DateTime.Now - _lastSoundTime).TotalSeconds < holdSeconds;
+        }
+    }
+
+    // ==========================================
+    // CANLI MEDYA & SPOTIFY OYNATICI SERVİSİ
+    // ==========================================
+    public class MediaTrackInfo
+    {
+        public bool IsPlaying;
+        public string Title = "";
+        public string Artist = "";
+        public string Player = ""; // "Spotify", "YouTube", "Müzik"
+        public bool HasMedia { get { return !string.IsNullOrEmpty(Title); } }
+    }
+
+    public static class MediaTrackerService
+    {
+        [DllImport("user32.dll")]
+        public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        public const byte VK_MEDIA_NEXT_TRACK = 0xB0;
+        public const byte VK_MEDIA_PREV_TRACK = 0xB1;
+        public const byte VK_MEDIA_PLAY_PAUSE = 0xB3;
+
+        public static IntPtr LastPlayerHwnd = IntPtr.Zero;
+
+        public static void PlayPause()
+        {
+            keybd_event(VK_MEDIA_PLAY_PAUSE, 0, 0, 0);
+            keybd_event(VK_MEDIA_PLAY_PAUSE, 0, 2, 0);
+        }
+
+        public static void NextTrack()
+        {
+            keybd_event(VK_MEDIA_NEXT_TRACK, 0, 0, 0);
+            keybd_event(VK_MEDIA_NEXT_TRACK, 0, 2, 0);
+        }
+
+        public static void PrevTrack()
+        {
+            keybd_event(VK_MEDIA_PREV_TRACK, 0, 0, 0);
+            keybd_event(VK_MEDIA_PREV_TRACK, 0, 2, 0);
+        }
+
+        public static void FocusPlayer()
+        {
+            if (LastPlayerHwnd != IntPtr.Zero)
+            {
+                try { SetForegroundWindow(LastPlayerHwnd); } catch { }
+            }
+        }
+
+        public static bool IsSearchOrNonMedia(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return true;
+            string s = raw.Trim().ToLowerInvariant();
+
+            // 1. Google ve arama motorları sorguları / arama sayfaları
+            if (s.Contains("google'da ara") ||
+                s.Contains("google da ara") ||
+                s.Contains("google'da arama") ||
+                s.Contains("google arama") ||
+                s.Contains("google search") ||
+                s.Contains("google ara") ||
+                s.Contains("- google") ||
+                s.Contains(" - google") ||
+                s.Contains("– google") ||
+                s.Contains("— google") ||
+                s.Contains("google -") ||
+                s.Contains("google.com") ||
+                s.Contains("google.com.tr") ||
+                s.Contains("yandex'te ara") ||
+                s.Contains("yandex ara") ||
+                s.Contains("yandex arama") ||
+                s.Contains("- yandex") ||
+                s.Contains(" - yandex") ||
+                s.Contains("bing search") ||
+                s.Contains("bing'de ara") ||
+                s.Contains("bing arama") ||
+                s.Contains("- bing") ||
+                s.Contains(" - bing") ||
+                s.Contains("duckduckgo") ||
+                s.Contains("yahoo search") ||
+                s.Contains("arama sonuçları") ||
+                s.Contains("search results") ||
+                s == "google")
+            {
+                return true;
+            }
+
+            // 2. Tarayıcı başlangıç ve ayar/sistem sekmeleri
+            if (s.StartsWith("yeni sekme") ||
+                s.StartsWith("new tab") ||
+                s.StartsWith("adsız") ||
+                s.StartsWith("untitled") ||
+                s.StartsWith("karşılama") ||
+                s.StartsWith("welcome") ||
+                s.StartsWith("ayarlar") ||
+                s.StartsWith("settings") ||
+                s.StartsWith("uzantılar") ||
+                s.StartsWith("extensions") ||
+                s.StartsWith("geçmiş") ||
+                s.StartsWith("history") ||
+                s.StartsWith("indirilenler") ||
+                s.StartsWith("downloads"))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public static string CleanTrackTitle(string raw, bool isMusicPlayer, out string artist)
+        {
+            artist = "";
+            if (string.IsNullOrWhiteSpace(raw)) return "";
+
+            // Arama sorguları veya boş/sistem pencerelerini doğrudan engelle
+            if (IsSearchOrNonMedia(raw)) return "";
+
+            string s = raw.Trim();
+
+            // 1. Unicode tire ve tire varyantlarını standart '-' yap
+            s = s.Replace('\u2013', '-').Replace('\u2014', '-').Replace('\u2015', '-');
+
+            // 2. Başlangıçtaki bildirim sayaçlarını temizle: "(377) ", "(1) " vb.
+            s = Regex.Replace(s, @"^\s*\(\d+\)\s*", "");
+
+            // 3. Çoklu sekme sayaçlarını temizle: "ve 2 diğer sekme", "and 3 more tabs"
+            s = Regex.Replace(s, @"\s*[-–—]?\s*(?:ve\s+\d+\s+diğer\s+sekme|and\s+\d+\s+more\s+tabs)\s*", "", RegexOptions.IgnoreCase);
+
+            // 4. Baştaki profil / tarayıcı kalıntılarını temizle (örn: "Kişisel - Microsoft Edge - ")
+            s = Regex.Replace(s, @"^(?:Kişisel|Personal|İş|Work|Default|Profil\s*\d*|Profile\s*\d*)\s*[-–—]\s*", "", RegexOptions.IgnoreCase);
+            s = Regex.Replace(s, @"^(?:Microsoft\s*Edge|Google\s*Chrome|Mozilla\s*Firefox|Brave|Opera|Vivaldi)\s*[-–—]\s*", "", RegexOptions.IgnoreCase);
+
+            // 5. Sondaki tarayıcı, profil ve platform çöplerini döngü ile tamamen buda
+            bool changed = true;
+            while (changed)
+            {
+                changed = false;
+                string prev = s;
+
+                // Sondaki tarayıcı isimleri
+                s = Regex.Replace(s, @"\s*[-–—]\s*(?:Microsoft\s*Edge|Google\s*Chrome|Mozilla\s*Firefox|Brave|Opera|Vivaldi)\s*$", "", RegexOptions.IgnoreCase);
+                // Sondaki profil isimleri (Kişisel, Personal, İş, Work, Profil 1, vb.)
+                s = Regex.Replace(s, @"\s*[-–—]\s*(?:Kişisel|Personal|İş|Work|Default|Profile\s*\d+|Profil\s*\d+)\s*$", "", RegexOptions.IgnoreCase);
+                // Sondaki platform isimleri
+                s = Regex.Replace(s, @"\s*[-–—]\s*(?:YouTube\s*Music|YouTube|Spotify\s*Free|Spotify\s*Premium|Spotify|VLC\s*media\s*player)\s*$", "", RegexOptions.IgnoreCase);
+
+                s = s.Trim();
+                if (s != prev) changed = true;
+            }
+
+            // Ekstra son temizlik: Kalan sondaki veya baştaki tire işaretlerini buda
+            s = s.Trim('-', ' ', '\t');
+
+            // Eğer temizleme sonrası arama veya sistem kelimesi kaldıysa iptal et
+            if (IsSearchOrNonMedia(s)) return "";
+
+            // 6. Spotify gibi müzik oynatıcılarında "Sanatçı - Parça" ayrımı
+            if (isMusicPlayer)
+            {
+                int sep = s.IndexOf(" - ");
+                if (sep > 0)
+                {
+                    string part1 = s.Substring(0, sep).Trim();
+                    string part2 = s.Substring(sep + 3).Trim();
+
+                    if (!IsGarbageWord(part1) && !IsGarbageWord(part2))
+                    {
+                        artist = part1;
+                        return part2;
+                    }
+                    else if (IsGarbageWord(part1))
+                    {
+                        return part2;
+                    }
+                    else
+                    {
+                        return part1;
+                    }
+                }
+            }
+
+            return s;
+        }
+
+        private static bool IsGarbageWord(string word)
+        {
+            if (string.IsNullOrWhiteSpace(word)) return true;
+            string w = word.Trim().ToLowerInvariant();
+            if (w == "kişisel" || w == "personal" || w == "iş" || w == "work" ||
+                w == "microsoft edge" || w == "google chrome" || w == "mozilla firefox" ||
+                w == "brave" || w == "opera" || w == "vivaldi" ||
+                w == "youtube" || w == "spotify" || w == "vlc" ||
+                w == "google" || w == "google'da ara" || w == "google da ara" || w == "google search")
+                return true;
+            if (Regex.IsMatch(w, @"^profil(e)?\s*\d*$")) return true;
+            return false;
+        }
+
+        public static MediaTrackInfo GetCurrentMedia()
+        {
+            var info = new MediaTrackInfo();
+            try
+            {
+                StringBuilder sb = new StringBuilder(512);
+                MediaTrackInfo found = null;
+
+                Win32.EnumWindows(delegate(IntPtr hwnd, IntPtr lParam)
+                {
+                    if (!Win32.IsWindowVisible(hwnd)) return true;
+
+                    sb.Clear();
+                    int len = Win32.GetWindowText(hwnd, sb, sb.Capacity);
+                    if (len <= 0) return true;
+
+                    string title = sb.ToString();
+
+                    // Arama motoru veya medya dışı pencere ise doğrudan atla
+                    if (IsSearchOrNonMedia(title)) return true;
+
+                    bool isPotentialSpotify = (title != "Spotify" && title != "Spotify Free" && title != "Spotify Premium" && title.Contains(" - "));
+                    bool isPotentialBrowser = (title.IndexOf(" - YouTube", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                               title.IndexOf(" – YouTube", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                               title.IndexOf("— YouTube", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                               title.IndexOf("YouTube Music", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                               title.IndexOf("SoundCloud", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                               title.IndexOf("Twitch", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                               title.IndexOf("Spotify", StringComparison.OrdinalIgnoreCase) >= 0);
+                    bool isPotentialVlc = (title.IndexOf("VLC", StringComparison.OrdinalIgnoreCase) >= 0);
+
+                    if (isPotentialSpotify || isPotentialBrowser || isPotentialVlc)
+                    {
+                        uint pid;
+                        Win32.GetWindowThreadProcessId(hwnd, out pid);
+                        if (pid != 0)
+                        {
+                            string pName = "";
+                            try
+                            {
+                                using (var proc = Process.GetProcessById((int)pid))
+                                {
+                                    pName = proc.ProcessName.ToLowerInvariant();
+                                }
+                            }
+                            catch { }
+
+                            if (pName == "spotify")
+                            {
+                                string artistPart;
+                                string cleanTitle = CleanTrackTitle(title, true, out artistPart);
+                                if (!string.IsNullOrWhiteSpace(cleanTitle) && !IsSearchOrNonMedia(cleanTitle))
+                                {
+                                    LastPlayerHwnd = hwnd;
+                                    found = new MediaTrackInfo { Title = cleanTitle, Artist = artistPart, IsPlaying = true, Player = "Spotify" };
+                                    return false; // Bulundu, taramayı durdur
+                                }
+                            }
+                            else if (pName == "chrome" || pName == "msedge" || pName == "firefox" || pName == "opera" || pName == "brave" || pName == "vivaldi")
+                            {
+                                if (IsSearchOrNonMedia(title)) return true;
+
+                                string artistPart;
+                                string cleanTitle = CleanTrackTitle(title, false, out artistPart);
+                                if (!string.IsNullOrWhiteSpace(cleanTitle) && !IsSearchOrNonMedia(cleanTitle))
+                                {
+                                    LastPlayerHwnd = hwnd;
+                                    found = new MediaTrackInfo { Title = cleanTitle, Artist = artistPart, IsPlaying = true, Player = "Tarayıcı" };
+                                    return false; // Bulundu, taramayı durdur
+                                }
+                            }
+                            else if (pName == "vlc")
+                            {
+                                string artistPart;
+                                string cleanTitle = CleanTrackTitle(title, true, out artistPart);
+                                if (!string.IsNullOrWhiteSpace(cleanTitle) && !IsSearchOrNonMedia(cleanTitle))
+                                {
+                                    LastPlayerHwnd = hwnd;
+                                    found = new MediaTrackInfo { Title = cleanTitle, Artist = artistPart, IsPlaying = true, Player = "VLC" };
+                                    return false; // Bulundu, taramayı durdur
+                                }
+                            }
+                        }
+                    }
+
+                    return true;
+                }, IntPtr.Zero);
+
+                if (found != null) return found;
+            }
+            catch { }
+            return info;
+        }
+    }
+
+    // ==========================================
+    // GÜNÜN ÂYETİ VE HADÎSİ KART PENCERESİ (WIDGET'A PARALEL)
+    // ==========================================
+    public class InspirationCardWindow : Window
+    {
+        public enum InspirationType
+        {
+            Verse,
+            Hadith,
+            Quote
+        }
+
+        private readonly Config _cfg;
+        private readonly InspirationType _type;
+        private int _currentOffset = 0;
+        private Border _cardBorder;
+        private Border _divider;
+        private TextBlock _txtBadgeIcon;
+        private TextBlock _txtBadgeTitle;
+        private TextBlock _txtTopic;
+        private TextBlock _txtContent;
+        private TextBlock _txtSource;
+        private TextBlock _btnCopy;
+        private TextBlock _btnCycle;
+        private DispatcherTimer _copyToastTimer;
+
+        public InspirationType Type { get { return _type; } }
+        public Func<WidgetWindow> GetWidgetWinFunc { get; set; }
+
+        public InspirationCardWindow(Config cfg, InspirationType type)
+        {
+            _cfg = cfg;
+            _type = type;
+
+            Title = (_type == InspirationType.Verse) ? "Günün Âyeti" : (_type == InspirationType.Hadith ? "Günün Hadîsi" : "Günün Sözü & Özdeyiş");
+            WindowStyle = WindowStyle.None;
+            AllowsTransparency = true;
+            Background = System.Windows.Media.Brushes.Transparent;
+            ShowInTaskbar = false;
+            SizeToContent = SizeToContent.WidthAndHeight;
+            ResizeMode = ResizeMode.NoResize;
+            ShowActivated = false;
+            Topmost = false;
+            WindowStartupLocation = WindowStartupLocation.Manual;
+
+            BuildUI();
+
+            PreviewMouseWheel += delegate(object s, MouseWheelEventArgs e)
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                {
+                    double delta = (e.Delta > 0) ? 0.05 : -0.05;
+                    double newScale = Math.Round((_cfg.InspirationWidgetScale + delta) * 20.0) / 20.0;
+                    if (newScale < 0.50) newScale = 0.50;
+                    if (newScale > 1.00) newScale = 1.00;
+                    if (Math.Abs(newScale - _cfg.InspirationWidgetScale) > 0.001)
+                    {
+                        _cfg.InspirationWidgetScale = newScale;
+                        _cfg.Save();
+                        ApplyThemeAndStyle();
+                    }
+                    e.Handled = true;
+                }
+            };
+
+            SizeChanged += delegate
+            {
+                var w = GetWidgetWinFunc != null ? GetWidgetWinFunc() : null;
+                UpdatePosition(w);
+            };
+
+            SourceInitialized += delegate
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    if (!Win32.InspirationWindowHandles.Contains(hwnd))
+                    {
+                        Win32.InspirationWindowHandles.Add(hwnd);
+                    }
+
+                    int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                    Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle | Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE);
+
+                    var source = HwndSource.FromHwnd(hwnd);
+                    if (source != null)
+                    {
+                        source.AddHook(WndProc);
+                    }
+                }
+            };
+
+            try { new WindowInteropHelper(this).EnsureHandle(); } catch { }
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            try
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    Win32.InspirationWindowHandles.Remove(hwnd);
+                }
+            }
+            catch { }
+            base.OnClosed(e);
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == 0x0021) // WM_MOUSEACTIVATE
+            {
+                handled = true;
+                return (IntPtr)3; // MA_NOACTIVATE (3)
+            }
+            return IntPtr.Zero;
+        }
+
+        private void BuildUI()
+        {
+            _cardBorder = new Border
+            {
+                CornerRadius = new CornerRadius(22),
+                Padding = new Thickness(18, 14, 18, 14),
+                Margin = new Thickness(8),
+                Width = 350,
+                Cursor = Cursors.Hand,
+                Effect = new DropShadowEffect
+                {
+                    BlurRadius = 24,
+                    ShadowDepth = 5,
+                    Direction = 270,
+                    Opacity = 0.28,
+                    Color = System.Windows.Media.Colors.Black
+                }
+            };
+
+            var stack = new StackPanel { Orientation = Orientation.Vertical };
+
+            // Üst Başlık Satırı
+            var headerDock = new DockPanel { LastChildFill = true };
+
+            var badgeStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            DockPanel.SetDock(badgeStack, Dock.Left);
+
+            _txtBadgeIcon = new TextBlock
+            {
+                FontSize = 13.5,
+                Margin = new Thickness(0, 0, 6, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _txtBadgeTitle = new TextBlock
+            {
+                FontSize = 10.5,
+                FontWeight = FontWeights.Bold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI Variable Display, Segoe UI"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            badgeStack.Children.Add(_txtBadgeIcon);
+            badgeStack.Children.Add(_txtBadgeTitle);
+
+            _txtTopic = new TextBlock
+            {
+                FontSize = 9.5,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Margin = new Thickness(8, 0, 0, 0),
+                Opacity = 0.85,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            badgeStack.Children.Add(_txtTopic);
+            headerDock.Children.Add(badgeStack);
+
+            // Sağ üst döngü butonu
+            var rightTools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            DockPanel.SetDock(rightTools, Dock.Right);
+
+            _btnCycle = new TextBlock
+            {
+                Text = "🔄",
+                FontSize = 11,
+                Cursor = Cursors.Hand,
+                Opacity = 0.7,
+                ToolTip = "Sonrakine geç",
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0)
+            };
+            _btnCycle.MouseEnter += delegate { _btnCycle.Opacity = 1.0; };
+            _btnCycle.MouseLeave += delegate { _btnCycle.Opacity = 0.7; };
+            _btnCycle.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                _currentOffset++;
+                RefreshContent();
+            };
+            rightTools.Children.Add(_btnCycle);
+            headerDock.Children.Add(rightTools);
+
+            stack.Children.Add(headerDock);
+
+            // İnce Ayırıcı
+            _divider = new Border
+            {
+                Height = 1,
+                Margin = new Thickness(0, 8, 0, 8),
+                Opacity = 1.0
+            };
+            stack.Children.Add(_divider);
+
+            // Ana Metin (Ayet / Hadis Meali)
+            _txtContent = new TextBlock
+            {
+                FontSize = 11.5,
+                FontWeight = FontWeights.Normal,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                TextWrapping = TextWrapping.Wrap,
+                LineHeight = 18.0,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            stack.Children.Add(_txtContent);
+
+            // Alt Kaynak ve Kopyala Butonu Satırı
+            var footerDock = new DockPanel { LastChildFill = true };
+
+            _btnCopy = new TextBlock
+            {
+                Text = "📋 Kopyala",
+                FontSize = 9.5,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Opacity = 0.8,
+                Cursor = Cursors.Hand,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            DockPanel.SetDock(_btnCopy, Dock.Right);
+            _btnCopy.MouseEnter += delegate { _btnCopy.Opacity = 1.0; };
+            _btnCopy.MouseLeave += delegate { _btnCopy.Opacity = 0.8; };
+            _btnCopy.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                CopyToClipboard();
+            };
+            footerDock.Children.Add(_btnCopy);
+
+            _txtSource = new TextBlock
+            {
+                FontSize = 10,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Opacity = 0.85,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            footerDock.Children.Add(_txtSource);
+
+            stack.Children.Add(footerDock);
+
+            _cardBorder.Child = stack;
+            Content = _cardBorder;
+            _cardBorder.Cursor = _cfg.LockInspirationPosition ? Cursors.Arrow : Cursors.SizeAll;
+            _cardBorder.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                if (!_cfg.LockInspirationPosition)
+                {
+                    if (e.ButtonState == MouseButtonState.Pressed)
+                    {
+                        try
+                        {
+                            DragMove();
+                            if (_type == InspirationType.Quote)
+                            {
+                                _cfg.QuoteX = Left;
+                                _cfg.QuoteY = Top;
+                            }
+                            else if (_type == InspirationType.Verse)
+                            {
+                                _cfg.VerseX = Left;
+                                _cfg.VerseY = Top;
+                            }
+                            else if (_type == InspirationType.Hadith)
+                            {
+                                _cfg.HadithX = Left;
+                                _cfg.HadithY = Top;
+                            }
+                            _cfg.Save();
+                        }
+                        catch { }
+                    }
+                    return;
+                }
+
+                if (e.ClickCount == 2)
+                {
+                    _currentOffset++;
+                    RefreshContent();
+                }
+                else
+                {
+                    CopyToClipboard();
+                }
+            };
+
+            _cardBorder.MouseRightButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                ShowInspirationContextMenu(_cardBorder);
+            };
+
+            RefreshContent();
+        }
+
+        private void ShowInspirationContextMenu(FrameworkElement target)
+        {
+            var cm = new System.Windows.Controls.ContextMenu();
+
+            var miCopy = new System.Windows.Controls.MenuItem { Header = "📋 Metni Kopyala" };
+            miCopy.Click += delegate { CopyToClipboard(); };
+            cm.Items.Add(miCopy);
+
+            var miNext = new System.Windows.Controls.MenuItem { Header = "🔄 Sıradakini Göster" };
+            miNext.Click += delegate { _currentOffset++; RefreshContent(); };
+            cm.Items.Add(miNext);
+
+            var miLock = new System.Windows.Controls.MenuItem
+            {
+                Header = _cfg.LockInspirationPosition ? "🔓 Konum Kilidini Aç" : "🔒 Konumu Kilitle"
+            };
+            miLock.Click += delegate
+            {
+                _cfg.LockInspirationPosition = !_cfg.LockInspirationPosition;
+                _cfg.Save();
+                ApplyThemeAndStyle();
+            };
+            cm.Items.Add(miLock);
+
+            cm.Items.Add(new System.Windows.Controls.Separator());
+
+            var miScaleHeader = new System.Windows.Controls.MenuItem
+            {
+                Header = "📐 WİDGET BOYUTU (KÜÇÜLTME / BÜYÜTME)",
+                IsEnabled = false
+            };
+            cm.Items.Add(miScaleHeader);
+
+            double[] scaleOptions = new double[] { 1.0, 0.90, 0.85, 0.80, 0.75, 0.70, 0.60, 0.50 };
+            string[] scaleLabels = new string[] { "%100 (Varsayılan - En Büyük)", "%90", "%85", "%80", "%75", "%70", "%60", "%50 (En Küçük)" };
+
+            for (int sIdx = 0; sIdx < scaleOptions.Length; sIdx++)
+            {
+                double targetScale = scaleOptions[sIdx];
+                string label = scaleLabels[sIdx];
+                bool isCurrent = Math.Abs(_cfg.InspirationWidgetScale - targetScale) < 0.02;
+                var miScaleItem = new System.Windows.Controls.MenuItem
+                {
+                    Header = (isCurrent ? "✔ " : "   ") + label,
+                    FontWeight = isCurrent ? FontWeights.Bold : FontWeights.Normal
+                };
+                miScaleItem.Click += delegate
+                {
+                    _cfg.InspirationWidgetScale = targetScale;
+                    _cfg.Save();
+                    ApplyThemeAndStyle();
+                };
+                cm.Items.Add(miScaleItem);
+            }
+
+            cm.PlacementTarget = target;
+            cm.IsOpen = true;
+        }
+
+        private void CopyToClipboard()
+        {
+            try
+            {
+                string copyHeader = (_type == InspirationType.Verse) ? "📖 GÜNÜN ÂYET-İ KERÎMESİ\n"
+                                  : (_type == InspirationType.Hadith) ? "📜 GÜNÜN HADÎS-İ ŞERÎFİ\n"
+                                  : "💡 GÜNÜN SÖZÜ & ÖZDEYİŞ\n";
+                string copyText = copyHeader
+                    + _txtContent.Text + "\n\n"
+                    + _txtSource.Text;
+
+                Clipboard.SetText(copyText);
+
+                if (_btnCopy != null)
+                {
+                    _btnCopy.Text = "✓ Kopyalandı!";
+                    _btnCopy.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(34, 197, 94));
+                }
+
+                if (_copyToastTimer == null)
+                {
+                    _copyToastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.0) };
+                    _copyToastTimer.Tick += delegate
+                    {
+                        _copyToastTimer.Stop();
+                        if (_btnCopy != null)
+                        {
+                            _btnCopy.Text = "📋 Kopyala";
+                            ApplyThemeAndStyle();
+                        }
+                    };
+                }
+                _copyToastTimer.Stop();
+                _copyToastTimer.Start();
+            }
+            catch { }
+        }
+
+        public void RefreshContent()
+        {
+            if (_type == InspirationType.Verse)
+            {
+                var item = DailyVerseAndHadithService.GetDailyVerse(_currentOffset);
+                if (_txtBadgeIcon != null) _txtBadgeIcon.Text = "📖";
+                if (_txtBadgeTitle != null) _txtBadgeTitle.Text = "GÜNÜN ÂYETİ";
+                if (_txtTopic != null) _txtTopic.Text = "· " + item.Topic;
+                if (_txtContent != null) _txtContent.Text = "“" + item.Text + "”";
+                if (_txtSource != null) _txtSource.Text = "— " + item.Source;
+            }
+            else if (_type == InspirationType.Hadith)
+            {
+                var item = DailyVerseAndHadithService.GetDailyHadith(_currentOffset);
+                if (_txtBadgeIcon != null) _txtBadgeIcon.Text = "📜";
+                if (_txtBadgeTitle != null) _txtBadgeTitle.Text = "GÜNÜN HADÎSİ";
+                if (_txtTopic != null) _txtTopic.Text = "· " + item.Topic;
+                if (_txtContent != null) _txtContent.Text = "“" + item.Text + "”";
+                if (_txtSource != null) _txtSource.Text = "— " + item.Source;
+            }
+            else
+            {
+                var item = DailyVerseAndHadithService.GetDailyQuote(_currentOffset);
+                if (_txtBadgeIcon != null) _txtBadgeIcon.Text = "💡";
+                if (_txtBadgeTitle != null) _txtBadgeTitle.Text = "GÜNÜN SÖZÜ & ÖZDEYİŞ";
+                if (_txtTopic != null) _txtTopic.Text = "· " + item.Topic;
+                if (_txtContent != null) _txtContent.Text = "“" + item.Text + "”";
+                if (_txtSource != null) _txtSource.Text = "— " + item.Source;
+            }
+        }
+
+        public void ApplyThemeAndStyle()
+        {
+            string theme = _cfg.Theme;
+            bool isLight = (theme == "light");
+            double op = _cfg.WidgetOpacity;
+            if (op < 0.1) op = 0.1;
+            if (op > 1.0) op = 1.0;
+
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            byte bgAlpha = (byte)(op * 255);
+            byte borderAlpha = (byte)Math.Min(255, (int)(op * (isLight ? 180 : 80)));
+
+            System.Windows.Media.Color bg;
+            System.Windows.Media.Color border;
+            if (isLight)
+            {
+                bg = System.Windows.Media.Color.FromArgb(bgAlpha, 248, 250, 252);
+                border = System.Windows.Media.Color.FromArgb(borderAlpha, 215, 220, 230);
+            }
+            else
+            {
+                bg = System.Windows.Media.Color.FromArgb(bgAlpha, 20, 22, 30);
+                border = System.Windows.Media.Color.FromArgb(borderAlpha, 45, 50, 65);
+            }
+
+            if (_cardBorder != null)
+            {
+                _cardBorder.Background = new SolidColorBrush(bg);
+                _cardBorder.BorderBrush = new SolidColorBrush(border);
+                _cardBorder.BorderThickness = new Thickness(1);
+                _cardBorder.Effect = new DropShadowEffect
+                {
+                    Color = isLight ? System.Windows.Media.Color.FromRgb(140, 150, 160) : System.Windows.Media.Colors.Black,
+                    BlurRadius = 24,
+                    ShadowDepth = 6,
+                    Opacity = isLight ? (0.15 * op) : (0.35 * op)
+                };
+
+                double scale = _cfg.InspirationWidgetScale;
+                if (scale < 0.50) scale = 0.50;
+                if (scale > 1.00) scale = 1.00; // En buyuk boyutu suanki (%100)
+                _cardBorder.LayoutTransform = new ScaleTransform(scale, scale);
+            }
+
+            if (_divider != null)
+            {
+                _divider.Background = new SolidColorBrush(border);
+            }
+
+            System.Windows.Media.Color badgeColor = (_type == InspirationType.Verse)
+                ? (isLight ? System.Windows.Media.Color.FromRgb(5, 150, 105) : System.Windows.Media.Color.FromRgb(52, 211, 153))
+                : ((_type == InspirationType.Hadith)
+                    ? (isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(56, 189, 248))
+                    : (isLight ? System.Windows.Media.Color.FromRgb(217, 119, 6) : System.Windows.Media.Color.FromRgb(251, 191, 36)));
+
+            if (_txtBadgeTitle != null) _txtBadgeTitle.Foreground = new SolidColorBrush(badgeColor);
+            if (_txtBadgeIcon != null) _txtBadgeIcon.Foreground = new SolidColorBrush(badgeColor);
+            if (_txtTopic != null) _txtTopic.Foreground = new SolidColorBrush(textMuted);
+            if (_txtContent != null) _txtContent.Foreground = new SolidColorBrush(textPrimary);
+            if (_txtSource != null) _txtSource.Foreground = new SolidColorBrush(badgeColor);
+            if (_btnCopy != null && (_copyToastTimer == null || !_copyToastTimer.IsEnabled)) _btnCopy.Foreground = new SolidColorBrush(textMuted);
+            if (_btnCycle != null) _btnCycle.Foreground = new SolidColorBrush(textMuted);
+
+            if (_cardBorder != null)
+            {
+                _cardBorder.Cursor = _cfg.LockInspirationPosition ? Cursors.Arrow : Cursors.SizeAll;
+            }
+        }
+
+        public void UpdatePosition(WidgetWindow widget = null)
+        {
+            double cardW = ActualWidth > 0 ? ActualWidth : (DesiredSize.Width > 0 ? DesiredSize.Width : 350);
+            double cardH = ActualHeight > 0 ? ActualHeight : (DesiredSize.Height > 0 ? DesiredSize.Height : 140);
+
+            Forms.Screen scr = Forms.Screen.PrimaryScreen;
+            try
+            {
+                if (widget != null)
+                {
+                    var pt = new System.Drawing.Point((int)(widget.Left + 50), (int)(widget.Top + 50));
+                    scr = Forms.Screen.FromPoint(pt);
+                }
+            }
+            catch { }
+            if (scr == null) scr = Forms.Screen.PrimaryScreen;
+            var wa = scr.WorkingArea;
+
+            double targetTop;
+            double targetLeft;
+
+            if (_type == InspirationType.Quote && _cfg.QuoteX >= 0 && _cfg.QuoteY >= 0)
+            {
+                targetLeft = _cfg.QuoteX;
+                targetTop = _cfg.QuoteY;
+            }
+            else if (_type == InspirationType.Verse && _cfg.VerseX >= 0 && _cfg.VerseY >= 0)
+            {
+                targetLeft = _cfg.VerseX;
+                targetTop = _cfg.VerseY;
+            }
+            else if (_type == InspirationType.Hadith && _cfg.HadithX >= 0 && _cfg.HadithY >= 0)
+            {
+                targetLeft = _cfg.HadithX;
+                targetTop = _cfg.HadithY;
+            }
+            else if (_type == InspirationType.Quote)
+            {
+                // Ekranın sol üst köşesine zarifçe yerleştir
+                targetTop = wa.Top + 24;
+                targetLeft = wa.Left + 28;
+            }
+            else
+            {
+                // Ekranın en altında konumlandır (sol altta Günün Âyeti, sağ altta Günün Hadîsi)
+                targetTop = wa.Bottom - cardH - 18;
+                targetLeft = (_type == InspirationType.Verse) ? (wa.Left + 28) : (wa.Right - cardW - 28);
+            }
+
+            if (targetLeft < wa.Left) targetLeft = wa.Left + 10;
+            if (targetTop < wa.Top) targetTop = wa.Top + 10;
+            if (targetLeft + cardW > wa.Right) targetLeft = wa.Right - cardW - 10;
+            if (targetTop + cardH > wa.Bottom) targetTop = wa.Bottom - cardH - 10;
+
+            // Sadece gerçek değişim varsa veya henüz atanmamışsa güncelle
+            if (double.IsNaN(Top) || Math.Abs(Top - targetTop) > 1) Top = targetTop;
+            if (double.IsNaN(Left) || Math.Abs(Left - targetLeft) > 1) Left = targetLeft;
+        }
+
+        public void ShowCard(WidgetWindow widget)
+        {
+            RefreshContent();
+            ApplyThemeAndStyle();
+            UpdatePosition(widget);
+
+            if (!IsVisible)
+            {
+                Show();
+            }
+            try { UpdateLayout(); } catch { }
+            UpdatePosition(widget);
+        }
+
+        public void HideCard()
+        {
+            if (IsVisible)
+            {
+                Hide();
+            }
+        }
+    }
+
+    // ==========================================
+    // TÜRKİYE RESMÎ VE DÎNÎ TATİLLERİ WIDGET PENCERESİ (EKRANIN EN ALT ORTASI)
+    // ==========================================
+    public class HolidayBarWindow : Window
+    {
+        private readonly Config _cfg;
+        private int _currentHolidayOffset = 0;
+        private Border _cardBorder;
+        private Border _divLeft;
+        private Border _divRight;
+        private TextBlock _txtTitle;
+        private TextBlock _txtName;
+        private TextBlock _txtCountdown;
+        private TextBlock _btnCycle;
+        private DispatcherTimer _refreshTimer;
+
+        public HolidayBarWindow(Config cfg)
+        {
+            _cfg = cfg;
+
+            Title = "Türkiye Resmî Tatilleri";
+            WindowStyle = WindowStyle.None;
+            AllowsTransparency = true;
+            Background = System.Windows.Media.Brushes.Transparent;
+            ShowInTaskbar = false;
+            SizeToContent = SizeToContent.WidthAndHeight;
+            ResizeMode = ResizeMode.NoResize;
+            ShowActivated = false;
+            Topmost = false;
+            WindowStartupLocation = WindowStartupLocation.Manual;
+
+            BuildUI();
+
+            PreviewMouseWheel += delegate(object s, MouseWheelEventArgs e)
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                {
+                    double delta = (e.Delta > 0) ? 0.05 : -0.05;
+                    double newScale = Math.Round((_cfg.HolidayWidgetScale + delta) * 20.0) / 20.0;
+                    if (newScale < 0.50) newScale = 0.50;
+                    if (newScale > 1.00) newScale = 1.00;
+                    if (Math.Abs(newScale - _cfg.HolidayWidgetScale) > 0.001)
+                    {
+                        _cfg.HolidayWidgetScale = newScale;
+                        _cfg.Save();
+                        ApplyThemeAndStyle();
+                    }
+                    e.Handled = true;
+                }
+            };
+
+            SourceInitialized += delegate
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    if (!Win32.InspirationWindowHandles.Contains(hwnd))
+                    {
+                        Win32.InspirationWindowHandles.Add(hwnd);
+                    }
+
+                    int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                    Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle | Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE);
+
+                    var source = HwndSource.FromHwnd(hwnd);
+                    if (source != null)
+                    {
+                        source.AddHook(WndProc);
+                    }
+                }
+            };
+
+            try { new WindowInteropHelper(this).EnsureHandle(); } catch { }
+
+            _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(15) };
+            _refreshTimer.Tick += delegate { RefreshContent(); };
+            _refreshTimer.Start();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            try
+            {
+                if (_refreshTimer != null) _refreshTimer.Stop();
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    Win32.InspirationWindowHandles.Remove(hwnd);
+                }
+            }
+            catch { }
+            base.OnClosed(e);
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == 0x0021) // WM_MOUSEACTIVATE
+            {
+                handled = true;
+                return (IntPtr)3; // MA_NOACTIVATE
+            }
+            return IntPtr.Zero;
+        }
+
+        private void BuildUI()
+        {
+            _cardBorder = new Border
+            {
+                CornerRadius = new CornerRadius(20),
+                Padding = new Thickness(18, 9, 18, 9),
+                Margin = new Thickness(8),
+                Cursor = Cursors.Hand,
+                Effect = new DropShadowEffect
+                {
+                    BlurRadius = 24,
+                    ShadowDepth = 5,
+                    Direction = 270,
+                    Opacity = 0.28,
+                    Color = System.Windows.Media.Colors.Black
+                }
+            };
+
+            var mainDock = new DockPanel { LastChildFill = true };
+
+            // Sol Kısım: Rozet
+            var leftStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            DockPanel.SetDock(leftStack, Dock.Left);
+
+            _txtTitle = new TextBlock
+            {
+                FontSize = 10,
+                FontWeight = FontWeights.Bold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI Variable Display, Segoe UI"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            leftStack.Children.Add(_txtTitle);
+
+            _divLeft = new Border
+            {
+                Width = 1,
+                Height = 12,
+                Margin = new Thickness(0, 0, 10, 0),
+                Opacity = 1.0,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            leftStack.Children.Add(_divLeft);
+            mainDock.Children.Add(leftStack);
+
+            // Sağ Kısım: Sayaç ve Sonraki Butonu
+            var rightStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            DockPanel.SetDock(rightStack, Dock.Right);
+
+            _divRight = new Border
+            {
+                Width = 1,
+                Height = 12,
+                Margin = new Thickness(10, 0, 10, 0),
+                Opacity = 1.0,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            rightStack.Children.Add(_divRight);
+
+            _txtCountdown = new TextBlock
+            {
+                FontSize = 10.5,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            rightStack.Children.Add(_txtCountdown);
+
+            _btnCycle = new TextBlock
+            {
+                Text = "🔄",
+                FontSize = 11,
+                Opacity = 0.7,
+                Cursor = Cursors.Hand,
+                ToolTip = "Sonraki tatili göster",
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _btnCycle.MouseEnter += delegate { _btnCycle.Opacity = 1.0; };
+            _btnCycle.MouseLeave += delegate { _btnCycle.Opacity = 0.7; };
+            _btnCycle.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                _currentHolidayOffset++;
+                RefreshContent();
+            };
+            rightStack.Children.Add(_btnCycle);
+            mainDock.Children.Add(rightStack);
+
+            // Orta Kısım: Tarih ve Tatil Adı (Tek satır)
+            _txtName = new TextBlock
+            {
+                FontSize = 11,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            mainDock.Children.Add(_txtName);
+
+            _cardBorder.Child = mainDock;
+            Content = _cardBorder;
+
+            _cardBorder.Cursor = _cfg.LockHolidayPosition ? Cursors.Arrow : Cursors.SizeAll;
+            _cardBorder.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                if (!_cfg.LockHolidayPosition)
+                {
+                    if (e.ButtonState == MouseButtonState.Pressed)
+                    {
+                        try
+                        {
+                            DragMove();
+                            _cfg.HolidayX = Left;
+                            _cfg.HolidayY = Top;
+                            _cfg.Save();
+                        }
+                        catch { }
+                    }
+                    return;
+                }
+
+                e.Handled = true;
+                _currentHolidayOffset++;
+                RefreshContent();
+            };
+
+            _cardBorder.MouseRightButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                ShowHolidayContextMenu(_cardBorder);
+            };
+
+            RefreshContent();
+        }
+
+        private void ShowHolidayContextMenu(FrameworkElement target)
+        {
+            var cm = new System.Windows.Controls.ContextMenu();
+
+            var miNext = new System.Windows.Controls.MenuItem { Header = "🔄 Sıradaki Tatili Göster" };
+            miNext.Click += delegate { _currentHolidayOffset++; RefreshContent(); };
+            cm.Items.Add(miNext);
+
+            var miLock = new System.Windows.Controls.MenuItem
+            {
+                Header = _cfg.LockHolidayPosition ? "🔓 Konum Kilidini Aç" : "🔒 Konumu Kilitle"
+            };
+            miLock.Click += delegate
+            {
+                _cfg.LockHolidayPosition = !_cfg.LockHolidayPosition;
+                _cfg.Save();
+                ApplyThemeAndStyle();
+            };
+            cm.Items.Add(miLock);
+
+            cm.Items.Add(new System.Windows.Controls.Separator());
+
+            var miScaleHeader = new System.Windows.Controls.MenuItem
+            {
+                Header = "📐 WİDGET BOYUTU (KÜÇÜLTME / BÜYÜTME)",
+                IsEnabled = false
+            };
+            cm.Items.Add(miScaleHeader);
+
+            double[] scaleOptions = new double[] { 1.0, 0.90, 0.85, 0.80, 0.75, 0.70, 0.60, 0.50 };
+            string[] scaleLabels = new string[] { "%100 (Varsayılan - En Büyük)", "%90", "%85", "%80", "%75", "%70", "%60", "%50 (En Küçük)" };
+
+            for (int sIdx = 0; sIdx < scaleOptions.Length; sIdx++)
+            {
+                double targetScale = scaleOptions[sIdx];
+                string label = scaleLabels[sIdx];
+                bool isCurrent = Math.Abs(_cfg.HolidayWidgetScale - targetScale) < 0.02;
+                var miScaleItem = new System.Windows.Controls.MenuItem
+                {
+                    Header = (isCurrent ? "✔ " : "   ") + label,
+                    FontWeight = isCurrent ? FontWeights.Bold : FontWeights.Normal
+                };
+                miScaleItem.Click += delegate
+                {
+                    _cfg.HolidayWidgetScale = targetScale;
+                    _cfg.Save();
+                    ApplyThemeAndStyle();
+                };
+                cm.Items.Add(miScaleItem);
+            }
+
+            cm.PlacementTarget = target;
+            cm.IsOpen = true;
+        }
+
+        public void RefreshContent()
+        {
+            var holidays = TurkeyHolidaysService.GetUpcomingHolidays(DateTime.Now, 6);
+            if (holidays == null || holidays.Count == 0) return;
+
+            int idx = _currentHolidayOffset % holidays.Count;
+            var item = holidays[idx];
+
+            if (_txtTitle != null) _txtTitle.Text = item.Category == "Dini" ? "DÎNÎ BAYRAM" : "RESMÎ TATİL";
+            if (_txtName != null)
+            {
+                _txtName.Text = item.Date.ToString("d MMMM", new CultureInfo("tr-TR")) + " · " + item.Name;
+            }
+            if (_txtCountdown != null)
+            {
+                _txtCountdown.Text = TurkeyHolidaysService.FormatHolidayCountdown(item, DateTime.Now);
+            }
+        }
+
+        public void ApplyThemeAndStyle()
+        {
+            string theme = _cfg.Theme;
+            bool isLight = (theme == "light");
+            double op = _cfg.WidgetOpacity;
+            if (op < 0.1) op = 0.1;
+            if (op > 1.0) op = 1.0;
+
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            byte bgAlpha = (byte)(op * 255);
+            byte borderAlpha = (byte)Math.Min(255, (int)(op * (isLight ? 180 : 80)));
+
+            System.Windows.Media.Color bg;
+            System.Windows.Media.Color border;
+            if (isLight)
+            {
+                bg = System.Windows.Media.Color.FromArgb(bgAlpha, 248, 250, 252);
+                border = System.Windows.Media.Color.FromArgb(borderAlpha, 215, 220, 230);
+            }
+            else
+            {
+                bg = System.Windows.Media.Color.FromArgb(bgAlpha, 20, 22, 30);
+                border = System.Windows.Media.Color.FromArgb(borderAlpha, 45, 50, 65);
+            }
+
+            if (_cardBorder != null)
+            {
+                _cardBorder.Background = new SolidColorBrush(bg);
+                _cardBorder.BorderBrush = new SolidColorBrush(border);
+                _cardBorder.BorderThickness = new Thickness(1);
+                _cardBorder.Effect = new DropShadowEffect
+                {
+                    Color = isLight ? System.Windows.Media.Color.FromRgb(140, 150, 160) : System.Windows.Media.Colors.Black,
+                    BlurRadius = 24,
+                    ShadowDepth = 6,
+                    Opacity = isLight ? (0.15 * op) : (0.35 * op)
+                };
+
+                double scale = _cfg.HolidayWidgetScale;
+                if (scale < 0.50) scale = 0.50;
+                if (scale > 1.00) scale = 1.00; // En buyuk boyutu suanki (%100)
+                _cardBorder.LayoutTransform = new ScaleTransform(scale, scale);
+            }
+
+            var divBrush = new SolidColorBrush(border);
+            if (_divLeft != null) _divLeft.Background = divBrush;
+            if (_divRight != null) _divRight.Background = divBrush;
+
+            System.Windows.Media.Color accentColor = isLight 
+                ? System.Windows.Media.Color.FromRgb(225, 29, 72) // rose-600
+                : System.Windows.Media.Color.FromRgb(244, 63, 94); // rose-500
+
+            if (_txtTitle != null) _txtTitle.Foreground = new SolidColorBrush(accentColor);
+            if (_txtName != null) _txtName.Foreground = new SolidColorBrush(textPrimary);
+            if (_txtCountdown != null) _txtCountdown.Foreground = new SolidColorBrush(accentColor);
+            if (_btnCycle != null) _btnCycle.Foreground = new SolidColorBrush(textMuted);
+
+            if (_cardBorder != null)
+            {
+                _cardBorder.Cursor = _cfg.LockHolidayPosition ? Cursors.Arrow : Cursors.SizeAll;
+            }
+        }
+
+        public void UpdatePosition(WidgetWindow widget)
+        {
+            double cardW = ActualWidth > 0 ? ActualWidth : (DesiredSize.Width > 0 ? DesiredSize.Width : 400);
+            double cardH = ActualHeight > 0 ? ActualHeight : (DesiredSize.Height > 0 ? DesiredSize.Height : 44);
+
+            Forms.Screen scr = Forms.Screen.PrimaryScreen;
+            try
+            {
+                if (widget != null)
+                {
+                    var pt = new System.Drawing.Point((int)(widget.Left + 50), (int)(widget.Top + 50));
+                    scr = Forms.Screen.FromPoint(pt);
+                }
+            }
+            catch { }
+            if (scr == null) scr = Forms.Screen.PrimaryScreen;
+
+            var wa = scr.WorkingArea;
+
+            double targetTop;
+            double targetLeft;
+
+            if (_cfg.HolidayX >= 0 && _cfg.HolidayY >= 0)
+            {
+                targetLeft = _cfg.HolidayX;
+                targetTop = _cfg.HolidayY;
+            }
+            else
+            {
+                targetTop = wa.Bottom - cardH - 18;
+                targetLeft = wa.Left + (wa.Width - cardW) / 2.0;
+            }
+
+            if (targetLeft < wa.Left) targetLeft = wa.Left + 10;
+            if (targetTop < wa.Top) targetTop = wa.Top + 10;
+            if (targetLeft + cardW > wa.Right) targetLeft = wa.Right - cardW - 10;
+            if (targetTop + cardH > wa.Bottom) targetTop = wa.Bottom - cardH - 10;
+
+            // Sadece gerçek değişim varsa veya henüz atanmamışsa güncelle
+            if (double.IsNaN(Top) || Math.Abs(Top - targetTop) > 1) Top = targetTop;
+            if (double.IsNaN(Left) || Math.Abs(Left - targetLeft) > 1) Left = targetLeft;
+        }
+
+        public void ShowCard(WidgetWindow widget)
+        {
+            RefreshContent();
+            ApplyThemeAndStyle();
+            UpdatePosition(widget);
+
+            if (!IsVisible)
+            {
+                Show();
+            }
+            UpdatePosition(widget);
+        }
+
+        public void HideCard()
+        {
+            if (IsVisible)
+            {
+                Hide();
+            }
+        }
+    }
+
+    // ==========================================
+    // CANLI ŞUAN ÇALIYOR (NOW PLAYING) WİDGETI
+    // (İkonlar gizlendiğinde, Resmî Tatilin hemen üstünde)
+    // ==========================================
+    public class NowPlayingBarWindow : Window
+    {
+        private readonly Config _cfg;
+        private Border _cardBorder;
+        private TextBlock _txtTitle;
+        private TextBlock _txtArtist;
+        private TextBlock _txtPlayerBadge;
+        private System.Windows.Shapes.Rectangle _eqBar1;
+        private System.Windows.Shapes.Rectangle _eqBar2;
+        private System.Windows.Shapes.Rectangle _eqBar3;
+        private bool _isEqAnimating = false;
+        private Border _btnPrev;
+        private Border _btnPlayPause;
+        private Border _btnNext;
+        private TextBlock _iconPrev;
+        private TextBlock _iconPlayPause;
+        private TextBlock _iconNext;
+
+        private DispatcherTimer _pollTimer;
+
+        private bool _isPlaying = false;
+
+        public Func<HolidayBarWindow> GetHolidayWinFunc { get; set; }
+        public Func<WidgetWindow> GetWidgetWinFunc { get; set; }
+
+        public NowPlayingBarWindow(Config cfg)
+        {
+            _cfg = cfg;
+
+            Title = "Şuan Çalıyor - Desktop Zen";
+            WindowStyle = WindowStyle.None;
+            AllowsTransparency = true;
+            Background = System.Windows.Media.Brushes.Transparent;
+            ShowInTaskbar = false;
+            SizeToContent = SizeToContent.WidthAndHeight;
+            ResizeMode = ResizeMode.NoResize;
+            ShowActivated = false;
+            Topmost = false;
+            WindowStartupLocation = WindowStartupLocation.Manual;
+
+            BuildUI();
+
+            PreviewMouseWheel += delegate(object s, MouseWheelEventArgs e)
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                {
+                    double delta = (e.Delta > 0) ? 0.05 : -0.05;
+                    double newScale = Math.Round((_cfg.NowPlayingWidgetScale + delta) * 20.0) / 20.0;
+                    if (newScale < 0.50) newScale = 0.50;
+                    if (newScale > 1.00) newScale = 1.00;
+                    if (Math.Abs(newScale - _cfg.NowPlayingWidgetScale) > 0.001)
+                    {
+                        _cfg.NowPlayingWidgetScale = newScale;
+                        _cfg.Save();
+                        ApplyThemeAndStyle();
+                    }
+                }
+            };
+
+            SourceInitialized += delegate
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    if (!Win32.InspirationWindowHandles.Contains(hwnd))
+                    {
+                        Win32.InspirationWindowHandles.Add(hwnd);
+                    }
+
+                    int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                    Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle | Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE);
+
+                    var source = HwndSource.FromHwnd(hwnd);
+                    if (source != null)
+                    {
+                        source.AddHook(WndProc);
+                    }
+                }
+            };
+
+            try { new WindowInteropHelper(this).EnsureHandle(); } catch { }
+
+            Loaded += delegate
+            {
+                var widget = GetWidgetWinFunc != null ? GetWidgetWinFunc() : null;
+                var holiday = GetHolidayWinFunc != null ? GetHolidayWinFunc() : null;
+                UpdatePosition(widget, holiday);
+            };
+
+            // 1.2 saniyede bir aktif medya kontrolü
+            _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+            _pollTimer.Tick += delegate
+            {
+                if (Win32.AreIconsVisible() || !_cfg.ShowMediaPlayer)
+                {
+                    HideCard();
+                    return;
+                }
+
+                var widget = GetWidgetWinFunc != null ? GetWidgetWinFunc() : null;
+                var holiday = GetHolidayWinFunc != null ? GetHolidayWinFunc() : null;
+                CheckAndShow(widget, holiday);
+            };
+            _pollTimer.Start();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            try
+            {
+                if (_pollTimer != null) _pollTimer.Stop();
+                StopEqAnimation();
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    Win32.InspirationWindowHandles.Remove(hwnd);
+                }
+            }
+            catch { }
+            base.OnClosed(e);
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == 0x0021) // WM_MOUSEACTIVATE
+            {
+                handled = true;
+                return (IntPtr)3; // MA_NOACTIVATE
+            }
+            return IntPtr.Zero;
+        }
+
+        private void BuildUI()
+        {
+            _cardBorder = new Border
+            {
+                CornerRadius = new CornerRadius(22),
+                Padding = new Thickness(16, 9, 16, 9),
+                Margin = new Thickness(8),
+                Width = 400,
+                Cursor = Cursors.Arrow,
+                Effect = new DropShadowEffect
+                {
+                    BlurRadius = 24,
+                    ShadowDepth = 5,
+                    Direction = 270,
+                    Opacity = 0.28,
+                    Color = System.Windows.Media.Colors.Black
+                }
+            };
+
+            var mainDock = new DockPanel { LastChildFill = true };
+
+            // Sol: 3 Çubuklu Dinamik Ekolayzer
+            var eqStack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 12, 0),
+                Height = 18
+            };
+            _eqBar1 = new System.Windows.Shapes.Rectangle { Width = 3, Height = 4, Margin = new Thickness(0, 0, 2.5, 0), RadiusX = 1.5, RadiusY = 1.5, VerticalAlignment = VerticalAlignment.Center };
+            _eqBar2 = new System.Windows.Shapes.Rectangle { Width = 3, Height = 4, Margin = new Thickness(0, 0, 2.5, 0), RadiusX = 1.5, RadiusY = 1.5, VerticalAlignment = VerticalAlignment.Center };
+            _eqBar3 = new System.Windows.Shapes.Rectangle { Width = 3, Height = 4, Margin = new Thickness(0, 0, 0, 0), RadiusX = 1.5, RadiusY = 1.5, VerticalAlignment = VerticalAlignment.Center };
+            eqStack.Children.Add(_eqBar1);
+            eqStack.Children.Add(_eqBar2);
+            eqStack.Children.Add(_eqBar3);
+            DockPanel.SetDock(eqStack, Dock.Left);
+            mainDock.Children.Add(eqStack);
+
+            // Sağ: Kontrol Düğmeleri (⏮  ⏯  ⏭)
+            var btnStack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0)
+            };
+            DockPanel.SetDock(btnStack, Dock.Right);
+
+            _btnPrev = CreateCircleButton("⏮", 33, 14, out _iconPrev, delegate
+            {
+                MediaTrackerService.PrevTrack();
+            });
+            btnStack.Children.Add(_btnPrev);
+
+            _btnPlayPause = CreatePrimaryCircleButton(out _iconPlayPause, 38, 17, delegate
+            {
+                MediaTrackerService.PlayPause();
+            });
+            btnStack.Children.Add(_btnPlayPause);
+
+            _btnNext = CreateCircleButton("⏭", 33, 14, out _iconNext, delegate
+            {
+                MediaTrackerService.NextTrack();
+            });
+            btnStack.Children.Add(_btnNext);
+
+            mainDock.Children.Add(btnStack);
+
+            // Orta: Parça & Sanatçı Bilgisi + Kaynak Rozeti
+            var infoStack = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0)
+            };
+
+            _txtTitle = new TextBlock
+            {
+                Text = "Şarkı Adı",
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI Variable Display, Segoe UI"),
+                Foreground = System.Windows.Media.Brushes.White,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 210,
+                Cursor = Cursors.Hand,
+                ToolTip = "Oynatıcıyı öne getir"
+            };
+            _txtTitle.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                MediaTrackerService.FocusPlayer();
+            };
+            infoStack.Children.Add(_txtTitle);
+
+            var subRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 2, 0, 0)
+            };
+
+            _txtArtist = new TextBlock
+            {
+                Text = "Sanatçı",
+                FontSize = 10,
+                FontWeight = FontWeights.Normal,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromArgb(200, 241, 245, 249)),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 130
+            };
+            subRow.Children.Add(_txtArtist);
+
+            _txtPlayerBadge = new TextBlock
+            {
+                Text = " • 🟢 Spotify",
+                FontSize = 9.5,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248)),
+                Margin = new Thickness(3, 0, 0, 0)
+            };
+            subRow.Children.Add(_txtPlayerBadge);
+            infoStack.Children.Add(subRow);
+
+            mainDock.Children.Add(infoStack);
+
+            _cardBorder.Child = mainDock;
+            Content = _cardBorder;
+
+            _cardBorder.Cursor = _cfg.LockMediaPosition ? Cursors.Arrow : Cursors.SizeAll;
+            _cardBorder.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                if (_cfg.LockMediaPosition) return;
+                if (e.ButtonState == MouseButtonState.Pressed)
+                {
+                    try
+                    {
+                        DragMove();
+                        _cfg.MediaX = Left;
+                        _cfg.MediaY = Top;
+                        _cfg.Save();
+                    }
+                    catch { }
+                }
+            };
+
+            _cardBorder.MouseRightButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                ShowNowPlayingContextMenu(_cardBorder);
+            };
+
+            ApplyThemeAndStyle();
+        }
+
+        private void ShowNowPlayingContextMenu(FrameworkElement target)
+        {
+            var cm = new System.Windows.Controls.ContextMenu();
+
+            var miLock = new System.Windows.Controls.MenuItem
+            {
+                Header = _cfg.LockMediaPosition ? "🔓 Konum Kilidini Aç" : "🔒 Konumu Kilitle"
+            };
+            miLock.Click += delegate
+            {
+                _cfg.LockMediaPosition = !_cfg.LockMediaPosition;
+                _cfg.Save();
+                ApplyThemeAndStyle();
+            };
+            cm.Items.Add(miLock);
+
+            var miFocus = new System.Windows.Controls.MenuItem { Header = "🎵 Oynatıcıyı Öne Getir" };
+            miFocus.Click += delegate { MediaTrackerService.FocusPlayer(); };
+            cm.Items.Add(miFocus);
+
+            cm.Items.Add(new System.Windows.Controls.Separator());
+
+            var miScaleHeader = new System.Windows.Controls.MenuItem
+            {
+                Header = "📐 WİDGET BOYUTU (KÜÇÜLTME / BÜYÜTME)",
+                IsEnabled = false
+            };
+            cm.Items.Add(miScaleHeader);
+
+            double[] scaleOptions = new double[] { 1.0, 0.90, 0.85, 0.80, 0.75, 0.70, 0.60, 0.50 };
+            string[] scaleLabels = new string[] { "%100 (Varsayılan - En Büyük)", "%90", "%85", "%80", "%75", "%70", "%60", "%50 (En Küçük)" };
+
+            for (int sIdx = 0; sIdx < scaleOptions.Length; sIdx++)
+            {
+                double targetScale = scaleOptions[sIdx];
+                string label = scaleLabels[sIdx];
+                bool isCurrent = Math.Abs(_cfg.NowPlayingWidgetScale - targetScale) < 0.02;
+                var miScaleItem = new System.Windows.Controls.MenuItem
+                {
+                    Header = (isCurrent ? "✔ " : "   ") + label,
+                    FontWeight = isCurrent ? FontWeights.Bold : FontWeights.Normal
+                };
+                miScaleItem.Click += delegate
+                {
+                    _cfg.NowPlayingWidgetScale = targetScale;
+                    _cfg.Save();
+                    ApplyThemeAndStyle();
+                };
+                cm.Items.Add(miScaleItem);
+            }
+
+            cm.PlacementTarget = target;
+            cm.IsOpen = true;
+        }
+
+        private void StartEqAnimation()
+        {
+            if (_eqBar1 == null || _eqBar2 == null || _eqBar3 == null) return;
+
+            var ease1 = new SineEase { EasingMode = EasingMode.EaseInOut };
+            var ease2 = new SineEase { EasingMode = EasingMode.EaseInOut };
+            var ease3 = new SineEase { EasingMode = EasingMode.EaseInOut };
+
+            var anim1 = new DoubleAnimation(4.0, 14.0, new Duration(TimeSpan.FromMilliseconds(380)))
+            {
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = ease1
+            };
+            var anim2 = new DoubleAnimation(6.0, 17.0, new Duration(TimeSpan.FromMilliseconds(260)))
+            {
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = ease2
+            };
+            var anim3 = new DoubleAnimation(3.0, 13.0, new Duration(TimeSpan.FromMilliseconds(330)))
+            {
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = ease3
+            };
+
+            _eqBar1.BeginAnimation(FrameworkElement.HeightProperty, anim1);
+            _eqBar2.BeginAnimation(FrameworkElement.HeightProperty, anim2);
+            _eqBar3.BeginAnimation(FrameworkElement.HeightProperty, anim3);
+        }
+
+        private void StopEqAnimation()
+        {
+            if (_eqBar1 == null || _eqBar2 == null || _eqBar3 == null) return;
+
+            var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+            var stopAnim = new DoubleAnimation(4.0, new Duration(TimeSpan.FromMilliseconds(200)))
+            {
+                EasingFunction = ease
+            };
+            _eqBar1.BeginAnimation(FrameworkElement.HeightProperty, stopAnim);
+            _eqBar2.BeginAnimation(FrameworkElement.HeightProperty, stopAnim);
+            _eqBar3.BeginAnimation(FrameworkElement.HeightProperty, stopAnim);
+        }
+
+        private Border CreateCircleButton(string icon, double size, double fontSize, out TextBlock tbOut, Action onClick)
+        {
+            var border = new Border
+            {
+                Width = size,
+                Height = size,
+                CornerRadius = new CornerRadius(size / 2.0),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(35, 255, 255, 255)),
+                Cursor = Cursors.Hand,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(3, 0, 3, 0)
+            };
+            var tb = new TextBlock
+            {
+                Text = icon,
+                FontSize = fontSize,
+                Foreground = System.Windows.Media.Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontFamily = new System.Windows.Media.FontFamily("Segoe UI Symbol, Segoe UI, Arial")
+            };
+            border.Child = tb;
+            tbOut = tb;
+            border.MouseEnter += delegate { border.Opacity = 0.8; };
+            border.MouseLeave += delegate { border.Opacity = 1.0; };
+            border.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                if (onClick != null) onClick();
+            };
+            return border;
+        }
+
+        private Border CreatePrimaryCircleButton(out TextBlock iconTb, double size, double fontSize, Action onClick)
+        {
+            var border = new Border
+            {
+                Width = size,
+                Height = size,
+                CornerRadius = new CornerRadius(size / 2.0),
+                Background = new LinearGradientBrush(
+                    System.Windows.Media.Color.FromRgb(56, 189, 248),
+                    System.Windows.Media.Color.FromRgb(14, 165, 233),
+                    new System.Windows.Point(0, 0),
+                    new System.Windows.Point(1, 1)
+                ),
+                Cursor = Cursors.Hand,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 4, 0),
+                Effect = new DropShadowEffect
+                {
+                    BlurRadius = 12,
+                    ShadowDepth = 1,
+                    Opacity = 0.45,
+                    Color = System.Windows.Media.Color.FromRgb(14, 165, 233)
+                }
+            };
+            iconTb = new TextBlock
+            {
+                Text = "⏸",
+                FontSize = fontSize,
+                FontWeight = FontWeights.Bold,
+                Foreground = System.Windows.Media.Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontFamily = new System.Windows.Media.FontFamily("Segoe UI Symbol, Segoe UI, Arial")
+            };
+            border.Child = iconTb;
+            border.MouseEnter += delegate { border.Opacity = 0.9; };
+            border.MouseLeave += delegate { border.Opacity = 1.0; };
+            border.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                if (onClick != null) onClick();
+            };
+            return border;
+        }
+
+        public void CheckAndShow(WidgetWindow widget, HolidayBarWindow holidayWin)
+        {
+            if (Win32.AreIconsVisible() || !_cfg.ShowMediaPlayer)
+            {
+                HideCard();
+                return;
+            }
+
+            // Aktif ses çıkışı kontrolü: Sadece hoparlör/kulaklıktan ses çalarken ve medya varken gözüksün
+            bool isAudioActive = AudioMeterService.IsAudioPlaying(2.5);
+            MediaTrackInfo media = isAudioActive ? MediaTrackerService.GetCurrentMedia() : null;
+
+            if (media != null && media.HasMedia && media.IsPlaying)
+            {
+                _isPlaying = true;
+                ApplyMediaData(media);
+                ApplyThemeAndStyle();
+                UpdatePosition(widget, holidayWin);
+
+                if (!_isEqAnimating)
+                {
+                    _isEqAnimating = true;
+                    StartEqAnimation();
+                }
+
+                if (!IsVisible)
+                {
+                    Show();
+                    try
+                    {
+                        var hwnd = new WindowInteropHelper(this).Handle;
+                        if (hwnd != IntPtr.Zero && Win32.IsWindow(hwnd))
+                        {
+                            Win32.SetWindowPos(hwnd, Win32.HWND_BOTTOM, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+                        }
+                    }
+                    catch { }
+                }
+            }
+            else
+            {
+                _isPlaying = false;
+                if (_isEqAnimating)
+                {
+                    _isEqAnimating = false;
+                    StopEqAnimation();
+                }
+                HideCard();
+            }
+        }
+
+        public void HideCard()
+        {
+            if (_isEqAnimating)
+            {
+                _isEqAnimating = false;
+                StopEqAnimation();
+            }
+            if (IsVisible)
+            {
+                Hide();
+            }
+        }
+
+        private void ApplyMediaData(MediaTrackInfo media)
+        {
+            if (media == null) return;
+
+            if (_txtTitle != null) _txtTitle.Text = media.Title;
+            if (_txtArtist != null)
+            {
+                _txtArtist.Text = !string.IsNullOrWhiteSpace(media.Artist) ? media.Artist : "Bilinmeyen Sanatçı";
+            }
+            if (_txtPlayerBadge != null)
+            {
+                string iconPrefix = media.Player == "Spotify" ? "• 🟢 Spotify" : (media.Player == "Tarayıcı" ? "• 🔴 YouTube / Web" : "• 🎵 " + media.Player);
+                _txtPlayerBadge.Text = iconPrefix;
+            }
+
+            if (_iconPlayPause != null)
+            {
+                _iconPlayPause.Text = _isPlaying ? "⏸" : "▶";
+            }
+        }
+
+        public void ApplyThemeAndStyle()
+        {
+            string theme = _cfg.Theme;
+            bool isLight = (theme == "light");
+            double op = _cfg.WidgetOpacity;
+            if (op < 0.1) op = 0.1;
+            if (op > 1.0) op = 1.0;
+
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            byte bgAlpha = (byte)(op * 255);
+            byte borderAlpha = (byte)Math.Min(255, (int)(op * (isLight ? 180 : 80)));
+
+            System.Windows.Media.Color bg;
+            System.Windows.Media.Color border;
+            if (isLight)
+            {
+                bg = System.Windows.Media.Color.FromArgb(bgAlpha, 248, 250, 252);
+                border = System.Windows.Media.Color.FromArgb(borderAlpha, 215, 220, 230);
+            }
+            else
+            {
+                bg = System.Windows.Media.Color.FromArgb(bgAlpha, 20, 22, 30);
+                border = System.Windows.Media.Color.FromArgb(borderAlpha, 45, 50, 65);
+            }
+
+            if (_cardBorder != null)
+            {
+                _cardBorder.Background = new SolidColorBrush(bg);
+                _cardBorder.BorderBrush = new SolidColorBrush(border);
+                _cardBorder.BorderThickness = new Thickness(1);
+                _cardBorder.Effect = new DropShadowEffect
+                {
+                    Color = isLight ? System.Windows.Media.Color.FromRgb(140, 150, 160) : System.Windows.Media.Colors.Black,
+                    BlurRadius = 24,
+                    ShadowDepth = 6,
+                    Opacity = isLight ? (0.15 * op) : (0.35 * op)
+                };
+
+                double scale = _cfg.NowPlayingWidgetScale;
+                if (scale < 0.50) scale = 0.50;
+                if (scale > 1.00) scale = 1.00; // En buyuk boyutu suanki (%100)
+                _cardBorder.LayoutTransform = new ScaleTransform(scale, scale);
+            }
+
+            if (_txtTitle != null) _txtTitle.Foreground = new SolidColorBrush(textPrimary);
+            if (_txtArtist != null) _txtArtist.Foreground = new SolidColorBrush(textSecondary);
+            if (_txtPlayerBadge != null) _txtPlayerBadge.Foreground = new SolidColorBrush(textMuted);
+
+            var btnBg = isLight
+                ? System.Windows.Media.Color.FromArgb(20, 0, 0, 0)
+                : System.Windows.Media.Color.FromArgb(25, 255, 255, 255);
+            var btnIconColor = textPrimary;
+
+            if (_btnPrev != null) _btnPrev.Background = new SolidColorBrush(btnBg);
+            if (_btnNext != null) _btnNext.Background = new SolidColorBrush(btnBg);
+            if (_iconPrev != null) _iconPrev.Foreground = new SolidColorBrush(btnIconColor);
+            if (_iconNext != null) _iconNext.Foreground = new SolidColorBrush(btnIconColor);
+
+            var eqBrush = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(56, 189, 248));
+            if (_eqBar1 != null) _eqBar1.Fill = eqBrush;
+            if (_eqBar2 != null) _eqBar2.Fill = eqBrush;
+            if (_eqBar3 != null) _eqBar3.Fill = eqBrush;
+
+            if (_cardBorder != null)
+            {
+                _cardBorder.Cursor = _cfg.LockMediaPosition ? Cursors.Arrow : Cursors.SizeAll;
+            }
+        }
+
+        public void UpdatePosition(WidgetWindow widget, HolidayBarWindow holidayWin)
+        {
+            double cardW = ActualWidth > 0 ? ActualWidth : (DesiredSize.Width > 0 ? DesiredSize.Width : 400);
+            double cardH = ActualHeight > 0 ? ActualHeight : (DesiredSize.Height > 0 ? DesiredSize.Height : 56);
+
+            Forms.Screen scr = Forms.Screen.PrimaryScreen;
+            try
+            {
+                if (widget != null)
+                {
+                    var pt = new System.Drawing.Point((int)(widget.Left + 50), (int)(widget.Top + 50));
+                    scr = Forms.Screen.FromPoint(pt);
+                }
+            }
+            catch { }
+            if (scr == null) scr = Forms.Screen.PrimaryScreen;
+
+            var wa = scr.WorkingArea;
+
+            double targetLeft;
+            double targetTop;
+
+            if (_cfg.MediaX >= 0 && _cfg.MediaY >= 0)
+            {
+                targetLeft = _cfg.MediaX;
+                targetTop = _cfg.MediaY;
+            }
+            else
+            {
+                targetLeft = wa.Left + (wa.Width - cardW) / 2.0;
+                if (holidayWin != null && holidayWin.IsVisible && !double.IsNaN(holidayWin.Top) && holidayWin.Top > 50)
+                {
+                    targetTop = holidayWin.Top - cardH - 10;
+                }
+                else if (_cfg.ShowNationalHolidays)
+                {
+                    targetTop = wa.Bottom - cardH - 18 - 50;
+                }
+                else
+                {
+                    targetTop = wa.Bottom - cardH - 18;
+                }
+            }
+
+            if (targetLeft < wa.Left) targetLeft = wa.Left + 10;
+            if (targetTop < wa.Top) targetTop = wa.Top + 10;
+            if (targetLeft + cardW > wa.Right) targetLeft = wa.Right - cardW - 10;
+            if (targetTop + cardH > wa.Bottom) targetTop = wa.Bottom - cardH - 10;
+
+            // Sadece gerçek değişim varsa veya henüz atanmamışsa güncelle
+            if (double.IsNaN(Top) || Math.Abs(Top - targetTop) > 1) Top = targetTop;
+            if (double.IsNaN(Left) || Math.Abs(Left - targetLeft) > 1) Left = targetLeft;
+        }
+    }
+
+    public class DailyInspirationManager
+    {
+        private Config _cfg;
+        private InspirationCardWindow _verseWin;
+        private InspirationCardWindow _hadithWin;
+        private InspirationCardWindow _quoteWin;
+        private HolidayBarWindow _holidayWin;
+        private NowPlayingBarWindow _mediaWin;
+        private bool _isShowing = false;
+        public bool IsShowing { get { return _isShowing; } }
+
+        public void BringToTopAmbient()
+        {
+            try
+            {
+                var handles = GetWindowHandles();
+                foreach (var h in handles)
+                {
+                    if (h != IntPtr.Zero && Win32.IsWindow(h))
+                    {
+                        Win32.SetWindowPos(h, Win32.HWND_TOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE | Win32.SWP_SHOWWINDOW);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public DailyInspirationManager(Config cfg)
+        {
+            _cfg = cfg;
+        }
+
+        public List<IntPtr> GetWindowHandles()
+        {
+            var list = new List<IntPtr>();
+            if (_verseWin != null)
+            {
+                var h = new WindowInteropHelper(_verseWin).Handle;
+                if (h != IntPtr.Zero && Win32.IsWindow(h)) list.Add(h);
+            }
+            if (_hadithWin != null)
+            {
+                var h = new WindowInteropHelper(_hadithWin).Handle;
+                if (h != IntPtr.Zero && Win32.IsWindow(h)) list.Add(h);
+            }
+            if (_quoteWin != null)
+            {
+                var h = new WindowInteropHelper(_quoteWin).Handle;
+                if (h != IntPtr.Zero && Win32.IsWindow(h)) list.Add(h);
+            }
+            if (_holidayWin != null)
+            {
+                var h = new WindowInteropHelper(_holidayWin).Handle;
+                if (h != IntPtr.Zero && Win32.IsWindow(h)) list.Add(h);
+            }
+            if (_mediaWin != null)
+            {
+                var h = new WindowInteropHelper(_mediaWin).Handle;
+                if (h != IntPtr.Zero && Win32.IsWindow(h)) list.Add(h);
+            }
+            return list;
+        }
+
+        public bool IsPointOverCards(Win32.POINT pt)
+        {
+            if (!_isShowing) return false;
+            try
+            {
+                if (_verseWin != null && _verseWin.IsVisible)
+                {
+                    double w = _verseWin.ActualWidth > 0 ? _verseWin.ActualWidth : 350;
+                    double h = _verseWin.ActualHeight > 0 ? _verseWin.ActualHeight : 140;
+                    if (pt.X >= _verseWin.Left && pt.X <= _verseWin.Left + w &&
+                        pt.Y >= _verseWin.Top && pt.Y <= _verseWin.Top + h)
+                    {
+                        return true;
+                    }
+                }
+                if (_hadithWin != null && _hadithWin.IsVisible)
+                {
+                    double w = _hadithWin.ActualWidth > 0 ? _hadithWin.ActualWidth : 350;
+                    double h = _hadithWin.ActualHeight > 0 ? _hadithWin.ActualHeight : 140;
+                    if (pt.X >= _hadithWin.Left && pt.X <= _hadithWin.Left + w &&
+                        pt.Y >= _hadithWin.Top && pt.Y <= _hadithWin.Top + h)
+                    {
+                        return true;
+                    }
+                }
+                if (_quoteWin != null && _quoteWin.IsVisible)
+                {
+                    double w = _quoteWin.ActualWidth > 0 ? _quoteWin.ActualWidth : 350;
+                    double h = _quoteWin.ActualHeight > 0 ? _quoteWin.ActualHeight : 140;
+                    if (pt.X >= _quoteWin.Left && pt.X <= _quoteWin.Left + w &&
+                        pt.Y >= _quoteWin.Top && pt.Y <= _quoteWin.Top + h)
+                    {
+                        return true;
+                    }
+                }
+                if (_holidayWin != null && _holidayWin.IsVisible)
+                {
+                    double w = _holidayWin.ActualWidth > 0 ? _holidayWin.ActualWidth : 400;
+                    double h = _holidayWin.ActualHeight > 0 ? _holidayWin.ActualHeight : 44;
+                    if (pt.X >= _holidayWin.Left && pt.X <= _holidayWin.Left + w &&
+                        pt.Y >= _holidayWin.Top && pt.Y <= _holidayWin.Top + h)
+                    {
+                        return true;
+                    }
+                }
+                if (_mediaWin != null && _mediaWin.IsVisible)
+                {
+                    double w = _mediaWin.ActualWidth > 0 ? _mediaWin.ActualWidth : 400;
+                    double h = _mediaWin.ActualHeight > 0 ? _mediaWin.ActualHeight : 56;
+                    if (pt.X >= _mediaWin.Left && pt.X <= _mediaWin.Left + w &&
+                        pt.Y >= _mediaWin.Top && pt.Y <= _mediaWin.Top + h)
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        public void ApplyZOrder()
+        {
+            try
+            {
+                var handles = GetWindowHandles();
+                if (handles.Count == 0) return;
+
+                foreach (var h in handles)
+                {
+                    if (h != IntPtr.Zero && Win32.IsWindow(h))
+                    {
+                        int exStyle = Win32.GetWindowLong(h, Win32.GWL_EXSTYLE);
+                        exStyle |= Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE;
+                        Win32.SetWindowLong(h, Win32.GWL_EXSTYLE, exStyle);
+                        Win32.SetWindowPos(h, Win32.HWND_BOTTOM, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+                    }
+                }
+
+                // Canlı duvar kağıdı pencerelerini tekrar kartların hemen altına (en dibe) yerleştir
+                foreach (var wHwnd in Win32.WallpaperWindowHandles)
+                {
+                    if (wHwnd != IntPtr.Zero && Win32.IsWindow(wHwnd))
+                    {
+                        Win32.SetWindowPos(wHwnd, Win32.HWND_BOTTOM, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public void ShowInspirations(WidgetWindow widget)
+        {
+            if (!_cfg.ShowDailyVerse && !_cfg.ShowDailyHadith && !_cfg.ShowDailyQuote && !_cfg.ShowNationalHolidays && !_cfg.ShowMediaPlayer)
+            {
+                HideInspirations();
+                return;
+            }
+
+            _isShowing = true;
+
+            // Quote Window (Ekranın Sol Üstü)
+            if (_cfg.ShowDailyQuote)
+            {
+                if (_quoteWin == null)
+                {
+                    _quoteWin = new InspirationCardWindow(_cfg, InspirationCardWindow.InspirationType.Quote);
+                    _quoteWin.GetWidgetWinFunc = () => widget;
+                }
+                _quoteWin.ShowCard(widget);
+            }
+            else
+            {
+                if (_quoteWin != null) _quoteWin.HideCard();
+            }
+
+            // Verse Window (Ekranın Sol Altı)
+            if (_cfg.ShowDailyVerse)
+            {
+                if (_verseWin == null)
+                {
+                    _verseWin = new InspirationCardWindow(_cfg, InspirationCardWindow.InspirationType.Verse);
+                    _verseWin.GetWidgetWinFunc = () => widget;
+                }
+                _verseWin.ShowCard(widget);
+            }
+            else
+            {
+                if (_verseWin != null) _verseWin.HideCard();
+            }
+
+            // Hadith Window (Ekranın Sağ Altı)
+            if (_cfg.ShowDailyHadith)
+            {
+                if (_hadithWin == null)
+                {
+                    _hadithWin = new InspirationCardWindow(_cfg, InspirationCardWindow.InspirationType.Hadith);
+                    _hadithWin.GetWidgetWinFunc = () => widget;
+                }
+                _hadithWin.ShowCard(widget);
+            }
+            else
+            {
+                if (_hadithWin != null) _hadithWin.HideCard();
+            }
+
+            // National Holiday Window (Ekranın En Alt Ortası - Tek Satır)
+            if (_cfg.ShowNationalHolidays)
+            {
+                if (_holidayWin == null)
+                {
+                    _holidayWin = new HolidayBarWindow(_cfg);
+                }
+                _holidayWin.ShowCard(widget);
+            }
+            else
+            {
+                if (_holidayWin != null) _holidayWin.HideCard();
+            }
+
+            // Now Playing Window (Resmî Tatilin hemen üstünde)
+            if (_cfg.ShowMediaPlayer)
+            {
+                if (_mediaWin == null)
+                {
+                    _mediaWin = new NowPlayingBarWindow(_cfg);
+                    _mediaWin.GetWidgetWinFunc = () => widget;
+                    _mediaWin.GetHolidayWinFunc = () => _holidayWin;
+                }
+                _mediaWin.CheckAndShow(widget, _holidayWin);
+            }
+            else
+            {
+                if (_mediaWin != null) _mediaWin.HideCard();
+            }
+
+            // Z-Order'ı canlı duvar kağıdı ile senkronize ve kararlı katmanda sabitle
+            ApplyZOrder();
+        }
+
+        public void HideInspirations()
+        {
+            _isShowing = false;
+            if (_quoteWin != null) _quoteWin.HideCard();
+            if (_verseWin != null) _verseWin.HideCard();
+            if (_hadithWin != null) _hadithWin.HideCard();
+            if (_holidayWin != null) _holidayWin.HideCard();
+            if (_mediaWin != null) _mediaWin.HideCard();
+        }
+
+        public void UpdatePosition(WidgetWindow widget)
+        {
+            if (!_isShowing) return;
+            if (_quoteWin != null) _quoteWin.UpdatePosition(widget);
+            if (_verseWin != null) _verseWin.UpdatePosition(widget);
+            if (_hadithWin != null) _hadithWin.UpdatePosition(widget);
+            if (_holidayWin != null) _holidayWin.UpdatePosition(widget);
+            if (_mediaWin != null) _mediaWin.UpdatePosition(widget, _holidayWin);
+        }
+
+        public void UpdateConfigAndTheme(WidgetWindow widget)
+        {
+            if (_quoteWin != null) _quoteWin.ApplyThemeAndStyle();
+            if (_verseWin != null) _verseWin.ApplyThemeAndStyle();
+            if (_hadithWin != null) _hadithWin.ApplyThemeAndStyle();
+            if (_holidayWin != null) _holidayWin.ApplyThemeAndStyle();
+            if (_mediaWin != null) _mediaWin.ApplyThemeAndStyle();
+
+            if (!Win32.AreIconsVisible())
+            {
+                ShowInspirations(widget);
+            }
+            else
+            {
+                HideInspirations();
+            }
+        }
+
+        public void ResetPositions(WidgetWindow widget)
+        {
+            _cfg.QuoteX = -1;
+            _cfg.QuoteY = -1;
+            _cfg.VerseX = -1;
+            _cfg.VerseY = -1;
+            _cfg.HadithX = -1;
+            _cfg.HadithY = -1;
+            _cfg.HolidayX = -1;
+            _cfg.HolidayY = -1;
+            _cfg.MediaX = -1;
+            _cfg.MediaY = -1;
+            _cfg.Save();
+            UpdatePosition(widget);
+        }
+
+        public void Close()
+        {
+            if (_quoteWin != null) { try { _quoteWin.Close(); } catch { } _quoteWin = null; }
+            if (_verseWin != null) { try { _verseWin.Close(); } catch { } _verseWin = null; }
+            if (_hadithWin != null) { try { _hadithWin.Close(); } catch { } _hadithWin = null; }
+            if (_holidayWin != null) { try { _holidayWin.Close(); } catch { } _holidayWin = null; }
+            if (_mediaWin != null) { try { _mediaWin.Close(); } catch { } _mediaWin = null; }
+        }
+    }
+
+    // ==========================================
+    // ZEN ŞEFFAF HIZLI NOT KARTI (STICKY PAD)
+    // ==========================================
+    public class ZenNotesWindow : Window
+    {
+        private readonly Config _cfg;
+        private Border _cardBorder;
+        private TextBlock _txtSaveStatus;
+        private System.Windows.Controls.TextBox _txtNotes;
+        private DispatcherTimer _debounceTimer;
+        private TextBlock _btnLock;
+        private TextBlock _btnPinMode;
+        private Grid _headerGrid;
+        private bool _isApplyingZOrder = false;
+
+        public Action OnVisibilityModeChanged;
+        public Action OnOpenSettings;
+
+        private const string NOTES_FILE = "notes.txt";
+        private string NotesFilePath
+        {
+            get
+            {
+                try
+                {
+                    return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NOTES_FILE);
+                }
+                catch
+                {
+                    return NOTES_FILE;
+                }
+            }
+        }
+
+        public ZenNotesWindow(Config cfg)
+        {
+            _cfg = cfg;
+
+            Title = "Zen Hızlı Notlar";
+            WindowStyle = WindowStyle.None;
+            AllowsTransparency = true;
+            Background = System.Windows.Media.Brushes.Transparent;
+            ShowInTaskbar = false;
+            Width = 320;
+            Height = 250;
+            ResizeMode = ResizeMode.NoResize;
+            ShowActivated = false;
+            Topmost = false;
+
+            BuildUI();
+            SetInitialPosition();
+
+            PreviewMouseWheel += delegate(object s, MouseWheelEventArgs e)
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                {
+                    double delta = (e.Delta > 0) ? 0.05 : -0.05;
+                    double newScale = Math.Round((_cfg.NotesWidgetScale + delta) * 20.0) / 20.0;
+                    if (newScale < 0.50) newScale = 0.50;
+                    if (newScale > 1.00) newScale = 1.00;
+                    if (Math.Abs(newScale - _cfg.NotesWidgetScale) > 0.001)
+                    {
+                        _cfg.NotesWidgetScale = newScale;
+                        _cfg.Save();
+                        ApplyThemeAndStyle();
+                    }
+                    e.Handled = true;
+                }
+            };
+
+
+            SourceInitialized += delegate
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                    Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle | Win32.WS_EX_TOOLWINDOW);
+                    ApplyZOrder();
+                }
+            };
+
+            LoadNotesFromFile();
+        }
+
+        public void ResetPosition()
+        {
+            SetInitialPosition();
+        }
+
+        private void SetInitialPosition()
+        {
+            var wa = Forms.Screen.PrimaryScreen.WorkingArea;
+            double defaultW = Width;
+            double defaultH = Height;
+
+            if (_cfg.ZenNotesX >= 0 && _cfg.ZenNotesY >= 0)
+            {
+                Left = _cfg.ZenNotesX;
+                Top = _cfg.ZenNotesY;
+            }
+            else
+            {
+                // Sol kenarda, günün sözü ile âyet arasında dengeli konum
+                Left = wa.Left + 28;
+                Top = wa.Top + (wa.Height - defaultH) / 2.0;
+            }
+
+            if (Left < wa.Left) Left = wa.Left + 10;
+            if (Top < wa.Top) Top = wa.Top + 10;
+            if (Left + defaultW > wa.Right) Left = wa.Right - defaultW - 10;
+            if (Top + defaultH > wa.Bottom) Top = wa.Bottom - defaultH - 10;
+        }
+
+        private void BuildUI()
+        {
+            _cardBorder = new Border
+            {
+                CornerRadius = new CornerRadius(18),
+                Padding = new Thickness(14, 12, 14, 12),
+                Margin = new Thickness(6),
+                BorderThickness = new Thickness(1),
+                Cursor = _cfg.LockZenNotesPosition ? Cursors.Arrow : Cursors.SizeAll
+            };
+
+            _cardBorder.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                if (_cfg.LockZenNotesPosition) return;
+                if (e.ButtonState == MouseButtonState.Pressed)
+                {
+                    try
+                    {
+                        DragMove();
+                        _cfg.ZenNotesX = Left;
+                        _cfg.ZenNotesY = Top;
+                        _cfg.Save();
+                    }
+                    catch { }
+                }
+            };
+
+            _cardBorder.MouseRightButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                if (_txtNotes != null && _txtNotes.IsMouseOver) return;
+                e.Handled = true;
+                ShowHeaderContextMenu();
+            };
+
+            var mainGrid = new Grid();
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+            // Üst Başlık Çubuğu
+            _headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 8), Background = System.Windows.Media.Brushes.Transparent };
+            var headerGrid = _headerGrid;
+            headerGrid.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                if (_cfg.LockZenNotesPosition) return;
+                if (e.ButtonState == MouseButtonState.Pressed)
+                {
+                    try
+                    {
+                        DragMove();
+                        _cfg.ZenNotesX = Left;
+                        _cfg.ZenNotesY = Top;
+                        _cfg.Save();
+                    }
+                    catch { }
+                }
+            };
+            headerGrid.MouseRightButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                ShowHeaderContextMenu();
+            };
+
+            var leftHeader = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var txtIcon = new TextBlock
+            {
+                Text = "📝",
+                FontSize = 13,
+                Margin = new Thickness(0, 0, 6, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var txtTitle = new TextBlock
+            {
+                Text = "ZEN HIZLI NOTLAR",
+                FontSize = 11,
+                FontWeight = FontWeights.Bold,
+                FontFamily = new System.Windows.Media.FontFamily("Segoe UI, Inter"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _txtSaveStatus = new TextBlock
+            {
+                Text = "✓ Hazır",
+                FontSize = 9.5,
+                Margin = new Thickness(8, 0, 0, 0),
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(34, 197, 94)),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            leftHeader.Children.Add(txtIcon);
+            leftHeader.Children.Add(txtTitle);
+            leftHeader.Children.Add(_txtSaveStatus);
+
+            var rightHeader = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+
+            _btnPinMode = new TextBlock
+            {
+                Text = _cfg.ZenNotesOnlyWhenIconsHidden ? "⏱️" : "📌",
+                FontSize = 11,
+                Opacity = 0.7,
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(0, 0, 8, 0),
+                ToolTip = _cfg.ZenNotesOnlyWhenIconsHidden 
+                    ? "Görünüm: Sadece Simgeler Gizlendiğinde (Her zaman açık tutmak için tıklayın)" 
+                    : "Görünüm: Her Zaman Göster (Sadece simgeler gizlendiğinde göstermek için tıklayın)",
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _btnPinMode.MouseEnter += delegate { _btnPinMode.Opacity = 1.0; };
+            _btnPinMode.MouseLeave += delegate { _btnPinMode.Opacity = 0.7; };
+            _btnPinMode.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                _cfg.ZenNotesOnlyWhenIconsHidden = !_cfg.ZenNotesOnlyWhenIconsHidden;
+                _cfg.Save();
+                UpdatePinModeVisuals();
+                if (OnVisibilityModeChanged != null) OnVisibilityModeChanged();
+            };
+
+            _btnLock = new TextBlock
+            {
+                Text = _cfg.LockZenNotesPosition ? "🔒" : "🔓",
+                FontSize = 11,
+                Opacity = 0.7,
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(0, 0, 8, 0),
+                ToolTip = _cfg.LockZenNotesPosition ? "Konum Kilitli (Serbest bırakmak için tıklayın)" : "Konum Serbest (Kilitlemek için tıklayın)",
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _btnLock.MouseEnter += delegate { _btnLock.Opacity = 1.0; };
+            _btnLock.MouseLeave += delegate { _btnLock.Opacity = 0.7; };
+            _btnLock.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                _cfg.LockZenNotesPosition = !_cfg.LockZenNotesPosition;
+                _cfg.Save();
+                UpdateLockVisuals();
+            };
+
+            var btnClear = new TextBlock
+            {
+                Text = "🗑️",
+                FontSize = 11,
+                Opacity = 0.7,
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(0, 0, 8, 0),
+                ToolTip = "Notları Temizle",
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            btnClear.MouseEnter += delegate { btnClear.Opacity = 1.0; };
+            btnClear.MouseLeave += delegate { btnClear.Opacity = 0.7; };
+            btnClear.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                if (!string.IsNullOrEmpty(_txtNotes.Text))
+                {
+                    if (MessageBox.Show("Mevcut notları silmek istediğinizden emin misiniz?", "Notları Temizle", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                    {
+                        _txtNotes.Text = "";
+                        SaveNotesToFile();
+                    }
+                }
+            };
+
+            var btnClose = new TextBlock
+            {
+                Text = "✕",
+                FontSize = 11,
+                Opacity = 0.7,
+                Cursor = Cursors.Hand,
+                ToolTip = "Not Kartını Gizle",
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            btnClose.MouseEnter += delegate { btnClose.Opacity = 1.0; };
+            btnClose.MouseLeave += delegate { btnClose.Opacity = 0.7; };
+            btnClose.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                _cfg.ShowZenNotes = false;
+                _cfg.Save();
+                Hide();
+            };
+
+            rightHeader.Children.Add(_btnPinMode);
+            rightHeader.Children.Add(_btnLock);
+            rightHeader.Children.Add(btnClear);
+            rightHeader.Children.Add(btnClose);
+
+            headerGrid.Children.Add(leftHeader);
+            headerGrid.Children.Add(rightHeader);
+            Grid.SetRow(headerGrid, 0);
+            mainGrid.Children.Add(headerGrid);
+
+            // Not Yazma Kutusu (TextBox)
+            _txtNotes = new System.Windows.Controls.TextBox
+            {
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Background = System.Windows.Media.Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                FontSize = 12.5,
+                FontFamily = new System.Windows.Media.FontFamily("Segoe UI, Inter, Consolas"),
+                Padding = new Thickness(2)
+            };
+            _txtNotes.TextChanged += delegate
+            {
+                if (_txtSaveStatus != null)
+                {
+                    _txtSaveStatus.Text = "● Kaydediliyor...";
+                    _txtSaveStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(251, 191, 36));
+                }
+
+                if (_debounceTimer == null)
+                {
+                    _debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+                    _debounceTimer.Tick += delegate
+                    {
+                        _debounceTimer.Stop();
+                        SaveNotesToFile();
+                    };
+                }
+                _debounceTimer.Stop();
+                _debounceTimer.Start();
+            };
+
+            Grid.SetRow(_txtNotes, 1);
+            mainGrid.Children.Add(_txtNotes);
+
+            _cardBorder.Child = mainGrid;
+            Content = _cardBorder;
+
+            ApplyThemeAndStyle();
+        }
+
+        public void ApplyThemeAndStyle()
+        {
+            string theme = _cfg.Theme;
+            bool isLight = (theme == "light");
+            double op = _cfg.ZenNotesOpacity;
+            if (op < 0.1) op = 0.1;
+            if (op > 1.0) op = 1.0;
+
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            byte bgAlpha = (byte)(op * 255);
+            byte borderAlpha = (byte)Math.Min(255, (int)(op * (isLight ? 180 : 80)));
+
+            System.Windows.Media.Color bg;
+            System.Windows.Media.Color border;
+            if (isLight)
+            {
+                bg = System.Windows.Media.Color.FromArgb(bgAlpha, 255, 255, 255);
+                border = System.Windows.Media.Color.FromArgb(borderAlpha, 210, 215, 225);
+            }
+            else
+            {
+                bg = System.Windows.Media.Color.FromArgb(bgAlpha, 18, 22, 34);
+                border = System.Windows.Media.Color.FromArgb(borderAlpha, 50, 60, 80);
+            }
+
+            if (_cardBorder != null)
+            {
+                _cardBorder.Background = new SolidColorBrush(bg);
+                _cardBorder.BorderBrush = new SolidColorBrush(border);
+                _cardBorder.Effect = new DropShadowEffect
+                {
+                    Color = isLight ? System.Windows.Media.Color.FromRgb(140, 150, 160) : System.Windows.Media.Colors.Black,
+                    BlurRadius = 24,
+                    ShadowDepth = 6,
+                    Opacity = isLight ? (0.15 * op) : (0.35 * op)
+                };
+
+                double scale = _cfg.NotesWidgetScale;
+                if (scale < 0.50) scale = 0.50;
+                if (scale > 1.00) scale = 1.00; // En buyuk boyutu suanki (%100)
+                _cardBorder.LayoutTransform = new ScaleTransform(scale, scale);
+            }
+
+            if (_txtNotes != null)
+            {
+                _txtNotes.Foreground = new SolidColorBrush(textPrimary);
+                _txtNotes.CaretBrush = new SolidColorBrush(textPrimary);
+            }
+
+            UpdateLockVisuals();
+            UpdatePinModeVisuals();
+        }
+
+        private void UpdatePinModeVisuals()
+        {
+            if (_btnPinMode != null)
+            {
+                _btnPinMode.Text = _cfg.ZenNotesOnlyWhenIconsHidden ? "⏱️" : "📌";
+                _btnPinMode.ToolTip = _cfg.ZenNotesOnlyWhenIconsHidden 
+                    ? "Görünüm Modu: Sadece Simgeler Gizlendiğinde\n(Her zaman masaüstünde açık tutmak için tıklayın)" 
+                    : "Görünüm Modu: Her Zaman Göster\n(Sadece simgeler gizlendiğinde göstermek için tıklayın)";
+            }
+        }
+
+        private void ShowHeaderContextMenu()
+        {
+            var cm = new System.Windows.Controls.ContextMenu();
+
+            var miAlways = new System.Windows.Controls.MenuItem
+            {
+                Header = "📌 Not Kartını Her Zaman Göster",
+                IsCheckable = true,
+                IsChecked = !_cfg.ZenNotesOnlyWhenIconsHidden
+            };
+            miAlways.Click += delegate
+            {
+                _cfg.ZenNotesOnlyWhenIconsHidden = false;
+                _cfg.Save();
+                UpdatePinModeVisuals();
+                if (OnVisibilityModeChanged != null) OnVisibilityModeChanged();
+            };
+            cm.Items.Add(miAlways);
+
+            var miOnlyHidden = new System.Windows.Controls.MenuItem
+            {
+                Header = "⏱️ Sadece Simgeler Gizlendiğinde Göster",
+                IsCheckable = true,
+                IsChecked = _cfg.ZenNotesOnlyWhenIconsHidden
+            };
+            miOnlyHidden.Click += delegate
+            {
+                _cfg.ZenNotesOnlyWhenIconsHidden = true;
+                _cfg.Save();
+                UpdatePinModeVisuals();
+                if (OnVisibilityModeChanged != null) OnVisibilityModeChanged();
+            };
+            cm.Items.Add(miOnlyHidden);
+
+            cm.Items.Add(new System.Windows.Controls.Separator());
+
+            var miLock = new System.Windows.Controls.MenuItem
+            {
+                Header = _cfg.LockZenNotesPosition ? "🔓 Konum Kilidini Aç (Serbest Taşı)" : "🔒 Konumu Kilitle",
+                IsCheckable = true,
+                IsChecked = _cfg.LockZenNotesPosition
+            };
+            miLock.Click += delegate
+            {
+                _cfg.LockZenNotesPosition = !_cfg.LockZenNotesPosition;
+                _cfg.Save();
+                UpdateLockVisuals();
+                if (OnVisibilityModeChanged != null) OnVisibilityModeChanged();
+            };
+            cm.Items.Add(miLock);
+
+            var miResetPos = new System.Windows.Controls.MenuItem
+            {
+                Header = "🔄 Not Kartı Konumunu Sıfırla"
+            };
+            miResetPos.Click += delegate
+            {
+                _cfg.ZenNotesX = -1;
+                _cfg.ZenNotesY = -1;
+                _cfg.Save();
+                ResetPosition();
+            };
+            cm.Items.Add(miResetPos);
+
+            var miClear = new System.Windows.Controls.MenuItem
+            {
+                Header = "🗑️ Notları Temizle"
+            };
+            miClear.Click += delegate
+            {
+                if (!string.IsNullOrEmpty(_txtNotes != null ? _txtNotes.Text : ""))
+                {
+                    if (MessageBox.Show("Mevcut notları silmek istediğinizden emin misiniz?", "Notları Temizle", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                    {
+                        if (_txtNotes != null) _txtNotes.Text = "";
+                        SaveNotesToFile();
+                    }
+                }
+            };
+            cm.Items.Add(miClear);
+
+            cm.Items.Add(new System.Windows.Controls.Separator());
+
+            var miScaleHeader = new System.Windows.Controls.MenuItem
+            {
+                Header = "📐 WİDGET BOYUTU (KÜÇÜLTME / BÜYÜTME)",
+                IsEnabled = false
+            };
+            cm.Items.Add(miScaleHeader);
+
+            double[] scaleOptions = new double[] { 1.0, 0.90, 0.85, 0.80, 0.75, 0.70, 0.60, 0.50 };
+            string[] scaleLabels = new string[] { "%100 (Varsayılan - En Büyük)", "%90", "%85", "%80", "%75", "%70", "%60", "%50 (En Küçük)" };
+
+            for (int sIdx = 0; sIdx < scaleOptions.Length; sIdx++)
+            {
+                double targetScale = scaleOptions[sIdx];
+                string label = scaleLabels[sIdx];
+                bool isCurrent = Math.Abs(_cfg.NotesWidgetScale - targetScale) < 0.02;
+                var miScaleItem = new System.Windows.Controls.MenuItem
+                {
+                    Header = (isCurrent ? "✔ " : "   ") + label,
+                    FontWeight = isCurrent ? FontWeights.Bold : FontWeights.Normal
+                };
+                miScaleItem.Click += delegate
+                {
+                    _cfg.NotesWidgetScale = targetScale;
+                    _cfg.Save();
+                    ApplyThemeAndStyle();
+                };
+                cm.Items.Add(miScaleItem);
+            }
+
+            cm.Items.Add(new System.Windows.Controls.Separator());
+
+            var miSettings = new System.Windows.Controls.MenuItem
+            {
+                Header = "⚙️ Ayarlar..."
+            };
+            miSettings.Click += delegate
+            {
+                if (OnOpenSettings != null) OnOpenSettings();
+            };
+            cm.Items.Add(miSettings);
+
+            var miClose = new System.Windows.Controls.MenuItem
+            {
+                Header = "✕ Not Kartını Gizle"
+            };
+            miClose.Click += delegate
+            {
+                _cfg.ShowZenNotes = false;
+                _cfg.Save();
+                Hide();
+                if (OnVisibilityModeChanged != null) OnVisibilityModeChanged();
+            };
+            cm.Items.Add(miClose);
+
+            cm.IsOpen = true;
+        }
+
+        private void UpdateLockVisuals()
+        {
+            bool locked = _cfg.LockZenNotesPosition;
+            if (_btnLock != null)
+            {
+                _btnLock.Text = locked ? "🔒" : "🔓";
+                _btnLock.ToolTip = locked ? "Konum Kilitli (Serbest bırakmak için tıklayın)" : "Konum Serbest (Kilitlemek için tıklayın)";
+            }
+            if (_cardBorder != null)
+            {
+                _cardBorder.Cursor = locked ? Cursors.Arrow : Cursors.SizeAll;
+            }
+            if (_headerGrid != null)
+            {
+                _headerGrid.Cursor = locked ? Cursors.Arrow : Cursors.SizeAll;
+            }
+        }
+
+        public void SaveNotesToFile()
+        {
+            try
+            {
+                string text = _txtNotes != null ? _txtNotes.Text : "";
+                File.WriteAllText(NotesFilePath, text, Encoding.UTF8);
+                if (_txtSaveStatus != null)
+                {
+                    _txtSaveStatus.Text = "✓ Kaydedildi";
+                    _txtSaveStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(34, 197, 94));
+                }
+            }
+            catch { }
+        }
+
+        private void LoadNotesFromFile()
+        {
+            try
+            {
+                if (File.Exists(NotesFilePath))
+                {
+                    string text = File.ReadAllText(NotesFilePath, Encoding.UTF8);
+                    if (_txtNotes != null)
+                    {
+                        _txtNotes.Text = text;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public void ApplyZOrder()
+        {
+            if (_isApplyingZOrder) return;
+            _isApplyingZOrder = true;
+            try
+            {
+                IntPtr hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd == IntPtr.Zero) return;
+
+                int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                exStyle |= Win32.WS_EX_TOOLWINDOW;
+                Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle);
+
+                Win32.SetWindowPos(hwnd, Win32.HWND_BOTTOM, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+            }
+            catch { }
+            finally { _isApplyingZOrder = false; }
+        }
+    }
+
+    // ==========================================
+    // ZEN UYGULAMA ÇEKMECESİ (MINIMAL DOCK / LAUNCHPAD)
+    // ==========================================
+    public class ZenDockWindow : Window
+    {
+        private readonly Config _cfg;
+        private readonly Action _onOpenSettings;
+        private Border _dockContainer;
+        private TextBlock _grip;
+        private bool _isApplyingZOrder = false;
+
+        public ZenDockWindow(Config cfg, Action onOpenSettings)
+        {
+            _cfg = cfg;
+            _onOpenSettings = onOpenSettings;
+
+            Title = "Zen Dock";
+            WindowStyle = WindowStyle.None;
+            AllowsTransparency = true;
+            Background = System.Windows.Media.Brushes.Transparent;
+            ShowInTaskbar = false;
+            SizeToContent = SizeToContent.WidthAndHeight;
+            ResizeMode = ResizeMode.NoResize;
+            ShowActivated = false;
+            Topmost = false;
+
+            BuildUI();
+            SetInitialPosition();
+
+
+            SourceInitialized += delegate
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                    Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle | Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE);
+
+                    var source = HwndSource.FromHwnd(hwnd);
+                    if (source != null) source.AddHook(WndProc);
+
+                    ApplyZOrder();
+                }
+            };
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == 0x0021) // WM_MOUSEACTIVATE
+            {
+                handled = true;
+                return (IntPtr)3; // MA_NOACTIVATE
+            }
+            return IntPtr.Zero;
+        }
+
+        public void ResetPosition()
+        {
+            SetInitialPosition();
+        }
+
+        public void SetInitialPosition()
+        {
+            var wa = Forms.Screen.PrimaryScreen.WorkingArea;
+            double defaultW = 380;
+            double defaultH = 56;
+
+            if (_cfg.DockX >= 0 && _cfg.DockY >= 0)
+            {
+                Left = _cfg.DockX;
+                Top = _cfg.DockY;
+            }
+            else
+            {
+                Left = wa.Left + (wa.Width - defaultW) / 2.0;
+                double baseTop = wa.Bottom - defaultH - 18;
+                if (_cfg.ShowNationalHolidays)
+                {
+                    baseTop -= 56;
+                }
+                Top = baseTop;
+            }
+
+            if (Left < wa.Left) Left = wa.Left + 10;
+            if (Top < wa.Top) Top = wa.Top + 10;
+            if (Left + defaultW > wa.Right) Left = wa.Right - defaultW - 10;
+            if (Top + defaultH > wa.Bottom) Top = wa.Bottom - defaultH - 10;
+        }
+
+        private void BuildUI()
+        {
+            _dockContainer = new Border
+            {
+                CornerRadius = new CornerRadius(28),
+                Padding = new Thickness(10, 6, 10, 6),
+                Margin = new Thickness(8),
+                BorderThickness = new Thickness(1),
+                Cursor = _cfg.LockDockPosition ? Cursors.Arrow : Cursors.SizeAll
+            };
+
+            _dockContainer.PreviewMouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                if (_cfg.LockDockPosition) return;
+                if (e.ButtonState == MouseButtonState.Pressed)
+                {
+                    try
+                    {
+                        DragMove();
+                        _cfg.DockX = Left;
+                        _cfg.DockY = Top;
+                        _cfg.Save();
+                    }
+                    catch { }
+                }
+            };
+
+            var stack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var grip = new TextBlock
+            {
+                Text = "⠿",
+                FontSize = 14,
+                Opacity = 0.5,
+                Margin = new Thickness(4, 0, 4, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = _cfg.LockDockPosition ? Cursors.Arrow : Cursors.SizeAll,
+                ToolTip = _cfg.LockDockPosition ? "Dock Kilitli" : "Dock Konumunu Sürükle & Taşı"
+            };
+            grip.MouseEnter += delegate { grip.Opacity = 0.9; };
+            grip.MouseLeave += delegate { grip.Opacity = 0.5; };
+            _grip = grip;
+            stack.Children.Add(grip);
+
+            stack.Children.Add(CreateDockItem("📁", "Dosya Gezgini", delegate { LaunchApp("explorer.exe"); }));
+            stack.Children.Add(CreateDockItem("🌐", "Web Tarayıcısı", delegate { LaunchApp("https://www.google.com"); }));
+            stack.Children.Add(CreateDockItem("📊", "Vardiya & Çizelge", delegate { LaunchShiftOrExcel(); }));
+            stack.Children.Add(CreateDockItem("📝", "Not Defteri", delegate { LaunchApp("notepad.exe"); }));
+            stack.Children.Add(CreateDockItem("🧮", "Hesap Makinesi", delegate { LaunchApp("calc.exe"); }));
+            stack.Children.Add(CreateDockItem("💻", "Komut İstemi", delegate { LaunchApp("cmd.exe"); }));
+
+            // Dikey ayırıcı
+            var div = new Border
+            {
+                Width = 1,
+                Height = 22,
+                Margin = new Thickness(6, 0, 6, 0),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(60, 255, 255, 255)),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            stack.Children.Add(div);
+
+            stack.Children.Add(CreateDockItem("⚙️", "Desktop Zen Ayarları", delegate { if (_onOpenSettings != null) _onOpenSettings(); }));
+
+            _dockContainer.Child = stack;
+            Content = _dockContainer;
+
+            ApplyThemeAndStyle();
+        }
+
+        private Border CreateDockItem(string icon, string tooltipText, Action onClick)
+        {
+            var item = new Border
+            {
+                Width = 42,
+                Height = 42,
+                CornerRadius = new CornerRadius(14),
+                Background = System.Windows.Media.Brushes.Transparent,
+                Margin = new Thickness(3, 0, 3, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = tooltipText
+            };
+
+            var txt = new TextBlock
+            {
+                Text = icon,
+                FontSize = 19,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            item.Child = txt;
+
+            item.MouseEnter += delegate
+            {
+                item.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(45, 255, 255, 255));
+                txt.RenderTransform = new ScaleTransform(1.15, 1.15);
+                txt.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
+            };
+
+            item.MouseLeave += delegate
+            {
+                item.Background = System.Windows.Media.Brushes.Transparent;
+                txt.RenderTransform = null;
+            };
+
+            System.Windows.Point downPoint = new System.Windows.Point(0, 0);
+            item.PreviewMouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                downPoint = e.GetPosition(this);
+            };
+
+            item.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                var curPoint = e.GetPosition(this);
+                double dist = Math.Max(Math.Abs(curPoint.X - downPoint.X), Math.Abs(curPoint.Y - downPoint.Y));
+                if (dist > 5)
+                {
+                    // Sürükleme yapıldı, tıklama işlemini çalıştırma
+                    return;
+                }
+                e.Handled = true;
+                if (onClick != null) onClick();
+            };
+
+            return item;
+        }
+
+        private void LaunchApp(string target)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+            }
+            catch { }
+        }
+
+        private void LaunchShiftOrExcel()
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(_cfg.ShiftFolderPath))
+                {
+                    string p = _cfg.ShiftFolderPath;
+                    if (p.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase) || File.Exists(p) || Directory.Exists(p))
+                    {
+                        Process.Start(new ProcessStartInfo(p) { UseShellExecute = true });
+                        return;
+                    }
+                }
+                Process.Start(new ProcessStartInfo("excel.exe") { UseShellExecute = true });
+            }
+            catch
+            {
+                try { Process.Start(new ProcessStartInfo("explorer.exe") { UseShellExecute = true }); } catch { }
+            }
+        }
+
+        public void ApplyThemeAndStyle()
+        {
+            string theme = _cfg.Theme;
+            bool isLight = (theme == "light");
+            double op = _cfg.WidgetOpacity;
+            if (op < 0.1) op = 0.1;
+            if (op > 1.0) op = 1.0;
+
+            byte bgAlpha = (byte)(op * 240);
+            byte borderAlpha = (byte)Math.Min(255, (int)(op * (isLight ? 160 : 70)));
+
+            System.Windows.Media.Color bg = isLight
+                ? System.Windows.Media.Color.FromArgb(bgAlpha, 245, 247, 250)
+                : System.Windows.Media.Color.FromArgb(bgAlpha, 18, 22, 32);
+
+            System.Windows.Media.Color border = isLight
+                ? System.Windows.Media.Color.FromArgb(borderAlpha, 210, 215, 225)
+                : System.Windows.Media.Color.FromArgb(borderAlpha, 55, 65, 85);
+
+            if (_dockContainer != null)
+            {
+                _dockContainer.Background = new SolidColorBrush(bg);
+                _dockContainer.BorderBrush = new SolidColorBrush(border);
+                _dockContainer.Effect = new DropShadowEffect
+                {
+                    Color = isLight ? System.Windows.Media.Color.FromRgb(140, 150, 160) : System.Windows.Media.Colors.Black,
+                    BlurRadius = 26,
+                    ShadowDepth = 6,
+                    Opacity = isLight ? (0.18 * op) : (0.40 * op)
+                };
+                _dockContainer.Cursor = _cfg.LockDockPosition ? Cursors.Arrow : Cursors.SizeAll;
+            }
+            if (_grip != null)
+            {
+                _grip.Cursor = _cfg.LockDockPosition ? Cursors.Arrow : Cursors.SizeAll;
+                _grip.ToolTip = _cfg.LockDockPosition ? "Dock Kilitli" : "Dock Konumunu Sürükle & Taşı";
+            }
+        }
+
+        public void ApplyZOrder()
+        {
+            if (_isApplyingZOrder) return;
+            _isApplyingZOrder = true;
+            try
+            {
+                IntPtr hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd == IntPtr.Zero) return;
+
+                int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                exStyle |= Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE;
+                Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle);
+
+                Win32.SetWindowPos(hwnd, Win32.HWND_BOTTOM, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+            }
+            catch { }
+            finally { _isApplyingZOrder = false; }
+        }
+    }
+
+    // ==========================================
+    // ZEN DİNLENME MODU: TAKIM ZAFER BAYRAĞI (BALKON KONSEPTİ)
+    // Tasarım & Mimari: Serkan ŞENTÜRK
+    // ==========================================
+    public class ZenVictoryFlagWindow : Window
+    {
+        private readonly Config _cfg;
+        private System.Windows.Controls.Image _flagImage;
+        private TextBlock _txtTitle;
+        private TextBlock _txtSubtitle;
+        private Border _bannerContainer;
+        private TranslateTransform _unfurlTranslate;
+        private RotateTransform _swayRotate;
+        private SkewTransform _swaySkew;
+        private Storyboard _unfurlStoryboard;
+        private Storyboard _swayStoryboard;
+        private Storyboard _sheenStoryboard;
+        private Border _sheenOverlay;
+        private bool _isApplyingZOrder = false;
+        private string _loadedTeam = "";
+        public Action OnCloseRequested;
+
+        public ZenVictoryFlagWindow(Config cfg)
+        {
+            _cfg = cfg;
+
+            Title = "DesktopZen_VictoryFlag";
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.NoResize;
+            ShowInTaskbar = false;
+            ShowActivated = false;
+            Focusable = false;
+            AllowsTransparency = true;
+            Background = System.Windows.Media.Brushes.Transparent;
+            Topmost = true;
+
+            // Büyük Dikey Saten Bayrak / Flama Boyutları
+            Width = 380;
+            Height = 650;
+            SnapsToDevicePixels = true;
+            UseLayoutRounding = true;
+
+            PreviewKeyDown += delegate(object s, KeyEventArgs e)
+            {
+                if (e.Key == Key.Escape)
+                {
+                    HideFlag();
+                    if (OnCloseRequested != null) OnCloseRequested();
+                }
+            };
+
+            BuildVisualTree();
+
+            SourceInitialized += delegate
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                    Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle | Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE);
+                }
+            };
+        }
+
+        private void BuildVisualTree()
+        {
+            var rootGrid = new Grid();
+
+            // Kumaş dalgalanması ve yukarıdan aşağıya açılma için transform grubu
+            var transformGroup = new TransformGroup();
+            _unfurlTranslate = new TranslateTransform(0, 0);
+            _swayRotate = new RotateTransform(0, 190, 14); // Üst askı ekseninin tam ortası
+            _swaySkew = new SkewTransform(0, 0, 190, 14);
+            transformGroup.Children.Add(_unfurlTranslate);
+            transformGroup.Children.Add(_swayRotate);
+            transformGroup.Children.Add(_swaySkew);
+
+            _bannerContainer = new Border
+            {
+                RenderTransform = transformGroup,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Top
+            };
+
+            var stack = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            // 1. Üst Askı Kordonları (Altın Zincir / İpler)
+            var cordCanvas = new Canvas
+            {
+                Width = 360,
+                Height = 10,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            var leftCord = new Border
+            {
+                Width = 2.5,
+                Height = 10,
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 175, 55))
+            };
+            Canvas.SetLeft(leftCord, 42);
+            Canvas.SetTop(leftCord, 0);
+            cordCanvas.Children.Add(leftCord);
+
+            var rightCord = new Border
+            {
+                Width = 2.5,
+                Height = 10,
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 175, 55))
+            };
+            Canvas.SetLeft(rightCord, 315);
+            Canvas.SetTop(rightCord, 0);
+            cordCanvas.Children.Add(rightCord);
+
+            stack.Children.Add(cordCanvas);
+
+            // 2. Altın / Bronz Tören Askı Direği & Uç Topuzları (Top Hanger Rod with Finials)
+            var rodGrid = new Grid
+            {
+                Width = 356,
+                Height = 18,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            var rodBorder = new Border
+            {
+                Width = 340,
+                Height = 12,
+                CornerRadius = new CornerRadius(6),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var goldRodBrush = new LinearGradientBrush
+            {
+                StartPoint = new System.Windows.Point(0, 0),
+                EndPoint = new System.Windows.Point(1, 0)
+            };
+            goldRodBrush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(140, 95, 0), 0.0));
+            goldRodBrush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(255, 235, 140), 0.22));
+            goldRodBrush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(212, 175, 55), 0.5));
+            goldRodBrush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(255, 245, 190), 0.78));
+            goldRodBrush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromRgb(130, 85, 0), 1.0));
+            rodBorder.Background = goldRodBrush;
+            rodBorder.Effect = new DropShadowEffect
+            {
+                Color = Colors.Black,
+                BlurRadius = 10,
+                ShadowDepth = 3,
+                Opacity = 0.65
+            };
+            rodGrid.Children.Add(rodBorder);
+
+            // Sol Küre Başlık (Finial)
+            var leftFinial = new Border
+            {
+                Width = 16,
+                Height = 16,
+                CornerRadius = new CornerRadius(8),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center,
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(230, 195, 75))
+            };
+            rodGrid.Children.Add(leftFinial);
+
+            // Sağ Küre Başlık (Finial)
+            var rightFinial = new Border
+            {
+                Width = 16,
+                Height = 16,
+                CornerRadius = new CornerRadius(8),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(230, 195, 75))
+            };
+            rodGrid.Children.Add(rightFinial);
+
+            stack.Children.Add(rodGrid);
+
+            // 3. Büyük Dikey Saten Kumaş Çerçevesi (Flag Fabric with Drop Shadow)
+            var flagOuterBorder = new Border
+            {
+                Width = 320,
+                Height = 510,
+                CornerRadius = new CornerRadius(0, 0, 8, 8),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(60, 255, 255, 255)),
+                Margin = new Thickness(0, 0, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            flagOuterBorder.Effect = new DropShadowEffect
+            {
+                Color = Colors.Black,
+                BlurRadius = 36,
+                ShadowDepth = 12,
+                Direction = 270,
+                Opacity = 0.75
+            };
+
+            var flagGrid = new Grid
+            {
+                ClipToBounds = true,
+                Clip = new RectangleGeometry(new Rect(0, 0, 320, 510), 8, 8)
+            };
+
+            // Bayrak Görseli - Yüksek Kalite Fant Ölçekleme & Kenar Yumuşatma
+            _flagImage = new System.Windows.Controls.Image
+            {
+                Stretch = Stretch.UniformToFill,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                SnapsToDevicePixels = true
+            };
+            RenderOptions.SetBitmapScalingMode(_flagImage, BitmapScalingMode.Fant);
+            RenderOptions.SetEdgeMode(_flagImage, EdgeMode.Unspecified);
+            flagGrid.Children.Add(_flagImage);
+
+            // İpek & Saten Işıltı Katmanı (Renkleri matlaştırmayan zarif parıltı)
+            _sheenOverlay = new Border
+            {
+                IsHitTestVisible = false
+            };
+            var sheenBrush = new LinearGradientBrush
+            {
+                StartPoint = new System.Windows.Point(0, 0),
+                EndPoint = new System.Windows.Point(1, 1)
+            };
+            sheenBrush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 255, 255, 255), 0.00));
+            sheenBrush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(14, 255, 255, 255), 0.35));
+            sheenBrush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(36, 255, 255, 255), 0.50));
+            sheenBrush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(12, 255, 255, 255), 0.65));
+            sheenBrush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(0, 255, 255, 255), 1.00));
+            _sheenOverlay.Background = sheenBrush;
+            _sheenOverlay.Opacity = 0.22;
+            flagGrid.Children.Add(_sheenOverlay);
+
+            // Alt Kenar Tören Saçağı (Fringe)
+            var fringeBorder = new Border
+            {
+                Height = 12,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            var fringeBrush = new LinearGradientBrush
+            {
+                StartPoint = new System.Windows.Point(0, 0),
+                EndPoint = new System.Windows.Point(0, 1)
+            };
+            fringeBrush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(160, 212, 175, 55), 0.0));
+            fringeBrush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(240, 255, 220, 110), 0.5));
+            fringeBrush.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(140, 130, 80, 0), 1.0));
+            fringeBorder.Background = fringeBrush;
+            flagGrid.Children.Add(fringeBorder);
+
+            flagOuterBorder.Child = flagGrid;
+            stack.Children.Add(flagOuterBorder);
+
+            // 4. Şık Alt Rozet Kartı (Kullanıcı Talebi: "3 Puan Bizim" KALDIRILDI)
+            var badgeBorder = new Border
+            {
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 12, 16, 24)),
+                BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 175, 55)),
+                BorderThickness = new Thickness(1.5),
+                CornerRadius = new CornerRadius(14),
+                Padding = new Thickness(18, 6, 18, 6),
+                Margin = new Thickness(0, 10, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            badgeBorder.Effect = new DropShadowEffect
+            {
+                Color = Colors.Black,
+                BlurRadius = 14,
+                ShadowDepth = 4,
+                Opacity = 0.75
+            };
+
+            var badgeStack = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            _txtTitle = new TextBlock
+            {
+                Text = "GALATASARAY",
+                FontSize = 12.5,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 215, 0)),
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            badgeStack.Children.Add(_txtTitle);
+
+            _txtSubtitle = new TextBlock
+            {
+                Text = "",
+                FontSize = 10,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(220, 230, 245)),
+                Margin = new Thickness(0, 2, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Visibility = Visibility.Collapsed
+            };
+            badgeStack.Children.Add(_txtSubtitle);
+
+            badgeBorder.Child = badgeStack;
+            stack.Children.Add(badgeBorder);
+
+            _bannerContainer.Child = stack;
+            rootGrid.Children.Add(_bannerContainer);
+
+            // Sağ üst kapatma butonu
+            var btnClose = new Border
+            {
+                Width = 24,
+                Height = 24,
+                CornerRadius = new CornerRadius(12),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(170, 20, 24, 32)),
+                BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(100, 212, 175, 55)),
+                BorderThickness = new Thickness(1),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 10, 8, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Kapat (Esc, Sağ Tık veya fareyi hareket ettirin)"
+            };
+            var txtClose = new TextBlock
+            {
+                Text = "✕",
+                FontSize = 11,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(240, 240, 240)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            btnClose.Child = txtClose;
+            btnClose.MouseEnter += delegate { btnClose.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(230, 220, 50, 50)); };
+            btnClose.MouseLeave += delegate { btnClose.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(170, 20, 24, 32)); };
+            btnClose.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                HideFlag();
+                if (OnCloseRequested != null) OnCloseRequested();
+            };
+            rootGrid.Children.Add(btnClose);
+
+            // Sağ tık ile hızlı kapatma
+            MouseRightButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                HideFlag();
+                if (OnCloseRequested != null) OnCloseRequested();
+            };
+
+            Content = rootGrid;
+
+            // Sürükle & Bırak (Kilit kapalıysa serbest taşıma)
+            MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                if (!_cfg.LockFlagPosition && e.ButtonState == MouseButtonState.Pressed)
+                {
+                    try
+                    {
+                        DragMove();
+                        _cfg.FlagX = Left;
+                        _cfg.FlagY = Top;
+                        _cfg.Save();
+                    }
+                    catch { }
+                }
+            };
+        }
+
+        private void SetupAnimations()
+        {
+            // 1. Yukarıdan Aşağıya Açılma (Unfurl / Roll-down)
+            _unfurlStoryboard = new Storyboard();
+            var unfurlAnim = new DoubleAnimation
+            {
+                From = -650,
+                To = 0,
+                Duration = TimeSpan.FromSeconds(1.25),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            Storyboard.SetTarget(_unfurlStoryboard, _unfurlTranslate);
+            Storyboard.SetTargetProperty(_unfurlStoryboard, new PropertyPath("Y"));
+            _unfurlStoryboard.Children.Add(unfurlAnim);
+
+            var fadeAnim = new DoubleAnimation
+            {
+                From = 0.0,
+                To = 1.0,
+                Duration = TimeSpan.FromSeconds(0.6)
+            };
+            Storyboard.SetTarget(_unfurlStoryboard, this);
+            Storyboard.SetTargetProperty(_unfurlStoryboard, new PropertyPath("Opacity"));
+            _unfurlStoryboard.Children.Add(fadeAnim);
+
+            // 2. Büyük Dikey Kumaş Salınımı (Majestic Pendulum Sway)
+            _swayStoryboard = new Storyboard
+            {
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            var rotateAnim = new DoubleAnimation
+            {
+                From = -1.6,
+                To = 1.6,
+                Duration = TimeSpan.FromSeconds(4.2),
+                AutoReverse = true,
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+            };
+            Storyboard.SetTarget(_swayStoryboard, _swayRotate);
+            Storyboard.SetTargetProperty(_swayStoryboard, new PropertyPath("Angle"));
+            _swayStoryboard.Children.Add(rotateAnim);
+
+            var skewAnim = new DoubleAnimation
+            {
+                From = -1.0,
+                To = 1.0,
+                Duration = TimeSpan.FromSeconds(3.2),
+                AutoReverse = true,
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+            };
+            Storyboard.SetTarget(_swayStoryboard, _swaySkew);
+            Storyboard.SetTargetProperty(_swayStoryboard, new PropertyPath("AngleX"));
+            _swayStoryboard.Children.Add(skewAnim);
+
+            // 3. Kumaş Işıltısı Nabzı (Satin Sheen Pulse)
+            _sheenStoryboard = new Storyboard
+            {
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            var sheenAnim = new DoubleAnimation
+            {
+                From = 0.12,
+                To = 0.32,
+                Duration = TimeSpan.FromSeconds(2.6),
+                AutoReverse = true,
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+            };
+            Storyboard.SetTarget(_sheenStoryboard, _sheenOverlay);
+            Storyboard.SetTargetProperty(_sheenStoryboard, new PropertyPath("Opacity"));
+            _sheenStoryboard.Children.Add(sheenAnim);
+        }
+
+        private void LoadTeamFlagImage(string teamKey)
+        {
+            if (_loadedTeam == teamKey && _flagImage.Source != null) return;
+            _loadedTeam = teamKey;
+
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string flagsDir = System.IO.Path.Combine(baseDir, "flags");
+            string filePattern = "flag_" + teamKey;
+
+            string targetFile = null;
+            if (File.Exists(System.IO.Path.Combine(flagsDir, filePattern + ".png")))
+                targetFile = System.IO.Path.Combine(flagsDir, filePattern + ".png");
+            else if (File.Exists(System.IO.Path.Combine(flagsDir, filePattern + ".jpg")))
+                targetFile = System.IO.Path.Combine(flagsDir, filePattern + ".jpg");
+            else if (File.Exists(System.IO.Path.Combine(flagsDir, "flag_galatasaray.png")))
+                targetFile = System.IO.Path.Combine(flagsDir, "flag_galatasaray.png");
+
+            if (targetFile != null && File.Exists(targetFile))
+            {
+                try
+                {
+                    var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                    bmp.BeginInit();
+                    bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                    bmp.UriSource = new Uri(targetFile, UriKind.Absolute);
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    _flagImage.Source = bmp;
+                    return;
+                }
+                catch { }
+            }
+        }
+
+        public void ShowFlag(string teamKey, string scoreText = null)
+        {
+            teamKey = (teamKey ?? "galatasaray").ToLowerInvariant();
+            LoadTeamFlagImage(teamKey);
+
+            string teamName = GetTeamDisplayName(teamKey);
+            _txtTitle.Text = teamName;
+
+            // "3 puan bizim" tamamen kaldırıldı
+            if (!string.IsNullOrEmpty(scoreText) && !scoreText.Contains("3 PUAN") && !scoreText.Contains("3 Puan"))
+            {
+                _txtSubtitle.Text = scoreText;
+                _txtSubtitle.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                _txtSubtitle.Visibility = Visibility.Collapsed;
+            }
+
+            // Konumlandırma: Sağ üstten veya sol üstten aşağı inen flama
+            var wa = Forms.Screen.PrimaryScreen.WorkingArea;
+            if (_cfg.FlagX >= 0 && _cfg.FlagY >= 0 && _cfg.LockFlagPosition)
+            {
+                Left = _cfg.FlagX;
+                Top = _cfg.FlagY;
+            }
+            else if (string.Equals(_cfg.FlagSide, "left", StringComparison.OrdinalIgnoreCase))
+            {
+                // Sol üstten aşağı inen flama
+                Left = wa.Left + 40;
+                Top = wa.Top;
+            }
+            else
+            {
+                // Sağ üstten aşağı inen flama (Varsayılan)
+                Left = wa.Right - Width - 40;
+                Top = wa.Top;
+            }
+
+            if (!IsVisible) Show();
+            ApplyZOrder();
+
+            if (_unfurlStoryboard == null)
+            {
+                SetupAnimations();
+            }
+
+            try
+            {
+                _unfurlStoryboard.Begin();
+                _swayStoryboard.Begin();
+                _sheenStoryboard.Begin();
+            }
+            catch { }
+        }
+
+        public void HideFlag()
+        {
+            try
+            {
+                if (_swayStoryboard != null) _swayStoryboard.Stop();
+                if (_sheenStoryboard != null) _sheenStoryboard.Stop();
+                if (_unfurlStoryboard != null) _unfurlStoryboard.Stop();
+            }
+            catch { }
+
+            if (IsVisible) Hide();
+        }
+
+        public void ApplyZOrder()
+        {
+            if (_isApplyingZOrder) return;
+            _isApplyingZOrder = true;
+            try
+            {
+                IntPtr hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero && Win32.IsWindow(hwnd))
+                {
+                    Win32.SetWindowPos(hwnd, Win32.HWND_TOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE | Win32.SWP_SHOWWINDOW);
+                }
+            }
+            catch { }
+            finally { _isApplyingZOrder = false; }
+        }
+
+        public static string GetTeamDisplayName(string teamKey)
+        {
+            switch ((teamKey ?? "").ToLowerInvariant())
+            {
+                case "galatasaray": return "GALATASARAY";
+                case "fenerbahce": return "FENERBAHÇE";
+                case "besiktas": return "BEŞİKTAŞ";
+                case "trabzonspor": return "TRABZONSPOR";
+                case "turkiye": return "TÜRKİYE";
+                default: return "ŞAMPİYON";
+            }
+        }
+    }
+
+    // ==========================================
+    // MODERN MASAÜSTÜ WIDGET PENCERESİ
+    // ==========================================
+    public class WidgetWindow : Window
+    {
+        private Config _cfg;
+        private Action _onOpenSettings;
+        private Action _onToggleIcons;
+        public Func<bool> IsWallpaperActiveFunc { get; set; }
+        public Func<List<IntPtr>> GetInspirationHandlesFunc { get; set; }
+        public Action<string> OnOpenSettingsTab { get; set; }
+        public bool IsAmbientMode { get; set; }
+
+        // UI Elemanları
+        private Border _cardBorder;
+        private TextBlock _txtHour;
+        private TextBlock _txtColon;
+        private Viewbox _crescentStarBox;
+        private System.Windows.Shapes.Path _pathCrescentStar;
+        private TextBlock _txtMinute;
+        private TextBlock _txtSeconds;
+        private TextBlock _txtDate;
+        private TextBlock _txtDay;
+        private System.Windows.Media.Color _currentTextPrimary;
+        private System.Windows.Media.Color _currentTextSecondary;
+        private System.Windows.Media.Color _currentTextMuted;
+        private Canvas _weatherIconCanvas;
+        private string _lastWeatherCondition = "partly_cloudy";
+        private TextBlock _txtTemp;
+        private TextBlock _txtStatus;
+        private TextBlock _txtCity;
+        private ColumnDefinition _colTime;
+        private StackPanel _timeStack;
+        private Border _divider;
+        private StackPanel _weatherSection;
+        private Grid _mainGrid;
+
+        // Akıllı Modlar & Sistem
+        private TextBlock _txtSysStats;
+        private Border _matchBorder;
+        private TextBlock _txtMatchInfo;
+        private DispatcherTimer _sysMediaTimer;
+        private int _currentMatchIndex = 0;
+        private List<MatchItem> _lastMatchList = null;
+        private DateTime _cycleHoldUntil = DateTime.MinValue;
+
+        // Canlı Maç Başlangıç Bildirimi & Gol Animasyonu
+        private Border _matchAlertBanner;
+        private FrameworkElement _bouncingBallContainer;
+        private TextBlock _txtAlertHeader;
+        private TextBlock _txtAlertDetail;
+        private string _currentAlertTeamKey = "";
+        private string _currentAlertStyle = "";
+        private string _lastWhistlePlayedKey = "";
+        private string _lastFinalWhistlePlayedKey = "";
+        private DateTime? _testAlertEndTime = null;
+
+        // Canlı Gol Kutlaması & Bildirimi
+        private DateTime? _goalCelebrationEndTime = null;
+        private string _goalCelebrationTeamKey = "";
+        private string _goalCelebrationHeader = "";
+        private string _goalCelebrationDetail = "";
+        private string _lastLiveMatchKey = "";
+        private int _lastLiveTrackedScore = -1;
+
+        // Canlı Medya & Spotify / Müzik Mini Oynatıcı
+        private Border _mediaPlayerBorder;
+        private TextBlock _txtMediaTitle;
+        private TextBlock _txtMediaArtist;
+        private TextBlock _btnMediaPrev;
+        private TextBlock _btnMediaPlay;
+        private TextBlock _btnMediaNext;
+        private System.Windows.Shapes.Rectangle _eqBar1;
+        private System.Windows.Shapes.Rectangle _eqBar2;
+        private System.Windows.Shapes.Rectangle _eqBar3;
+        private bool _isMediaPlaying = false;
+        private bool _isEqAnimating = false;
+
+        public Action<string> OnWeatherUpdated;
+
+        // Finans ve Kripto UI Elemanları
+        private Border _financeDivider;
+        private StackPanel _financePanel;
+        private Grid _financeGrid;
+        private TextBlock _lblUsdTitle, _txtUsdPrice, _txtUsdChange;
+        private TextBlock _lblEurTitle, _txtEurPrice, _txtEurChange;
+        private TextBlock _lblGramTitle, _txtGramPrice, _txtGramChange;
+        private TextBlock _lblOunceTitle, _txtOuncePrice, _txtOunceChange;
+        private TextBlock _lblBistTitle, _lblBistStatus, _txtBistPrice, _txtBistChange;
+        private TextBlock _lblBtcTitle, _txtBtcPrice, _txtBtcChange;
+        private TextBlock _lblEthTitle, _txtEthPrice, _txtEthChange;
+        private StackPanel _colUsd, _colEur, _colGram, _colOunce, _colBist, _colBtc, _colEth;
+        private TextBlock _txtFinanceStatus;
+        private DispatcherTimer _financeTimer;
+        private FinanceData _currentFinance;
+
+        private DispatcherTimer _clockTimer;
+        private DispatcherTimer _weatherTimer;
+
+        // Diyanet Namaz Vakitleri UI Elemanları
+        private Border _prayerDivider;
+        private StackPanel _prayerPanel;
+        private TextBlock _txtPrayerTitle;
+        private TextBlock _txtPrayerCity;
+        private TextBlock _txtPrayerDateInfo;
+        private TextBlock _txtPrayerCountdown;
+        private TextBlock _txtPrayerFooter;
+        private Grid _prayerGrid;
+        private Border[] _prayerColBorders = new Border[6];
+        private TextBlock[] _prayerColNames = new TextBlock[6];
+        private TextBlock[] _prayerColTimes = new TextBlock[6];
+        private PrayerTimesData _currentPrayer = null;
+        private DispatcherTimer _prayerTimer;
+
+        // Türkiye Resmî Tatilleri UI Elemanları
+        private Border _holidayDivider;
+        private Border _holidayPanel;
+        private TextBlock _txtHolidayTitle;
+        private TextBlock _txtHolidayName;
+        private TextBlock _txtHolidayCountdown;
+        private TextBlock _txtHolidayCycleHint;
+        private int _currentHolidayOffset = 0;
+        public Action OnPositionChanged;
+        public Action<string, string> OnVictoryMatchFinished;
+
+        private static readonly string[] TurkishDays = new string[] {
+            "Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"
+        };
+
+        public WidgetWindow(Config cfg, Action onOpenSettings, Action onToggleIcons)
+        {
+            _cfg = cfg;
+            _onOpenSettings = onOpenSettings;
+            _onToggleIcons = onToggleIcons;
+
+            Title = "Modern Minimal Widget";
+            WindowStyle = WindowStyle.None;
+            AllowsTransparency = true;
+            Background = System.Windows.Media.Brushes.Transparent;
+            ShowInTaskbar = false;
+            SizeToContent = SizeToContent.WidthAndHeight;
+            ResizeMode = ResizeMode.NoResize;
+            ShowActivated = false;
+
+            BuildUI();
+
+            LocationChanged += delegate { if (OnPositionChanged != null) OnPositionChanged(); };
+            SizeChanged += delegate { if (OnPositionChanged != null) OnPositionChanged(); };
+
+            Loaded += delegate(object s, RoutedEventArgs e)
+            {
+                ApplyWindowPosition();
+                ApplyThemeAndSurface();
+                UpdateClock();
+                RefreshWeather();
+
+                // 1. Önce yerel önbellekteki son başarılı finans verilerini göster
+                var cached = FinanceCache.Load();
+                if (cached != null)
+                {
+                    UpdateFinanceUI(cached);
+                }
+
+                // 2. Arka planda hemen güncelle
+                RefreshFinance();
+                UpdateSystemAndMedia();
+
+                // 3. Namaz vakitlerini yükle
+                RefreshPrayerTimes();
+
+                // 4. Türkiye Resmî Tatillerini yükle
+                UpdateHolidayUI();
+
+                ApplyZOrder();
+            };
+
+            // Saat Zamanlayıcısı
+            _clockTimer = new DispatcherTimer();
+            _clockTimer.Interval = TimeSpan.FromMilliseconds(500);
+            _clockTimer.Tick += delegate(object s, EventArgs e) { UpdateClock(); };
+            _clockTimer.Start();
+
+            // Hava Durumu Zamanlayıcısı (30 dk)
+            _weatherTimer = new DispatcherTimer();
+            _weatherTimer.Interval = TimeSpan.FromMinutes(30);
+            _weatherTimer.Tick += delegate(object s, EventArgs e) { RefreshWeather(); };
+            _weatherTimer.Start();
+
+            // Finans Zamanlayıcısı (5 dk)
+            _financeTimer = new DispatcherTimer();
+            _financeTimer.Interval = TimeSpan.FromMinutes(5);
+            _financeTimer.Tick += delegate(object s, EventArgs e) { RefreshFinance(); };
+            _financeTimer.Start();
+
+            // Namaz Vakitleri Zamanlayıcısı (15 dk)
+            _prayerTimer = new DispatcherTimer();
+            _prayerTimer.Interval = TimeSpan.FromMinutes(15);
+            _prayerTimer.Tick += delegate(object s, EventArgs e) { RefreshPrayerTimes(); };
+            _prayerTimer.Start();
+
+            // Sistem, Medya ve Maç Zamanlayıcısı (2 saniyede bir)
+            _sysMediaTimer = new DispatcherTimer();
+            _sysMediaTimer.Interval = TimeSpan.FromSeconds(2);
+            _sysMediaTimer.Tick += delegate(object s, EventArgs e) { UpdateSystemAndMedia(); };
+            _sysMediaTimer.Start();
+        }
+
+        private void BuildUI()
+        {
+            // Ana Kart Çerçevesi
+            _cardBorder = new Border
+            {
+                CornerRadius = new CornerRadius(30),
+                Padding = new Thickness(44, 14, 44, 26),
+                Margin = new Thickness(15),
+                ClipToBounds = true,
+                Cursor = _cfg.LockWidgetPosition ? Cursors.Arrow : Cursors.SizeAll
+            };
+
+            _cardBorder.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                if (_cfg.LockWidgetPosition)
+                {
+                    // Kilitli mod: Fare ile sürüklenemez ve yeri oynatılamaz
+                    return;
+                }
+
+                if (e.ClickCount == 2)
+                {
+                    TogglePosition();
+                }
+                else
+                {
+                    DragMove();
+                    _cfg.WidgetPosition = "custom";
+                    _cfg.WidgetX = Left;
+                    _cfg.WidgetY = Top;
+                    _cfg.Save();
+                    ApplyZOrder();
+                    if (OnPositionChanged != null) OnPositionChanged();
+                }
+            };
+
+            _cardBorder.MouseRightButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                if (_onOpenSettings != null) _onOpenSettings();
+            };
+
+            _mainGrid = new Grid();
+            var mainGrid = _mainGrid;
+            _colTime = new ColumnDefinition { Width = new GridLength(225) };
+            mainGrid.ColumnDefinitions.Add(_colTime);
+            mainGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            mainGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            // 1. SOL: Saat, Saniye, Tarih ve Gün (Sabit Genişlik ile Oynama/Kayma Engellendi)
+            var timeStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Width = 225 };
+            _timeStack = timeStack;
+
+            var clockRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom };
+
+            _txtHour = new TextBlock
+            {
+                FontSize = 74,
+                FontWeight = FontWeights.ExtraLight,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI Variable Display, Segoe UI"),
+                LineHeight = 68,
+                VerticalAlignment = VerticalAlignment.Bottom
+            };
+            Typography.SetNumeralAlignment(_txtHour, FontNumeralAlignment.Tabular);
+
+            _txtColon = new TextBlock
+            {
+                Text = ":",
+                FontSize = 70,
+                FontWeight = FontWeights.ExtraLight,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI Variable Display, Segoe UI"),
+                LineHeight = 68,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Margin = new Thickness(1, 0, 1, 0)
+            };
+
+            _crescentStarBox = new Viewbox
+            {
+                Width = 26,
+                Height = 34,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Margin = new Thickness(5, 0, 5, 12),
+                Visibility = Visibility.Collapsed
+            };
+            _pathCrescentStar = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse("M 80.4,30.7 A 36,36 0 1,0 80.4,69.3 A 28.8,28.8 0 1,1 80.4,30.7 Z M 68,50 L 74.9,47.7 L 74.9,40.5 L 79.2,44.4 L 86.1,44.1 L 81.8,50 L 86.1,55.9 L 79.2,55.6 L 74.9,59.5 L 74.9,52.3 Z"),
+                Stretch = Stretch.Uniform,
+                Fill = System.Windows.Media.Brushes.White
+            };
+            _crescentStarBox.Child = _pathCrescentStar;
+
+            _txtMinute = new TextBlock
+            {
+                FontSize = 74,
+                FontWeight = FontWeights.ExtraLight,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI Variable Display, Segoe UI"),
+                LineHeight = 68,
+                VerticalAlignment = VerticalAlignment.Bottom
+            };
+            Typography.SetNumeralAlignment(_txtMinute, FontNumeralAlignment.Tabular);
+
+            _txtSeconds = new TextBlock
+            {
+                FontSize = 24,
+                FontWeight = FontWeights.Light,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI Variable Display, Segoe UI"),
+                Margin = new Thickness(4, 0, 0, 10),
+                VerticalAlignment = VerticalAlignment.Bottom
+            };
+            Typography.SetNumeralAlignment(_txtSeconds, FontNumeralAlignment.Tabular);
+
+            clockRow.Children.Add(_txtHour);
+            clockRow.Children.Add(_txtColon);
+            clockRow.Children.Add(_crescentStarBox);
+            clockRow.Children.Add(_txtMinute);
+            clockRow.Children.Add(_txtSeconds);
+
+            var dateRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, 6, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            _txtDate = new TextBlock
+            {
+                FontSize = 14,
+                FontWeight = FontWeights.Normal,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI")
+            };
+            var dot = new Ellipse
+            {
+                Width = 4,
+                Height = 4,
+                Margin = new Thickness(8, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _txtDay = new TextBlock
+            {
+                FontSize = 14,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI")
+            };
+            dateRow.Children.Add(_txtDate);
+            dateRow.Children.Add(dot);
+            dateRow.Children.Add(_txtDay);
+
+            timeStack.Children.Add(clockRow);
+            timeStack.Children.Add(dateRow);
+
+            _txtSysStats = new TextBlock
+            {
+                Text = "⚡ CPU: %0 · RAM: %0",
+                FontSize = 11,
+                FontWeight = FontWeights.Normal,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Margin = new Thickness(2, 6, 0, 0),
+                Width = 225,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Cursor = Cursors.Hand,
+                ToolTip = "Windows Görev Yöneticisi'ni açmak için tıklayın"
+            };
+            Typography.SetNumeralAlignment(_txtSysStats, FontNumeralAlignment.Tabular);
+            _txtSysStats.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                try { Process.Start("taskmgr.exe"); } catch { }
+            };
+            timeStack.Children.Add(_txtSysStats);
+
+            Grid.SetColumn(timeStack, 0);
+            mainGrid.Children.Add(timeStack);
+
+            // 2. DİKEY AYIRICI ÇİZGİ
+            _divider = new Border
+            {
+                Width = 1,
+                Height = 64,
+                Margin = new Thickness(42, 0, 42, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(_divider, 1);
+            mainGrid.Children.Add(_divider);
+
+            // 3. SAĞ: Hava Durumu (Sol taraf sabit olduğundan konumu asla oynamaz)
+            var weatherRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, MinWidth = 140 };
+            _weatherSection = weatherRow;
+
+            var iconBox = new Viewbox
+            {
+                Width = 46,
+                Height = 46,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 16, 0)
+            };
+            _weatherIconCanvas = new Canvas
+            {
+                Width = 64,
+                Height = 64,
+                ClipToBounds = false
+            };
+            iconBox.Child = _weatherIconCanvas;
+            weatherRow.Children.Add(iconBox);
+
+            var weatherTextStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            _txtTemp = new TextBlock
+            {
+                FontSize = 32,
+                FontWeight = FontWeights.Light,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI Variable Display, Segoe UI"),
+                LineHeight = 30
+            };
+            _txtStatus = new TextBlock
+            {
+                FontSize = 13,
+                FontWeight = FontWeights.Normal,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Margin = new Thickness(1, 3, 0, 0)
+            };
+            _txtCity = new TextBlock
+            {
+                FontSize = 11,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Margin = new Thickness(1, 1, 0, 0),
+                Cursor = Cursors.Hand
+            };
+            _txtCity.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                if (_onOpenSettings != null) _onOpenSettings();
+            };
+
+            weatherTextStack.Children.Add(_txtTemp);
+            weatherTextStack.Children.Add(_txtStatus);
+            weatherTextStack.Children.Add(_txtCity);
+            weatherRow.Children.Add(weatherTextStack);
+
+            Grid.SetColumn(weatherRow, 2);
+            mainGrid.Children.Add(weatherRow);
+            _mainGrid = mainGrid;
+
+            // Dikey Kök Konteyner (Üst: Saat ve Hava Durumu, Orta: Maç ve Medya, Alt: Finans Paneli)
+            var rootCardStack = new StackPanel { Orientation = Orientation.Vertical, ClipToBounds = true };
+            rootCardStack.Children.Add(mainGrid);
+
+            // Seken Futbol Toplu Maç Başlangıç Bildirim Kartı (5 dk önce başlar, 6 dk sürer)
+            _matchAlertBanner = new Border
+            {
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(14, 8, 14, 8),
+                Margin = new Thickness(0, 14, 0, 0),
+                Cursor = Cursors.Hand,
+                Visibility = Visibility.Collapsed,
+                ToolTip = "Maç başlamak üzere! Düdüğü test etmek için tıklayın"
+            };
+
+            var alertGrid = new Grid { VerticalAlignment = VerticalAlignment.Center };
+            alertGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            alertGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var textStack = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+            _txtAlertHeader = new TextBlock
+            {
+                Text = "🔥 MAÇ BAŞLAMAK ÜZERE!",
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI")
+            };
+            _txtAlertDetail = new TextBlock
+            {
+                Text = "Takım Karşılaşması (20:00)",
+                FontSize = 10.5,
+                FontWeight = FontWeights.Normal,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Margin = new Thickness(0, 2, 0, 0)
+            };
+            textStack.Children.Add(_txtAlertHeader);
+            textStack.Children.Add(_txtAlertDetail);
+            Grid.SetColumn(textStack, 0);
+            alertGrid.Children.Add(textStack);
+
+            FrameworkElement dummyBall;
+            Ellipse dummyShadow;
+            _bouncingBallContainer = SoccerBallFactory.CreateGoalBannerVisual("galatasaray", _cfg.GoalEffectStyle, out dummyBall, out dummyShadow);
+            _currentAlertStyle = _cfg.GoalEffectStyle;
+            Grid.SetColumn(_bouncingBallContainer, 1);
+            alertGrid.Children.Add(_bouncingBallContainer);
+
+            _matchAlertBanner.Child = alertGrid;
+            _matchAlertBanner.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                WhistleService.PlayAsync();
+            };
+
+            rootCardStack.Children.Add(_matchAlertBanner);
+
+            // Futbol Maç Takip Rozeti
+            _matchBorder = new Border
+            {
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(14, 7, 14, 7),
+                Margin = new Thickness(0, 14, 0, 0),
+                Cursor = Cursors.Hand,
+                Visibility = Visibility.Collapsed,
+                ToolTip = "Fikstürdeki diğer maçları görmek için tıklayın"
+            };
+            _txtMatchInfo = new TextBlock
+            {
+                Text = "⚽ Maç bilgisi",
+                FontSize = 11.5,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                TextWrapping = TextWrapping.NoWrap
+            };
+            _matchBorder.Child = _txtMatchInfo;
+            _matchBorder.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                CycleOrShowMatches();
+            };
+            rootCardStack.Children.Add(_matchBorder);
+
+            // 🎵 Canlı Medya & Spotify Mini Oynatıcı Kartı
+            _mediaPlayerBorder = BuildMediaPlayerCard();
+            rootCardStack.Children.Add(_mediaPlayerBorder);
+
+            _financeDivider = new Border
+            {
+                Height = 1,
+                Margin = new Thickness(0, 18, 0, 14),
+                Opacity = 0.5
+            };
+            rootCardStack.Children.Add(_financeDivider);
+
+            _financePanel = BuildFinancePanel();
+            rootCardStack.Children.Add(_financePanel);
+
+            // 🕌 Diyanet Namaz Vakitleri Kartı (Widget'ın en altında, isteğe bağlı aktif/pasif edilebilir)
+            _prayerDivider = new Border
+            {
+                Height = 1,
+                Margin = new Thickness(0, 16, 0, 12),
+                Opacity = 0.5
+            };
+            rootCardStack.Children.Add(_prayerDivider);
+
+            _prayerPanel = BuildPrayerPanel();
+            rootCardStack.Children.Add(_prayerPanel);
+
+            // 🇹🇷 Türkiye Resmî Tatilleri Kartı (Widget'ın en altında, tıklanınca sonraki tatili listeler)
+            _holidayDivider = new Border
+            {
+                Height = 1,
+                Margin = new Thickness(0, 14, 0, 10),
+                Opacity = 0.5
+            };
+            rootCardStack.Children.Add(_holidayDivider);
+
+            _holidayPanel = BuildHolidayPanel();
+            rootCardStack.Children.Add(_holidayPanel);
+
+            _cardBorder.Child = rootCardStack;
+            Content = _cardBorder;
+        }
+
+        private Border BuildMediaPlayerCard()
+        {
+            var border = new Border
+            {
+                CornerRadius = new CornerRadius(11),
+                Padding = new Thickness(12, 7, 12, 7),
+                Margin = new Thickness(0, 10, 0, 0),
+                Visibility = Visibility.Collapsed,
+                Cursor = Cursors.Hand,
+                ToolTip = "Oynatıcıyı öne getirmek için tıklayın"
+            };
+
+            var mainDock = new DockPanel { LastChildFill = true };
+
+            // Sol Kısım: 3 Çubuklu Dinamik Ekolayzer (Akıcı WPF Donanım Hızlandırmalı)
+            var eqStack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0),
+                Height = 18
+            };
+            DockPanel.SetDock(eqStack, Dock.Left);
+
+            _eqBar1 = new System.Windows.Shapes.Rectangle { Width = 3, Height = 4, Margin = new Thickness(0, 0, 2.5, 0), RadiusX = 1.5, RadiusY = 1.5, VerticalAlignment = VerticalAlignment.Center };
+            _eqBar2 = new System.Windows.Shapes.Rectangle { Width = 3, Height = 4, Margin = new Thickness(0, 0, 2.5, 0), RadiusX = 1.5, RadiusY = 1.5, VerticalAlignment = VerticalAlignment.Center };
+            _eqBar3 = new System.Windows.Shapes.Rectangle { Width = 3, Height = 4, Margin = new Thickness(0, 0, 0, 0), RadiusX = 1.5, RadiusY = 1.5, VerticalAlignment = VerticalAlignment.Center };
+
+            eqStack.Children.Add(_eqBar1);
+            eqStack.Children.Add(_eqBar2);
+            eqStack.Children.Add(_eqBar3);
+            mainDock.Children.Add(eqStack);
+
+            // Sağ Kısım: Beyaz Kontrol Düğmeleri (⏮  ⏯  ⏭)
+            var ctrlStack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0)
+            };
+            DockPanel.SetDock(ctrlStack, Dock.Right);
+
+            _btnMediaPrev = CreateMediaButton("⏮", "Önceki Parça", delegate { MediaTrackerService.PrevTrack(); });
+            _btnMediaPlay = CreateMediaButton("⏯", "Oynat / Duraklat", delegate { MediaTrackerService.PlayPause(); });
+            _btnMediaNext = CreateMediaButton("⏭", "Sonraki Parça", delegate { MediaTrackerService.NextTrack(); });
+
+            ctrlStack.Children.Add(_btnMediaPrev);
+            ctrlStack.Children.Add(_btnMediaPlay);
+            ctrlStack.Children.Add(_btnMediaNext);
+            mainDock.Children.Add(ctrlStack);
+
+            // Orta Kısım: Parça Adı (Tıklanınca Spotify / Tarayıcıyı öne getirir)
+            var infoStack = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0)
+            };
+            _txtMediaTitle = new TextBlock
+            {
+                Text = "Çalan Medya",
+                FontSize = 11.5,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 260
+            };
+            _txtMediaArtist = new TextBlock
+            {
+                Text = "",
+                FontSize = 9.5,
+                FontWeight = FontWeights.Normal,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 260,
+                Opacity = 0.85,
+                Visibility = Visibility.Collapsed
+            };
+            infoStack.Children.Add(_txtMediaTitle);
+            infoStack.Children.Add(_txtMediaArtist);
+
+            infoStack.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                MediaTrackerService.FocusPlayer();
+            };
+
+            mainDock.Children.Add(infoStack);
+            border.Child = mainDock;
+            return border;
+        }
+
+        private void StartEqAnimation()
+        {
+            if (_eqBar1 == null || _eqBar2 == null || _eqBar3 == null) return;
+
+            var ease1 = new SineEase { EasingMode = EasingMode.EaseInOut };
+            var ease2 = new SineEase { EasingMode = EasingMode.EaseInOut };
+            var ease3 = new SineEase { EasingMode = EasingMode.EaseInOut };
+
+            var anim1 = new DoubleAnimation(4.0, 14.0, new Duration(TimeSpan.FromMilliseconds(380)))
+            {
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = ease1
+            };
+            var anim2 = new DoubleAnimation(6.0, 18.0, new Duration(TimeSpan.FromMilliseconds(260)))
+            {
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = ease2
+            };
+            var anim3 = new DoubleAnimation(3.0, 13.0, new Duration(TimeSpan.FromMilliseconds(330)))
+            {
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = ease3
+            };
+
+            _eqBar1.BeginAnimation(FrameworkElement.HeightProperty, anim1);
+            _eqBar2.BeginAnimation(FrameworkElement.HeightProperty, anim2);
+            _eqBar3.BeginAnimation(FrameworkElement.HeightProperty, anim3);
+        }
+
+        private void StopEqAnimation()
+        {
+            if (_eqBar1 == null || _eqBar2 == null || _eqBar3 == null) return;
+
+            var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+            var stopAnim = new DoubleAnimation(4.0, new Duration(TimeSpan.FromMilliseconds(200)))
+            {
+                EasingFunction = ease
+            };
+            _eqBar1.BeginAnimation(FrameworkElement.HeightProperty, stopAnim);
+            _eqBar2.BeginAnimation(FrameworkElement.HeightProperty, stopAnim);
+            _eqBar3.BeginAnimation(FrameworkElement.HeightProperty, stopAnim);
+        }
+
+        private TextBlock CreateMediaButton(string icon, string tooltip, Action onClick)
+        {
+            var tb = new TextBlock
+            {
+                Text = icon,
+                FontSize = 13,
+                Margin = new Thickness(4, 0, 4, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = tooltip,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontFamily = new System.Windows.Media.FontFamily("Segoe UI Symbol, Segoe UI, Arial"),
+                Foreground = System.Windows.Media.Brushes.White,
+                Opacity = 0.95
+            };
+            tb.MouseEnter += delegate { tb.Opacity = 1.0; };
+            tb.MouseLeave += delegate { tb.Opacity = 0.95; };
+            tb.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                if (onClick != null) onClick();
+            };
+            return tb;
+        }
+
+        private StackPanel BuildFinancePanel()
+        {
+            var panel = new StackPanel { Orientation = Orientation.Vertical };
+
+            _colUsd = CreateFinanceItemColumn("USD / TRY", out _lblUsdTitle, out _txtUsdPrice, out _txtUsdChange);
+            _colEur = CreateFinanceItemColumn("EUR / TRY", out _lblEurTitle, out _txtEurPrice, out _txtEurChange);
+            _colGram = CreateFinanceItemColumn("GRAM ALTIN", out _lblGramTitle, out _txtGramPrice, out _txtGramChange);
+            _colOunce = CreateFinanceItemColumn("ONS ALTIN", out _lblOunceTitle, out _txtOuncePrice, out _txtOunceChange);
+            _colBist = CreateBistColumn(out _lblBistTitle, out _lblBistStatus, out _txtBistPrice, out _txtBistChange);
+            _colBtc = CreateFinanceItemColumn("BTC / USDT", out _lblBtcTitle, out _txtBtcPrice, out _txtBtcChange);
+            _colEth = CreateFinanceItemColumn("ETH / USDT", out _lblEthTitle, out _txtEthPrice, out _txtEthChange);
+
+            _financeGrid = new Grid();
+            panel.Children.Add(_financeGrid);
+            RenderFinanceGrid();
+
+            // Alt Bilgi: "Son güncelleme: SS:DD" - Kullanıcı isteğiyle gizlendi (Özellik arka planda 5 dakikada bir çalışmaya devam eder)
+            _financeGrid.Cursor = Cursors.Hand;
+            _financeGrid.ToolTip = "Finans verilerini yenilemek için tıklayın";
+            _financeGrid.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                RefreshFinance();
+            };
+
+            var footerRow = new Grid { Visibility = Visibility.Collapsed };
+            _txtFinanceStatus = new TextBlock
+            {
+                Text = "",
+                Visibility = Visibility.Collapsed
+            };
+            footerRow.Children.Add(_txtFinanceStatus);
+
+            return panel;
+        }
+
+        private StackPanel BuildPrayerPanel()
+        {
+            var panel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(0, 2, 0, 0)
+            };
+
+            // 1. Başlık ve Şehir Satırı
+            var headerDock = new DockPanel { LastChildFill = true, Margin = new Thickness(2, 0, 2, 0) };
+
+            var titleStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            _txtPrayerTitle = new TextBlock
+            {
+                Text = "Namaz vakitleri",
+                FontSize = 13.5,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI")
+            };
+            _txtPrayerCity = new TextBlock
+            {
+                Text = "· " + _cfg.PrayerCity,
+                FontSize = 11,
+                FontWeight = FontWeights.Normal,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Margin = new Thickness(6, 2, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = Cursors.Hand,
+                ToolTip = "Namaz vakitleri bölgesini veya ayarlarını değiştirmek için tıklayın"
+            };
+            _txtPrayerCity.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                if (OnOpenSettingsTab != null) OnOpenSettingsTab("tools");
+                else if (_onOpenSettings != null) _onOpenSettings();
+            };
+            titleStack.Children.Add(_txtPrayerTitle);
+            titleStack.Children.Add(_txtPrayerCity);
+            DockPanel.SetDock(titleStack, Dock.Left);
+            headerDock.Children.Add(titleStack);
+
+            _txtPrayerDateInfo = new TextBlock
+            {
+                Text = "",
+                FontSize = 10.5,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            headerDock.Children.Add(_txtPrayerDateInfo);
+            panel.Children.Add(headerDock);
+
+            // 2. "Bugün" Sekmesi ve Canlı Vakit Geri Sayım Satırı (Kullanıcının gönderdiği görseldeki stil)
+            var tabStack = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, 8, 2, 10), VerticalAlignment = VerticalAlignment.Center };
+            var tabBugun = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 14, 0) };
+            var txtBugun = new TextBlock
+            {
+                Text = "Bugün",
+                FontSize = 11.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(249, 115, 22))
+            };
+            var bugunLine = new Border
+            {
+                Height = 2.2,
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(249, 115, 22)),
+                Margin = new Thickness(0, 3, 0, 0),
+                CornerRadius = new CornerRadius(1.2)
+            };
+            tabBugun.Children.Add(txtBugun);
+            tabBugun.Children.Add(bugunLine);
+
+            _txtPrayerCountdown = new TextBlock
+            {
+                Text = "Vakitler yükleniyor...",
+                FontSize = 11,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromArgb(140, 241, 245, 249)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(2, 0, 0, 2)
+            };
+            tabStack.Children.Add(tabBugun);
+            tabStack.Children.Add(_txtPrayerCountdown);
+            panel.Children.Add(tabStack);
+
+            // 3. 6 Vakit Kolon Tablosu (İmsak, Güneş, Öğle, İkindi, Akşam, Yatsı)
+            _prayerGrid = new Grid();
+            for (int i = 0; i < 6; i++)
+            {
+                _prayerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            }
+
+            string[] names = new string[] { "İmsak", "Güneş", "Öğle", "İkindi", "Akşam", "Yatsı" };
+            for (int i = 0; i < 6; i++)
+            {
+                var border = new Border
+                {
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(2, 6, 2, 6),
+                    Margin = new Thickness(i == 0 ? 0 : 2, 0, i == 5 ? 0 : 2, 0)
+                };
+
+                var sp = new StackPanel { Orientation = Orientation.Vertical, HorizontalAlignment = HorizontalAlignment.Center };
+                var lbl = new TextBlock
+                {
+                    Text = names[i],
+                    FontSize = 11,
+                    FontWeight = FontWeights.Medium,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+                var val = new TextBlock
+                {
+                    Text = "--:--",
+                    FontSize = 13.5,
+                    FontWeight = FontWeights.SemiBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI Variable Display, Segoe UI"),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 3, 0, 0)
+                };
+                sp.Children.Add(lbl);
+                sp.Children.Add(val);
+                border.Child = sp;
+
+                Grid.SetColumn(border, i);
+                _prayerGrid.Children.Add(border);
+
+                _prayerColBorders[i] = border;
+                _prayerColNames[i] = lbl;
+                _prayerColTimes[i] = val;
+            }
+            panel.Children.Add(_prayerGrid);
+
+            // 4. Alt Bilgi: Kaynak ve Değiştir Linki (Kullanıcının gönderdiği görselin birebir altı)
+            var footerGrid = new Grid { Margin = new Thickness(2, 10, 2, 2) };
+            _txtPrayerFooter = new TextBlock
+            {
+                Text = "Kaynak: Türkiye Diyanet İşleri Başkanlığı",
+                FontSize = 9.5,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Opacity = 0.65,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            footerGrid.Children.Add(_txtPrayerFooter);
+            panel.Children.Add(footerGrid);
+
+            return panel;
+        }
+
+        public void RefreshPrayerTimes()
+        {
+            if (!_cfg.ShowPrayerTimes || _cfg.CompactMode) return;
+
+            if (_currentPrayer != null && !string.Equals(_currentPrayer.City, _cfg.PrayerCity, StringComparison.OrdinalIgnoreCase))
+            {
+                _currentPrayer = null;
+                if (_txtPrayerCity != null) _txtPrayerCity.Text = "· " + _cfg.PrayerCity;
+                if (_txtPrayerCountdown != null) _txtPrayerCountdown.Text = "Vakitler yükleniyor...";
+                for (int i = 0; i < 6; i++)
+                {
+                    if (_prayerColTimes[i] != null) _prayerColTimes[i].Text = "--:--";
+                }
+            }
+
+            // Önce yerel önbellekten hemen göster
+            var cached = PrayerCache.Load(_cfg.PrayerCity);
+            if (cached != null)
+            {
+                UpdatePrayerUI(cached);
+            }
+
+            // Arka planda Diyanet verilerini çek ve güncelle
+            PrayerService.FetchPrayerTimesAsync(_cfg.PrayerCity, delegate(PrayerTimesData data)
+            {
+                if (System.Windows.Application.Current != null && System.Windows.Application.Current.Dispatcher != null)
+                {
+                    System.Windows.Application.Current.Dispatcher.BeginInvoke((Action)delegate
+                    {
+                        UpdatePrayerUI(data);
+                    });
+                }
+            });
+        }
+
+        private void UpdatePrayerUI(PrayerTimesData data)
+        {
+            if (data == null) return;
+            _currentPrayer = data;
+
+            if (_txtPrayerCity != null) _txtPrayerCity.Text = "· " + _cfg.PrayerCity;
+            if (_txtPrayerDateInfo != null && !string.IsNullOrEmpty(data.HijriDate))
+            {
+                _txtPrayerDateInfo.Text = data.HijriDate;
+            }
+
+            if (_prayerColTimes[0] != null) _prayerColTimes[0].Text = data.Imsak;
+            if (_prayerColTimes[1] != null) _prayerColTimes[1].Text = data.Gunes;
+            if (_prayerColTimes[2] != null) _prayerColTimes[2].Text = data.Ogle;
+            if (_prayerColTimes[3] != null) _prayerColTimes[3].Text = data.Ikindi;
+            if (_prayerColTimes[4] != null) _prayerColTimes[4].Text = data.Aksam;
+            if (_prayerColTimes[5] != null) _prayerColTimes[5].Text = data.Yatsi;
+
+            UpdatePrayerCountdownUI();
+        }
+
+        private void UpdatePrayerCountdownUI()
+        {
+            if (_currentPrayer == null) return;
+            PrayerService.CalculateNextPrayer(_currentPrayer);
+
+            if (_txtPrayerCountdown != null)
+            {
+                if (!string.IsNullOrEmpty(_currentPrayer.NextPrayerName))
+                {
+                    _txtPrayerCountdown.Text = "• Sıradaki: " + _currentPrayer.NextPrayerName + " (" + _currentPrayer.NextPrayerTime + ") · " + _currentPrayer.TimeRemaining + " kaldı";
+                }
+                if (_txtPrayerFooter != null && _txtPrayerFooter.Foreground != null)
+                {
+                    _txtPrayerCountdown.Foreground = _txtPrayerFooter.Foreground;
+                }
+                else
+                {
+                    bool isLight = (_cfg.Theme == "light");
+                    var muted = isLight ? System.Windows.Media.Color.FromArgb(120, 15, 23, 42) : System.Windows.Media.Color.FromArgb(120, 241, 245, 249);
+                    _txtPrayerCountdown.Foreground = new SolidColorBrush(muted);
+                }
+            }
+
+            bool isDark = (_cfg.Theme == "dark");
+            bool isCompletelyTransparent = (_cfg.WidgetOpacity <= 0.05);
+
+            for (int i = 0; i < 6; i++)
+            {
+                if (_prayerColBorders[i] == null) continue;
+                bool isNext = (i == _currentPrayer.NextPrayerIndex);
+
+                if (isNext)
+                {
+                    _prayerColBorders[i].Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(isDark ? (byte)42 : (byte)28, 249, 115, 22));
+                    _prayerColBorders[i].BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 249, 115, 22));
+                    _prayerColBorders[i].BorderThickness = new Thickness(1.5);
+                    if (_prayerColNames[i] != null)
+                    {
+                        _prayerColNames[i].Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(251, 146, 60));
+                        _prayerColNames[i].FontWeight = FontWeights.SemiBold;
+                    }
+                }
+                else
+                {
+                    _prayerColBorders[i].Background = System.Windows.Media.Brushes.Transparent;
+                    _prayerColBorders[i].BorderBrush = isCompletelyTransparent
+                        ? new SolidColorBrush(isDark ? System.Windows.Media.Color.FromArgb(30, 255, 255, 255) : System.Windows.Media.Color.FromArgb(20, 0, 0, 0))
+                        : new SolidColorBrush(isDark ? System.Windows.Media.Color.FromArgb(40, 255, 255, 255) : System.Windows.Media.Color.FromArgb(30, 0, 0, 0));
+                    _prayerColBorders[i].BorderThickness = new Thickness(1);
+                    if (_prayerColNames[i] != null)
+                    {
+                        _prayerColNames[i].Foreground = new SolidColorBrush(_currentTextSecondary);
+                        _prayerColNames[i].FontWeight = FontWeights.Normal;
+                    }
+                }
+
+                if (_prayerColTimes[i] != null)
+                {
+                    _prayerColTimes[i].Foreground = new SolidColorBrush(_currentTextPrimary);
+                }
+            }
+        }
+
+        private Border BuildHolidayPanel()
+        {
+            var panelBorder = new Border
+            {
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(12, 6, 12, 6),
+                Margin = new Thickness(0, 4, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Sonraki tatili görmek için tıklayın"
+            };
+
+            var mainDock = new DockPanel { LastChildFill = true };
+
+            // Sol Kısım: Bayrak / Simge + Kategori Başlığı
+            var leftStack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+            DockPanel.SetDock(leftStack, Dock.Left);
+
+            _txtHolidayTitle = new TextBlock
+            {
+                Text = "Resmî Tatil",
+                FontSize = 10,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            leftStack.Children.Add(_txtHolidayTitle);
+            mainDock.Children.Add(leftStack);
+
+            // Sağ Kısım: Kalan Gün Sayacı ve Döngü İpucu
+            var rightStack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0)
+            };
+            DockPanel.SetDock(rightStack, Dock.Right);
+
+            _txtHolidayCountdown = new TextBlock
+            {
+                Text = "-- gün kaldı",
+                FontSize = 10.5,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            _txtHolidayCycleHint = new TextBlock
+            {
+                Text = "🔄",
+                FontSize = 9.5,
+                Opacity = 0.65,
+                Margin = new Thickness(6, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            rightStack.Children.Add(_txtHolidayCountdown);
+            rightStack.Children.Add(_txtHolidayCycleHint);
+            mainDock.Children.Add(rightStack);
+
+            // Orta Kısım: Tarih ve Tatil Adı
+            _txtHolidayName = new TextBlock
+            {
+                Text = "Yükleniyor...",
+                FontSize = 11,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            mainDock.Children.Add(_txtHolidayName);
+
+            panelBorder.Child = mainDock;
+
+            panelBorder.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                _currentHolidayOffset++;
+                UpdateHolidayUI();
+            };
+
+            return panelBorder;
+        }
+
+        private void UpdateHolidayUI()
+        {
+            if (!_cfg.ShowNationalHolidays || _cfg.CompactMode) return;
+
+            var holidays = TurkeyHolidaysService.GetUpcomingHolidays(DateTime.Now, 6);
+            if (holidays == null || holidays.Count == 0) return;
+
+            int idx = _currentHolidayOffset % holidays.Count;
+            var item = holidays[idx];
+
+            if (_txtHolidayTitle != null) _txtHolidayTitle.Text = item.Category == "Dini" ? "Dinî Bayram" : "Resmî Tatil";
+            if (_txtHolidayName != null)
+            {
+                _txtHolidayName.Text = item.Date.ToString("d MMMM", new CultureInfo("tr-TR")) + " " + item.Name;
+            }
+            if (_txtHolidayCountdown != null)
+            {
+                _txtHolidayCountdown.Text = TurkeyHolidaysService.FormatHolidayCountdown(item, DateTime.Now);
+            }
+        }
+
+        private void RenderFinanceGrid()
+        {
+            if (_financeGrid == null) return;
+            _financeGrid.Children.Clear();
+            _financeGrid.ColumnDefinitions.Clear();
+
+            bool isDark = (_cfg.Theme == "dark");
+            var labelBrush = new SolidColorBrush(_currentTextMuted);
+            var priceBrush = new SolidColorBrush(_currentTextPrimary);
+
+            var activeItems = new List<UIElement>();
+
+            if (_cfg.ShowUsd && _colUsd != null) activeItems.Add(_colUsd);
+            if (_cfg.ShowEur && _colEur != null) activeItems.Add(_colEur);
+            if (_cfg.ShowGramGold && _colGram != null) activeItems.Add(_colGram);
+            if (_cfg.ShowOunceGold && _colOunce != null) activeItems.Add(_colOunce);
+            if (_cfg.ShowBist && _colBist != null) activeItems.Add(_colBist);
+            if (_cfg.ShowBtc && _colBtc != null) activeItems.Add(_colBtc);
+            if (_cfg.ShowEth && _colEth != null) activeItems.Add(_colEth);
+
+            // Özel Pariteler (Kullanıcının yazdığı kısa adlar: SOL, AVAX, GBP vb.)
+            if (_currentFinance != null && _currentFinance.CustomItems != null)
+            {
+                foreach (var cItem in _currentFinance.CustomItems)
+                {
+                    var col = CreateCustomItemColumn(cItem.Title, cItem.Price, cItem.Change, cItem.IsUp, labelBrush, priceBrush);
+                    activeItems.Add(col);
+                }
+            }
+
+            if (activeItems.Count == 0)
+            {
+                var noParityNotice = new TextBlock
+                {
+                    Text = "Görüntülenecek finans/kripto paritesi seçilmedi (⚙️ Ayarlar'dan seçebilirsiniz).",
+                    FontSize = 10.5,
+                    Foreground = labelBrush,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 4, 0, 4)
+                };
+                _financeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                Grid.SetColumn(noParityNotice, 0);
+                _financeGrid.Children.Add(noParityNotice);
+            }
+            else
+            {
+                for (int i = 0; i < activeItems.Count; i++)
+                {
+                    _financeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    Grid.SetColumn(activeItems[i], i);
+                    _financeGrid.Children.Add(activeItems[i]);
+                }
+            }
+        }
+
+        private StackPanel CreateCustomItemColumn(string title, string price, string change, bool isUp, System.Windows.Media.Brush labelBrush, System.Windows.Media.Brush priceBrush)
+        {
+            var sp = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(4, 0, 4, 0) };
+
+            var lblTitle = new TextBlock
+            {
+                Text = title,
+                FontSize = 9.5,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Foreground = labelBrush,
+                Margin = new Thickness(0, 0, 0, 3)
+            };
+
+            var valRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var txtPrice = new TextBlock
+            {
+                Text = price,
+                FontSize = 13,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI Variable Display, Segoe UI"),
+                Foreground = priceBrush
+            };
+            var txtChange = new TextBlock
+            {
+                Text = change,
+                FontSize = 10.5,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Margin = new Thickness(5, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            SetChangeColor(txtChange, isUp);
+
+            valRow.Children.Add(txtPrice);
+            valRow.Children.Add(txtChange);
+
+            sp.Children.Add(lblTitle);
+            sp.Children.Add(valRow);
+            return sp;
+        }
+
+        private StackPanel CreateFinanceItemColumn(string title, out TextBlock lblTitle, out TextBlock txtPrice, out TextBlock txtChange)
+        {
+            var sp = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(4, 0, 4, 0) };
+
+            lblTitle = new TextBlock
+            {
+                Text = title,
+                FontSize = 9.5,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Margin = new Thickness(0, 0, 0, 3)
+            };
+
+            var valRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            txtPrice = new TextBlock
+            {
+                Text = "--",
+                FontSize = 13,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI Variable Display, Segoe UI")
+            };
+            txtChange = new TextBlock
+            {
+                Text = "%0,00",
+                FontSize = 10.5,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Margin = new Thickness(5, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            valRow.Children.Add(txtPrice);
+            valRow.Children.Add(txtChange);
+
+            sp.Children.Add(lblTitle);
+            sp.Children.Add(valRow);
+            return sp;
+        }
+
+        private StackPanel CreateBistColumn(out TextBlock lblTitle, out TextBlock lblStatus, out TextBlock txtPrice, out TextBlock txtChange)
+        {
+            var sp = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(4, 0, 4, 0) };
+
+            var headerRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 3) };
+            lblTitle = new TextBlock
+            {
+                Text = "BIST 100",
+                FontSize = 9.5,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI")
+            };
+            lblStatus = new TextBlock
+            {
+                Text = FinanceService.IsBistMarketOpen() ? "● Açık" : "○ Kapalı",
+                FontSize = 8.5,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Margin = new Thickness(5, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            headerRow.Children.Add(lblTitle);
+            headerRow.Children.Add(lblStatus);
+
+            var valRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            txtPrice = new TextBlock
+            {
+                Text = "--",
+                FontSize = 13,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI Variable Display, Segoe UI")
+            };
+            txtChange = new TextBlock
+            {
+                Text = "%0,00",
+                FontSize = 10.5,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Margin = new Thickness(5, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            valRow.Children.Add(txtPrice);
+            valRow.Children.Add(txtChange);
+
+            sp.Children.Add(headerRow);
+            sp.Children.Add(valRow);
+            return sp;
+        }
+
+        private void UpdateFinanceUI(FinanceData data)
+        {
+            if (data == null) return;
+            _currentFinance = data;
+
+            if (_txtUsdPrice != null) _txtUsdPrice.Text = data.Usd.Price;
+            if (_txtUsdChange != null)
+            {
+                _txtUsdChange.Text = data.Usd.Change;
+                SetChangeColor(_txtUsdChange, data.Usd.IsUp);
+            }
+
+            if (_txtEurPrice != null) _txtEurPrice.Text = data.Eur.Price;
+            if (_txtEurChange != null)
+            {
+                _txtEurChange.Text = data.Eur.Change;
+                SetChangeColor(_txtEurChange, data.Eur.IsUp);
+            }
+
+            if (_txtGramPrice != null) _txtGramPrice.Text = data.GramGold.Price;
+            if (_txtGramChange != null)
+            {
+                _txtGramChange.Text = data.GramGold.Change;
+                SetChangeColor(_txtGramChange, data.GramGold.IsUp);
+            }
+
+            if (_txtOuncePrice != null) _txtOuncePrice.Text = data.OunceGold.Price;
+            if (_txtOunceChange != null)
+            {
+                _txtOunceChange.Text = data.OunceGold.Change;
+                SetChangeColor(_txtOunceChange, data.OunceGold.IsUp);
+            }
+
+            if (_txtBistPrice != null) _txtBistPrice.Text = data.Bist.Price;
+            if (_txtBistChange != null)
+            {
+                _txtBistChange.Text = data.Bist.Change;
+                SetChangeColor(_txtBistChange, data.Bist.IsUp);
+            }
+
+            if (_lblBistStatus != null)
+            {
+                bool isOpen = FinanceService.IsBistMarketOpen();
+                _lblBistStatus.Text = isOpen ? "● Açık" : "○ Kapalı";
+                bool isDark = (_cfg.Theme == "dark");
+                _lblBistStatus.Foreground = isOpen ? new SolidColorBrush(isDark ? System.Windows.Media.Color.FromRgb(74, 222, 128) : System.Windows.Media.Color.FromRgb(22, 163, 74))
+                                                   : new SolidColorBrush(isDark ? System.Windows.Media.Color.FromArgb(90, 241, 245, 249) : System.Windows.Media.Color.FromArgb(90, 15, 23, 42));
+            }
+
+            if (_txtBtcPrice != null) _txtBtcPrice.Text = data.Btc.Price;
+            if (_txtBtcChange != null)
+            {
+                _txtBtcChange.Text = data.Btc.Change;
+                SetChangeColor(_txtBtcChange, data.Btc.IsUp);
+            }
+
+            if (_txtEthPrice != null) _txtEthPrice.Text = data.Eth.Price;
+            if (_txtEthChange != null)
+            {
+                _txtEthChange.Text = data.Eth.Change;
+                SetChangeColor(_txtEthChange, data.Eth.IsUp);
+            }
+
+            RenderFinanceGrid();
+
+            if (_txtFinanceStatus != null)
+            {
+                if (data.IsSuccess)
+                {
+                    _txtFinanceStatus.Text = "Son güncelleme: " + data.LastUpdate;
+                }
+                else
+                {
+                    string timeStr = string.IsNullOrEmpty(data.LastUpdate) ? "--:--" : data.LastUpdate;
+                    _txtFinanceStatus.Text = "Son güncelleme: " + timeStr + " (Veri alınamadı)";
+                }
+            }
+        }
+
+        private void SetChangeColor(TextBlock tb, bool isUp)
+        {
+            if (tb == null) return;
+            bool isDark = (_cfg.Theme == "dark");
+            if (isUp)
+            {
+                tb.Foreground = new SolidColorBrush(isDark ? System.Windows.Media.Color.FromRgb(74, 222, 128) : System.Windows.Media.Color.FromRgb(22, 163, 74));
+            }
+            else
+            {
+                tb.Foreground = new SolidColorBrush(isDark ? System.Windows.Media.Color.FromRgb(248, 113, 113) : System.Windows.Media.Color.FromRgb(220, 38, 38));
+            }
+        }
+
+        public void RefreshFinance()
+        {
+            if (_txtFinanceStatus != null && _currentFinance != null && !string.IsNullOrEmpty(_currentFinance.LastUpdate))
+            {
+                _txtFinanceStatus.Text = "Finans güncelleniyor...";
+            }
+
+            FinanceService.FetchAsync(_cfg, delegate(FinanceData data)
+            {
+                Dispatcher.Invoke(new Action(delegate()
+                {
+                    if (data.IsSuccess)
+                    {
+                        UpdateFinanceUI(data);
+                    }
+                    else
+                    {
+                        // Başarısız olursa son başarılı verileri ekranda koru
+                        if (_currentFinance != null)
+                        {
+                            _currentFinance.IsSuccess = false;
+                            UpdateFinanceUI(_currentFinance);
+                        }
+                        else
+                        {
+                            data.LastUpdate = DateTime.Now.ToString("HH:mm");
+                            UpdateFinanceUI(data);
+                        }
+                    }
+                }));
+            });
+        }
+
+
+
+        public static void ResolveTextColors(string textColorKey, bool isLight,
+            out System.Windows.Media.Color primary,
+            out System.Windows.Media.Color secondary,
+            out System.Windows.Media.Color muted)
+        {
+            string key = (textColorKey ?? "").Trim().ToLowerInvariant();
+
+            if (string.IsNullOrEmpty(key) || key == "auto")
+            {
+                key = isLight ? "siyah" : "beyaz";
+            }
+
+            switch (key)
+            {
+                case "beyaz":
+                case "white":
+                    // Siyah ve Beyaz orijinal renk tonları birebir korunur
+                    primary = System.Windows.Media.Color.FromRgb(248, 250, 252);
+                    secondary = System.Windows.Media.Color.FromArgb(190, 241, 245, 249);
+                    muted = System.Windows.Media.Color.FromArgb(120, 241, 245, 249);
+                    break;
+
+                case "siyah":
+                case "black":
+                    // Siyah ve Beyaz orijinal renk tonları birebir korunur
+                    primary = System.Windows.Media.Color.FromRgb(15, 23, 42);
+                    secondary = System.Windows.Media.Color.FromArgb(190, 15, 23, 42);
+                    muted = System.Windows.Media.Color.FromArgb(120, 15, 23, 42);
+                    break;
+
+                case "mavi":
+                case "blue":
+                case "cyan":
+                    primary = System.Windows.Media.Color.FromRgb(56, 189, 248);
+                    secondary = System.Windows.Media.Color.FromArgb(190, 56, 189, 248);
+                    muted = System.Windows.Media.Color.FromArgb(125, 56, 189, 248);
+                    break;
+
+                case "yesil":
+                case "green":
+                    primary = System.Windows.Media.Color.FromRgb(52, 211, 153);
+                    secondary = System.Windows.Media.Color.FromArgb(190, 52, 211, 153);
+                    muted = System.Windows.Media.Color.FromArgb(125, 52, 211, 153);
+                    break;
+
+                case "sari":
+                case "yellow":
+                case "gold":
+                    primary = System.Windows.Media.Color.FromRgb(251, 191, 36);
+                    secondary = System.Windows.Media.Color.FromArgb(190, 251, 191, 36);
+                    muted = System.Windows.Media.Color.FromArgb(125, 251, 191, 36);
+                    break;
+
+                case "turuncu":
+                case "orange":
+                    primary = System.Windows.Media.Color.FromRgb(251, 146, 60);
+                    secondary = System.Windows.Media.Color.FromArgb(190, 251, 146, 60);
+                    muted = System.Windows.Media.Color.FromArgb(125, 251, 146, 60);
+                    break;
+
+                case "kirmizi":
+                case "red":
+                    primary = System.Windows.Media.Color.FromRgb(248, 113, 113);
+                    secondary = System.Windows.Media.Color.FromArgb(190, 248, 113, 113);
+                    muted = System.Windows.Media.Color.FromArgb(125, 248, 113, 113);
+                    break;
+
+                case "mor":
+                case "purple":
+                case "violet":
+                    primary = System.Windows.Media.Color.FromRgb(167, 139, 250);
+                    secondary = System.Windows.Media.Color.FromArgb(190, 167, 139, 250);
+                    muted = System.Windows.Media.Color.FromArgb(125, 167, 139, 250);
+                    break;
+
+                case "pembe":
+                case "pink":
+                    primary = System.Windows.Media.Color.FromRgb(244, 114, 182);
+                    secondary = System.Windows.Media.Color.FromArgb(190, 244, 114, 182);
+                    muted = System.Windows.Media.Color.FromArgb(125, 244, 114, 182);
+                    break;
+
+                case "turkuaz":
+                case "teal":
+                    primary = System.Windows.Media.Color.FromRgb(45, 212, 191);
+                    secondary = System.Windows.Media.Color.FromArgb(190, 45, 212, 191);
+                    muted = System.Windows.Media.Color.FromArgb(125, 45, 212, 191);
+                    break;
+
+                default:
+                    if (key.StartsWith("#") && (key.Length == 7 || key.Length == 9))
+                    {
+                        try
+                        {
+                            var c = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(key);
+                            primary = System.Windows.Media.Color.FromRgb(c.R, c.G, c.B);
+                            secondary = System.Windows.Media.Color.FromArgb(190, c.R, c.G, c.B);
+                            muted = System.Windows.Media.Color.FromArgb(125, c.R, c.G, c.B);
+                            return;
+                        }
+                        catch { }
+                    }
+                    if (isLight)
+                    {
+                        primary = System.Windows.Media.Color.FromRgb(15, 23, 42);
+                        secondary = System.Windows.Media.Color.FromArgb(190, 15, 23, 42);
+                        muted = System.Windows.Media.Color.FromArgb(120, 15, 23, 42);
+                    }
+                    else
+                    {
+                        primary = System.Windows.Media.Color.FromRgb(248, 250, 252);
+                        secondary = System.Windows.Media.Color.FromArgb(190, 241, 245, 249);
+                        muted = System.Windows.Media.Color.FromArgb(120, 241, 245, 249);
+                    }
+                    break;
+            }
+        }
+
+        public void ApplyThemeAndSurface()
+        {
+            string theme = _cfg.Theme; // "dark" veya "light"
+            bool isLight = (theme == "light");
+            bool isDark = !isLight;
+
+            System.Windows.Media.Color textPrimary;
+            System.Windows.Media.Color textSecondary;
+            System.Windows.Media.Color textMuted;
+
+            double op = _cfg.WidgetOpacity;
+            if (op < 0.0) op = 0.0;
+            if (op > 1.0) op = 1.0;
+
+            ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            // KULLANICI İSTEĞİ: Kart yüzeyinin şeffaflığını en sona (%0) getirdiğimde kart yüzeyi ve çerçevesi hiç gözükmesin
+            bool isCompletelyTransparent = (op <= 0.01);
+            System.Windows.Media.Color border;
+
+            if (isCompletelyTransparent)
+            {
+                _cardBorder.Background = System.Windows.Media.Brushes.Transparent;
+                _cardBorder.BorderBrush = System.Windows.Media.Brushes.Transparent;
+                _cardBorder.BorderThickness = new Thickness(0);
+                _cardBorder.Effect = null;
+                border = System.Windows.Media.Colors.Transparent;
+            }
+            else
+            {
+                byte bgAlpha = (byte)(op * 255);
+                byte borderAlpha = (byte)Math.Min(255, (int)(op * (isLight ? 180 : 80)));
+
+                System.Windows.Media.Color bg;
+                if (isLight)
+                {
+                    bg = System.Windows.Media.Color.FromArgb(bgAlpha, 248, 250, 252);
+                    border = System.Windows.Media.Color.FromArgb(borderAlpha, 215, 220, 230);
+                }
+                else
+                {
+                    bg = System.Windows.Media.Color.FromArgb(bgAlpha, 20, 22, 30);
+                    border = System.Windows.Media.Color.FromArgb(borderAlpha, 45, 50, 65);
+                }
+
+                _cardBorder.Background = new SolidColorBrush(bg);
+                _cardBorder.BorderBrush = new SolidColorBrush(border);
+                _cardBorder.BorderThickness = new Thickness(1);
+
+                if (op > 0.15)
+                {
+                    _cardBorder.Effect = new DropShadowEffect
+                    {
+                        Color = isLight ? System.Windows.Media.Color.FromRgb(140, 150, 160) : System.Windows.Media.Colors.Black,
+                        BlurRadius = 24,
+                        ShadowDepth = 6,
+                        Opacity = isLight ? (0.15 * op) : (0.35 * op)
+                    };
+                }
+                else
+                {
+                    _cardBorder.Effect = null;
+                }
+            }
+
+            _currentTextPrimary = textPrimary;
+            _currentTextSecondary = textSecondary;
+            _currentTextMuted = textMuted;
+            ApplyClockTheme(_currentTextPrimary);
+            _txtSeconds.Foreground = new SolidColorBrush(textMuted);
+            _txtDate.Foreground = new SolidColorBrush(textSecondary);
+            _txtDay.Foreground = new SolidColorBrush(textPrimary);
+
+            if (_divider != null)
+            {
+                _divider.Background = new SolidColorBrush(border);
+            }
+
+            if (_weatherIconCanvas != null && _weatherIconCanvas.Children.Count == 0) SetWeatherIcon(_lastWeatherCondition);
+            _txtTemp.Foreground = new SolidColorBrush(textPrimary);
+            _txtStatus.Foreground = new SolidColorBrush(textSecondary);
+            _txtCity.Foreground = new SolidColorBrush(textMuted);
+
+            // Saydamlık ayarı sadece arka plana uygulanır, saat ve yazılar %100 sabit kalır!
+            _cardBorder.Opacity = 1.0;
+            _cardBorder.Cursor = _cfg.LockWidgetPosition ? Cursors.Arrow : Cursors.SizeAll;
+            ApplyTextScale();
+
+            // Widget boyutu yüzdelik olarak ayarlanabilsin (%50 - %200)
+            double scale = _cfg.WidgetScale;
+            if (scale < 0.50) scale = 0.50;
+            if (scale > 2.00) scale = 2.00;
+            _cardBorder.LayoutTransform = new ScaleTransform(scale, scale);
+
+            _txtSeconds.Visibility = _cfg.ShowSeconds ? Visibility.Visible : Visibility.Collapsed;
+
+            // Kompakt Mod Yönetimi
+            if (_cfg.CompactMode)
+            {
+                if (_cardBorder != null) _cardBorder.MinWidth = 0;
+                if (_mainGrid != null) _mainGrid.MinWidth = 0;
+                if (_divider != null) _divider.Visibility = Visibility.Collapsed;
+                if (_weatherSection != null) _weatherSection.Visibility = Visibility.Collapsed;
+                if (_matchBorder != null) _matchBorder.Visibility = Visibility.Collapsed;
+                if (_txtSysStats != null) _txtSysStats.Visibility = Visibility.Collapsed;
+                if (_financeDivider != null) _financeDivider.Visibility = Visibility.Collapsed;
+                if (_financePanel != null) _financePanel.Visibility = Visibility.Collapsed;
+                if (_prayerDivider != null) _prayerDivider.Visibility = Visibility.Collapsed;
+                if (_prayerPanel != null) _prayerPanel.Visibility = Visibility.Collapsed;
+                if (_holidayDivider != null) _holidayDivider.Visibility = Visibility.Collapsed;
+                if (_holidayPanel != null) _holidayPanel.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                if (_cardBorder != null) _cardBorder.MinWidth = 540;
+                if (_mainGrid != null) _mainGrid.MinWidth = 460;
+
+                var dividerBrush = isCompletelyTransparent
+                    ? new SolidColorBrush(isDark ? System.Windows.Media.Color.FromArgb(45, 255, 255, 255) : System.Windows.Media.Color.FromArgb(30, 0, 0, 0))
+                    : new SolidColorBrush(border);
+
+                if (_divider != null)
+                {
+                    _divider.Background = dividerBrush;
+                    _divider.Visibility = Visibility.Visible;
+                }
+                if (_weatherSection != null) _weatherSection.Visibility = Visibility.Visible;
+
+                // Finans Paneli Renk ve Görünürlük
+                if (_financeDivider != null)
+                {
+                    _financeDivider.Background = dividerBrush;
+                    _financeDivider.Visibility = _cfg.ShowFinance ? Visibility.Visible : Visibility.Collapsed;
+                }
+                if (_financePanel != null)
+                {
+                    _financePanel.Visibility = _cfg.ShowFinance ? Visibility.Visible : Visibility.Collapsed;
+                }
+
+                // Diyanet Namaz Vakitleri Paneli Renk ve Görünürlük
+                if (_prayerDivider != null)
+                {
+                    _prayerDivider.Background = dividerBrush;
+                    _prayerDivider.Visibility = _cfg.ShowPrayerTimes ? Visibility.Visible : Visibility.Collapsed;
+                }
+                if (_prayerPanel != null)
+                {
+                    _prayerPanel.Visibility = _cfg.ShowPrayerTimes ? Visibility.Visible : Visibility.Collapsed;
+                }
+
+                // Türkiye Resmî Tatilleri artık ayrı bağımsız alt orta widget (HolidayBarWindow) olarak açılır
+                if (_holidayDivider != null)
+                {
+                    _holidayDivider.Visibility = Visibility.Collapsed;
+                }
+                if (_holidayPanel != null)
+                {
+                    _holidayPanel.Visibility = Visibility.Collapsed;
+                }
+
+                UpdateSystemAndMedia();
+            }
+
+            var labelColor = new SolidColorBrush(textMuted);
+            var priceColor = new SolidColorBrush(textPrimary);
+            var statusColor = new SolidColorBrush(textMuted);
+
+            if (_lblUsdTitle != null) _lblUsdTitle.Foreground = labelColor;
+            if (_txtUsdPrice != null) _txtUsdPrice.Foreground = priceColor;
+            if (_lblEurTitle != null) _lblEurTitle.Foreground = labelColor;
+            if (_txtEurPrice != null) _txtEurPrice.Foreground = priceColor;
+            if (_lblGramTitle != null) _lblGramTitle.Foreground = labelColor;
+            if (_txtGramPrice != null) _txtGramPrice.Foreground = priceColor;
+            if (_lblOunceTitle != null) _lblOunceTitle.Foreground = labelColor;
+            if (_txtOuncePrice != null) _txtOuncePrice.Foreground = priceColor;
+            if (_lblBistTitle != null) _lblBistTitle.Foreground = labelColor;
+            if (_txtBistPrice != null) _txtBistPrice.Foreground = priceColor;
+
+            if (_lblBtcTitle != null) _lblBtcTitle.Foreground = labelColor;
+            if (_txtBtcPrice != null) _txtBtcPrice.Foreground = priceColor;
+            if (_lblEthTitle != null) _lblEthTitle.Foreground = labelColor;
+            if (_txtEthPrice != null) _txtEthPrice.Foreground = priceColor;
+
+            if (_txtFinanceStatus != null) _txtFinanceStatus.Foreground = statusColor;
+            if (_txtSysStats != null) _txtSysStats.Foreground = new SolidColorBrush(textMuted);
+
+            if (_txtPrayerTitle != null) _txtPrayerTitle.Foreground = new SolidColorBrush(textPrimary);
+            if (_txtPrayerCity != null) _txtPrayerCity.Foreground = new SolidColorBrush(textSecondary);
+            if (_txtPrayerDateInfo != null) _txtPrayerDateInfo.Foreground = new SolidColorBrush(textMuted);
+            if (_txtPrayerFooter != null) _txtPrayerFooter.Foreground = new SolidColorBrush(textMuted);
+            if (_txtPrayerCountdown != null) _txtPrayerCountdown.Foreground = new SolidColorBrush(textMuted);
+            UpdatePrayerCountdownUI();
+
+            if (_mediaPlayerBorder != null)
+            {
+                if (_cfg.CompactMode)
+                {
+                    _mediaPlayerBorder.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    _mediaPlayerBorder.Background = new SolidColorBrush(isDark ? System.Windows.Media.Color.FromArgb(35, 255, 255, 255) : System.Windows.Media.Color.FromArgb(20, 0, 0, 0));
+                    _mediaPlayerBorder.BorderBrush = new SolidColorBrush(isDark ? System.Windows.Media.Color.FromArgb(45, 255, 255, 255) : System.Windows.Media.Color.FromArgb(30, 0, 0, 0));
+                    _mediaPlayerBorder.BorderThickness = new Thickness(1);
+                    if (_txtMediaTitle != null) _txtMediaTitle.Foreground = new SolidColorBrush(textPrimary);
+                    if (_txtMediaArtist != null) _txtMediaArtist.Foreground = new SolidColorBrush(textMuted);
+                    var accentGreen = new SolidColorBrush(System.Windows.Media.Color.FromRgb(34, 197, 94));
+                    if (_eqBar1 != null) _eqBar1.Fill = accentGreen;
+                    if (_eqBar2 != null) _eqBar2.Fill = accentGreen;
+                    if (_eqBar3 != null) _eqBar3.Fill = accentGreen;
+                    if (_btnMediaPrev != null) _btnMediaPrev.Foreground = System.Windows.Media.Brushes.White;
+                    if (_btnMediaPlay != null) _btnMediaPlay.Foreground = System.Windows.Media.Brushes.White;
+                    if (_btnMediaNext != null) _btnMediaNext.Foreground = System.Windows.Media.Brushes.White;
+                }
+            }
+
+            if (_currentFinance != null)
+            {
+                UpdateFinanceUI(_currentFinance);
+            }
+            else
+            {
+                RenderFinanceGrid();
+            }
+        }
+
+        public void ToggleCompactMode()
+        {
+            _cfg.CompactMode = !_cfg.CompactMode;
+            _cfg.Save();
+            ApplyThemeAndSurface();
+        }
+
+        public void ApplyTextScale()
+        {
+            double f = _cfg.WidgetFontScale;
+            if (f < 0.70) f = 0.70;
+            if (f > 1.40) f = 1.40;
+
+            // 1. Sol Sütun (Saat & Tarih) Genişliği ve Dikey Çizgi Dengesi (Arka plan boyutunu sabit tutmak için)
+            double timeW = Math.Round(225 + (f - 1.0) * 140);
+            if (_colTime != null) _colTime.Width = new GridLength(timeW);
+            if (_timeStack != null) _timeStack.Width = timeW;
+            if (_txtSysStats != null) _txtSysStats.Width = timeW;
+
+            double divMargin = Math.Max(10, Math.Round(42 - (f - 1.0) * 85));
+            if (_divider != null) _divider.Margin = new Thickness(divMargin, 0, divMargin, 0);
+
+            if (_cardBorder != null)
+            {
+                double horizPad = Math.Max(20, Math.Round(44 - (f - 1.0) * 45));
+                _cardBorder.Padding = new Thickness(horizPad, 14, horizPad, 26);
+            }
+
+            // 2. Saat & Saniye
+            if (_txtHour != null)
+            {
+                _txtHour.FontSize = Math.Round(74 * f);
+                _txtHour.LineHeight = Math.Round(68 * f);
+            }
+            if (_txtColon != null)
+            {
+                _txtColon.FontSize = Math.Round(70 * f);
+                _txtColon.LineHeight = Math.Round(68 * f);
+            }
+            if (_crescentStarBox != null)
+            {
+                _crescentStarBox.Width = Math.Round(26 * f);
+                _crescentStarBox.Height = Math.Round(34 * f);
+            }
+            if (_txtMinute != null)
+            {
+                _txtMinute.FontSize = Math.Round(74 * f);
+                _txtMinute.LineHeight = Math.Round(68 * f);
+            }
+            if (_txtSeconds != null)
+            {
+                _txtSeconds.FontSize = Math.Round(24 * f);
+            }
+
+            // 3. Tarih & Sistem Bilgisi
+            if (_txtDate != null) _txtDate.FontSize = Math.Round(14 * f);
+            if (_txtDay != null) _txtDay.FontSize = Math.Round(14 * f);
+            if (_txtSysStats != null) _txtSysStats.FontSize = Math.Round(11 * f);
+
+            // 4. Hava Durumu
+            if (_txtTemp != null)
+            {
+                _txtTemp.FontSize = Math.Round(32 * f);
+                _txtTemp.LineHeight = Math.Round(30 * f);
+            }
+            if (_txtStatus != null) _txtStatus.FontSize = Math.Round(13 * f);
+            if (_txtCity != null) _txtCity.FontSize = Math.Round(11 * f);
+
+            // 5. Maç Bilgisi ve Canlı Bildirimler
+            if (_txtMatchInfo != null) _txtMatchInfo.FontSize = Math.Round(11.5 * f);
+            if (_txtAlertHeader != null) _txtAlertHeader.FontSize = Math.Round(12 * f);
+            if (_txtAlertDetail != null) _txtAlertDetail.FontSize = Math.Round(10.5 * f);
+
+            // 6. Tatil ve Medya
+            if (_txtHolidayTitle != null) _txtHolidayTitle.FontSize = Math.Round(10 * f);
+            if (_txtHolidayCountdown != null) _txtHolidayCountdown.FontSize = Math.Round(10.5 * f);
+
+            double mediaScale = Math.Min(1.20, f);
+            if (_txtMediaTitle != null) _txtMediaTitle.FontSize = Math.Round(12 * mediaScale);
+            if (_txtMediaArtist != null) _txtMediaArtist.FontSize = Math.Round(10.5 * mediaScale);
+
+            // 7. Finans ve Namaz Panelleri
+            ApplyFinanceFontScale(f);
+            ApplyPrayerFontScale(f);
+        }
+
+        private void ApplyFinanceFontScale(double f)
+        {
+            double s = Math.Min(1.22, Math.Max(0.85, f));
+            double sTitle = Math.Round(9.5 * s);
+            double sPrice = Math.Round(13.0 * s);
+            double sChange = Math.Round(10.5 * s);
+
+            if (_lblUsdTitle != null) _lblUsdTitle.FontSize = sTitle;
+            if (_txtUsdPrice != null) _txtUsdPrice.FontSize = sPrice;
+            if (_txtUsdChange != null) _txtUsdChange.FontSize = sChange;
+
+            if (_lblEurTitle != null) _lblEurTitle.FontSize = sTitle;
+            if (_txtEurPrice != null) _txtEurPrice.FontSize = sPrice;
+            if (_txtEurChange != null) _txtEurChange.FontSize = sChange;
+
+            if (_lblGramTitle != null) _lblGramTitle.FontSize = sTitle;
+            if (_txtGramPrice != null) _txtGramPrice.FontSize = sPrice;
+            if (_txtGramChange != null) _txtGramChange.FontSize = sChange;
+
+            if (_lblOunceTitle != null) _lblOunceTitle.FontSize = sTitle;
+            if (_txtOuncePrice != null) _txtOuncePrice.FontSize = sPrice;
+            if (_txtOunceChange != null) _txtOunceChange.FontSize = sChange;
+
+            if (_lblBistTitle != null) _lblBistTitle.FontSize = sTitle;
+            if (_lblBistStatus != null) _lblBistStatus.FontSize = Math.Round(8.5 * s);
+            if (_txtBistPrice != null) _txtBistPrice.FontSize = sPrice;
+            if (_txtBistChange != null) _txtBistChange.FontSize = sChange;
+
+            if (_lblBtcTitle != null) _lblBtcTitle.FontSize = sTitle;
+            if (_txtBtcPrice != null) _txtBtcPrice.FontSize = sPrice;
+            if (_txtBtcChange != null) _txtBtcChange.FontSize = sChange;
+
+            if (_lblEthTitle != null) _lblEthTitle.FontSize = sTitle;
+            if (_txtEthPrice != null) _txtEthPrice.FontSize = sPrice;
+            if (_txtEthChange != null) _txtEthChange.FontSize = sChange;
+        }
+
+        private void ApplyPrayerFontScale(double f)
+        {
+            double s = Math.Min(1.20, Math.Max(0.85, f));
+            if (_txtPrayerTitle != null) _txtPrayerTitle.FontSize = Math.Round(13.5 * s);
+            if (_txtPrayerCity != null) _txtPrayerCity.FontSize = Math.Round(11.0 * s);
+            if (_txtPrayerDateInfo != null) _txtPrayerDateInfo.FontSize = Math.Round(10.5 * s);
+            if (_txtPrayerCountdown != null) _txtPrayerCountdown.FontSize = Math.Round(11.0 * s);
+            if (_txtPrayerFooter != null) _txtPrayerFooter.FontSize = Math.Round(9.5 * s);
+
+            double nameSize = Math.Round(11.0 * s);
+            double timeSize = Math.Round(13.5 * s);
+            for (int i = 0; i < 6; i++)
+            {
+                if (_prayerColNames[i] != null) _prayerColNames[i].FontSize = nameSize;
+                if (_prayerColTimes[i] != null) _prayerColTimes[i].FontSize = timeSize;
+            }
+        }
+
+        private void UpdateSystemAndMedia()
+        {
+            if (_cfg.GameModeEnabled && GameModeService.IsFullscreenAppActive())
+            {
+                return;
+            }
+
+            // 1. Sistem Monitörü (CPU & RAM)
+            if (_cfg.ShowSystemMonitor && !_cfg.CompactMode)
+            {
+                if (_txtSysStats != null)
+                {
+                    int cpu = SystemMonitor.GetCpuUsage();
+                    double usedGb, totalGb;
+                    int ram = SystemMonitor.GetRamUsage(out usedGb, out totalGb);
+                    _txtSysStats.Text = string.Format("⚡ CPU: %{0}  ·  RAM: %{1} ({2:0.0} GB)", cpu, ram, usedGb);
+                    _txtSysStats.Visibility = Visibility.Visible;
+                }
+            }
+            else
+            {
+                if (_txtSysStats != null) _txtSysStats.Visibility = Visibility.Collapsed;
+            }
+
+            // 2. Futbol Maç Takipçisi
+            UpdateMatchInfo();
+
+            // 3. Mini Medya Oynatıcı (Spotify & Tarayıcı / YouTube)
+            UpdateMediaPlayer();
+        }
+
+        private void UpdateMediaPlayer()
+        {
+            if (!_cfg.ShowMediaPlayer || _cfg.CompactMode)
+            {
+                if (_mediaPlayerBorder != null && _mediaPlayerBorder.Visibility == Visibility.Visible)
+                {
+                    _mediaPlayerBorder.Visibility = Visibility.Collapsed;
+                }
+                _isMediaPlaying = false;
+                if (_isEqAnimating)
+                {
+                    _isEqAnimating = false;
+                    StopEqAnimation();
+                }
+                return;
+            }
+
+            // Canlı ses çıkışı aktif mi kontrol et (Kullanıcı talebi: Canlı medya sadece aktif olarak bir şey çalıyorken gözüksün)
+            bool isAudioActive = AudioMeterService.IsAudioPlaying(2.5);
+            MediaTrackInfo media = isAudioActive ? MediaTrackerService.GetCurrentMedia() : null;
+
+            if (media != null && media.HasMedia)
+            {
+                _isMediaPlaying = media.IsPlaying;
+                if (_txtMediaTitle != null)
+                {
+                    _txtMediaTitle.Text = media.Title;
+                    _txtMediaTitle.ToolTip = media.Title;
+                }
+
+                if (_txtMediaArtist != null)
+                {
+                    if (!string.IsNullOrEmpty(media.Artist) && media.Artist != media.Title)
+                    {
+                        _txtMediaArtist.Text = media.Artist;
+                        _txtMediaArtist.ToolTip = media.Artist;
+                        _txtMediaArtist.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        _txtMediaArtist.Text = "";
+                        _txtMediaArtist.ToolTip = null;
+                        _txtMediaArtist.Visibility = Visibility.Collapsed;
+                    }
+                }
+
+                if (_mediaPlayerBorder != null && _mediaPlayerBorder.Visibility != Visibility.Visible)
+                {
+                    _mediaPlayerBorder.Visibility = Visibility.Visible;
+                }
+
+                if (_isMediaPlaying)
+                {
+                    if (!_isEqAnimating)
+                    {
+                        _isEqAnimating = true;
+                        StartEqAnimation();
+                    }
+                }
+                else
+                {
+                    if (_isEqAnimating)
+                    {
+                        _isEqAnimating = false;
+                        StopEqAnimation();
+                    }
+                }
+            }
+            else
+            {
+                _isMediaPlaying = false;
+                if (_mediaPlayerBorder != null && _mediaPlayerBorder.Visibility == Visibility.Visible)
+                {
+                    _mediaPlayerBorder.Visibility = Visibility.Collapsed;
+                }
+                if (_isEqAnimating)
+                {
+                    _isEqAnimating = false;
+                    StopEqAnimation();
+                }
+            }
+        }
+
+        private void UpdateMatchInfo()
+        {
+            if (_cfg.ShowMatchTracker && !_cfg.CompactMode)
+            {
+                var info = MatchService.GetCurrentMatchInfo(_cfg);
+                _lastMatchList = info.AllUpcoming;
+
+                if (DateTime.Now < _cycleHoldUntil)
+                {
+                    return;
+                }
+
+                if (info.HasMatch)
+                {
+                    if (_matchBorder != null)
+                    {
+                        if (IsMatchAlertActive())
+                        {
+                            _matchBorder.Visibility = Visibility.Collapsed;
+                        }
+                        else
+                        {
+                            RenderMatchCard(info.TodayMatchItem, info.IsToday, info.IsLive, info.IsFinished, info.FullText);
+                            _matchBorder.Visibility = Visibility.Visible;
+                        }
+                    }
+
+                    // KULLANICI İSTEĞİ: Seçili Takım Canlı Skor & Stadyum GOOOL Kutlaması
+                    if (_cfg.ShowMatchLiveScores && info.IsToday && info.TodayMatchItem != null && info.TodayMatchItem.IsLive && info.TodayMatchItem.HasScore)
+                    {
+                        var tm = info.TodayMatchItem;
+                        string teamKey = info.TodayTeamKey;
+                        if (!string.IsNullOrEmpty(teamKey))
+                        {
+                            string h = (tm.HomeTeam ?? "").ToLower();
+                            string a = (tm.AwayTeam ?? "").ToLower();
+                            bool isHomeTracked = false;
+                            bool isAwayTracked = false;
+
+                            if (teamKey == "turkiye")
+                            {
+                                isHomeTracked = h.Contains("türkiye") || h.Contains("turkiye");
+                                isAwayTracked = a.Contains("türkiye") || a.Contains("turkiye");
+                            }
+                            else if (teamKey == "galatasaray")
+                            {
+                                isHomeTracked = h.Contains("galatasaray");
+                                isAwayTracked = a.Contains("galatasaray");
+                            }
+                            else if (teamKey == "fenerbahce")
+                            {
+                                isHomeTracked = h.Contains("fenerbahçe") || h.Contains("fenerbahce");
+                                isAwayTracked = a.Contains("fenerbahçe") || a.Contains("fenerbahce");
+                            }
+                            else if (teamKey == "besiktas")
+                            {
+                                isHomeTracked = h.Contains("beşiktaş") || h.Contains("besiktas");
+                                isAwayTracked = a.Contains("beşiktaş") || a.Contains("besiktas");
+                            }
+                            else if (teamKey == "trabzonspor")
+                            {
+                                isHomeTracked = h.Contains("trabzonspor");
+                                isAwayTracked = a.Contains("trabzonspor");
+                            }
+
+                            int currentTrackedScore = -1;
+                            string trackedName = "";
+                            if (isHomeTracked)
+                            {
+                                currentTrackedScore = tm.HomeScore;
+                                trackedName = tm.HomeTeam;
+                            }
+                            else if (isAwayTracked)
+                            {
+                                currentTrackedScore = tm.AwayScore;
+                                trackedName = tm.AwayTeam;
+                            }
+
+                            if (currentTrackedScore >= 0)
+                            {
+                                string matchKey = tm.HomeTeam + "_" + tm.AwayTeam + "_" + tm.MatchDate.ToString("yyyyMMdd");
+                                if (_lastLiveMatchKey != matchKey)
+                                {
+                                    _lastLiveMatchKey = matchKey;
+                                    _lastLiveTrackedScore = currentTrackedScore;
+                                }
+                                else
+                                {
+                                    if (currentTrackedScore > _lastLiveTrackedScore)
+                                    {
+                                        _lastLiveTrackedScore = currentTrackedScore;
+                                        string scoreDetail = string.Format("⚽ {0} Gol Attı! ({1} - {2})", trackedName, tm.HomeScore, tm.AwayScore);
+                                        TriggerGoalCelebration(teamKey, "⚽ G O O O L ! ! !", scoreDetail);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    if (_matchBorder != null) _matchBorder.Visibility = Visibility.Collapsed;
+                }
+            }
+            else
+            {
+                if (_matchBorder != null) _matchBorder.Visibility = Visibility.Collapsed;
+            }
+
+            ApplyClockTheme();
+        }
+
+        private void RenderMatchCard(MatchItem m, bool isToday, bool isLive, bool isFinished, string fallbackText)
+        {
+            if (_matchBorder == null) return;
+            if (m == null)
+            {
+                _matchBorder.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            bool isDark = (_cfg.Theme == "dark");
+            double f = _cfg.WidgetFontScale;
+            if (f < 0.70) f = 0.70;
+            if (f > 1.40) f = 1.40;
+
+            if (isToday || isLive)
+            {
+                _matchBorder.Background = new SolidColorBrush(isDark ? System.Windows.Media.Color.FromArgb(55, 239, 68, 68) : System.Windows.Media.Color.FromArgb(30, 220, 38, 38));
+                _matchBorder.BorderBrush = new SolidColorBrush(isDark ? System.Windows.Media.Color.FromArgb(140, 239, 68, 68) : System.Windows.Media.Color.FromArgb(110, 220, 38, 38));
+                _matchBorder.BorderThickness = new Thickness(1);
+            }
+            else
+            {
+                _matchBorder.Background = new SolidColorBrush(isDark ? System.Windows.Media.Color.FromArgb(35, 255, 255, 255) : System.Windows.Media.Color.FromArgb(20, 0, 0, 0));
+                _matchBorder.BorderBrush = new SolidColorBrush(isDark ? System.Windows.Media.Color.FromArgb(50, 255, 255, 255) : System.Windows.Media.Color.FromArgb(35, 0, 0, 0));
+                _matchBorder.BorderThickness = new Thickness(1);
+            }
+
+            string homeGoals = "";
+            string awayGoals = "";
+            MatchService.ResolveHomeAndAwayGoals(m, out homeGoals, out awayGoals);
+            bool hasGoals = !string.IsNullOrEmpty(homeGoals) || !string.IsNullOrEmpty(awayGoals);
+
+            var brushPrimary = (_currentTextPrimary.A > 0) ? new SolidColorBrush(_currentTextPrimary)
+                : (isDark ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255))
+                          : new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42)));
+
+            var brushSecondary = isDark ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(210, 241, 245, 249))
+                                        : new SolidColorBrush(System.Windows.Media.Color.FromArgb(220, 51, 65, 85));
+
+            var brushLive = isDark ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 110, 110))
+                                   : new SolidColorBrush(System.Windows.Media.Color.FromRgb(185, 28, 28));
+
+            string tooltip = !string.IsNullOrEmpty(fallbackText) ? fallbackText : MatchService.FormatMatchItem(m);
+            if (hasGoals)
+            {
+                tooltip += "\n⚽ Goller:";
+                if (!string.IsNullOrEmpty(homeGoals)) tooltip += "\n  " + m.HomeTeam + ": " + homeGoals;
+                if (!string.IsNullOrEmpty(awayGoals)) tooltip += "\n  " + m.AwayTeam + ": " + awayGoals;
+            }
+            tooltip += "\n\n💡 Fikstürdeki diğer maçları görmek için tıklayın";
+            _matchBorder.ToolTip = tooltip;
+
+            if (!hasGoals)
+            {
+                if (_txtMatchInfo != null)
+                {
+                    _txtMatchInfo.Text = !string.IsNullOrEmpty(fallbackText) ? fallbackText : MatchService.FormatMatchItem(m);
+                    _txtMatchInfo.FontSize = Math.Round(11.5 * f);
+                    if (isLive || m.IsLive)
+                    {
+                        _txtMatchInfo.Foreground = isDark ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255))
+                                                          : brushLive;
+                    }
+                    else
+                    {
+                        _txtMatchInfo.Foreground = brushPrimary;
+                    }
+                }
+                _matchBorder.Padding = new Thickness(14, 7, 14, 7);
+                _matchBorder.Child = _txtMatchInfo;
+            }
+            else
+            {
+                // KULLANICI İSTEĞİ:
+                // "gol atanların ismi ilgili takımın altında yazsın 2 ismi varsa ilk ismin baş harfini yaz"
+                var cardStack = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    HorizontalAlignment = HorizontalAlignment.Stretch
+                };
+
+                string statusHeader = "";
+                if (isLive || m.IsLive)
+                {
+                    string minStr = !string.IsNullOrEmpty(m.Minute) ? m.Minute : "CANLI";
+                    statusHeader = "🔴 CANLI " + minStr;
+                }
+                else if (isFinished || m.IsFinished)
+                {
+                    statusHeader = "⚽ MAÇ SONUCU";
+                }
+                else
+                {
+                    statusHeader = "⚽ BUGÜN " + m.MatchDate.ToString("HH:mm");
+                }
+
+                string cleanTour = MatchService.CleanTournament(m.Tournament);
+                if (!string.IsNullOrEmpty(cleanTour))
+                {
+                    statusHeader += " · " + cleanTour;
+                }
+
+                var txtTopHeader = new TextBlock
+                {
+                    Text = statusHeader,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    FontSize = Math.Round(10.0 * f),
+                    FontWeight = FontWeights.SemiBold,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 0, 0, 5),
+                    Foreground = (isLive || m.IsLive) ? brushLive : brushSecondary
+                };
+                cardStack.Children.Add(txtTopHeader);
+
+                var grid = new Grid
+                {
+                    HorizontalAlignment = HorizontalAlignment.Stretch
+                };
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                // Sol: Ev Sahibi Takım ve Gol Atanlar
+                var spHome = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    HorizontalAlignment = HorizontalAlignment.Left
+                };
+                var txtHome = new TextBlock
+                {
+                    Text = m.HomeTeam,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    FontSize = Math.Round(12.0 * f),
+                    FontWeight = FontWeights.Bold,
+                    Foreground = brushPrimary,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                spHome.Children.Add(txtHome);
+
+                if (!string.IsNullOrEmpty(homeGoals))
+                {
+                    string hgText = homeGoals.StartsWith("⚽") ? homeGoals : ("⚽ " + homeGoals);
+                    var txtHomeGoals = new TextBlock
+                    {
+                        Text = hgText,
+                        FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                        FontSize = Math.Round(9.5 * f),
+                        FontWeight = FontWeights.Normal,
+                        Foreground = brushSecondary,
+                        TextWrapping = TextWrapping.Wrap,
+                        Margin = new Thickness(0, 2, 0, 0)
+                    };
+                    spHome.Children.Add(txtHomeGoals);
+                }
+                Grid.SetColumn(spHome, 0);
+                grid.Children.Add(spHome);
+
+                // Orta: Skor
+                var txtScore = new TextBlock
+                {
+                    Text = m.HomeScore + " - " + m.AwayScore,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    FontSize = Math.Round(14.5 * f),
+                    FontWeight = FontWeights.ExtraBold,
+                    Foreground = brushPrimary,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(10, 0, 10, 0)
+                };
+                Grid.SetColumn(txtScore, 1);
+                grid.Children.Add(txtScore);
+
+                // Sağ: Deplasman Takımı ve Gol Atanlar
+                var spAway = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    HorizontalAlignment = HorizontalAlignment.Right
+                };
+                var txtAway = new TextBlock
+                {
+                    Text = m.AwayTeam,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    FontSize = Math.Round(12.0 * f),
+                    FontWeight = FontWeights.Bold,
+                    Foreground = brushPrimary,
+                    TextAlignment = TextAlignment.Right,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                spAway.Children.Add(txtAway);
+
+                if (!string.IsNullOrEmpty(awayGoals))
+                {
+                    string agText = awayGoals.StartsWith("⚽") ? awayGoals : ("⚽ " + awayGoals);
+                    var txtAwayGoals = new TextBlock
+                    {
+                        Text = agText,
+                        FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                        FontSize = Math.Round(9.5 * f),
+                        FontWeight = FontWeights.Normal,
+                        Foreground = brushSecondary,
+                        TextAlignment = TextAlignment.Right,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        TextWrapping = TextWrapping.Wrap,
+                        Margin = new Thickness(0, 2, 0, 0)
+                    };
+                    spAway.Children.Add(txtAwayGoals);
+                }
+                Grid.SetColumn(spAway, 2);
+                grid.Children.Add(spAway);
+
+                cardStack.Children.Add(grid);
+
+                _matchBorder.Padding = new Thickness(12, 7, 12, 8);
+                _matchBorder.Child = cardStack;
+            }
+        }
+
+        private void CycleOrShowMatches()
+        {
+            if (_lastMatchList == null || _lastMatchList.Count == 0) return;
+            _currentMatchIndex = (_currentMatchIndex + 1) % _lastMatchList.Count;
+            var m = _lastMatchList[_currentMatchIndex];
+            DateTime now = DateTime.Now;
+            bool isToday = (m.MatchDate.Date == now.Date);
+            bool isFinished = m.IsFinished || (isToday && now > m.MatchDate.AddMinutes(115));
+            RenderMatchCard(m, isToday, m.IsLive, isFinished, MatchService.FormatMatchItem(m));
+            _cycleHoldUntil = DateTime.Now.AddSeconds(10);
+        }
+
+        private void UpdateClock()
+        {
+            var now = DateTime.Now;
+            if (_txtHour != null) _txtHour.Text = now.ToString("HH");
+            if (_txtMinute != null) _txtMinute.Text = now.ToString("mm");
+            if (_txtSeconds != null) _txtSeconds.Text = ":" + now.ToString("ss");
+            if (_txtDate != null) _txtDate.Text = now.ToString("dd.MM.yyyy");
+            if (_txtDay != null) _txtDay.Text = TurkishDays[(int)now.DayOfWeek];
+
+
+
+            CheckMatchCountdownAndWhistle();
+            if (_currentPrayer != null && _cfg.ShowPrayerTimes && !_cfg.CompactMode)
+            {
+                UpdatePrayerCountdownUI();
+            }
+
+            if (_cfg.ShowNationalHolidays && !_cfg.CompactMode && now.Second == 0)
+            {
+                UpdateHolidayUI();
+            }
+
+            // 5 dakikada bir otomatik RAM optimizasyonu
+            if (now.Second == 0 && now.Minute % 5 == 0)
+            {
+                MemoryOptimizer.TrimWorkingSet(false);
+            }
+        }
+
+        private bool IsMatchAlertActive()
+        {
+            DateTime now = DateTime.Now;
+            if (_goalCelebrationEndTime.HasValue && now < _goalCelebrationEndTime.Value) return true;
+            if (_testAlertEndTime.HasValue && now < _testAlertEndTime.Value) return true;
+            if (_matchAlertBanner != null && _matchAlertBanner.Visibility == Visibility.Visible) return true;
+            return false;
+        }
+
+        public void TriggerTestAlert()
+        {
+            string teamKey = "galatasaray";
+            if (_cfg.TrackTrabzonspor) teamKey = "trabzonspor";
+            else if (_cfg.TrackFenerbahce) teamKey = "fenerbahce";
+            else if (_cfg.TrackBesiktas) teamKey = "besiktas";
+            else if (_cfg.TrackTurkey) teamKey = "turkiye";
+
+            _testAlertEndTime = DateTime.Now.AddSeconds(15);
+            if (_matchBorder != null) _matchBorder.Visibility = Visibility.Collapsed;
+            WhistleService.PlayAsync();
+            ShowMatchAlert(null, "Test Karşılaşması (Canlı Önizleme)", DateTime.Now.AddSeconds(15), teamKey, true);
+        }
+
+        public void TriggerTestGoal()
+        {
+            string teamKey = "galatasaray";
+            string teamName = "Galatasaray";
+            if (_cfg.TrackTrabzonspor) { teamKey = "trabzonspor"; teamName = "Trabzonspor"; }
+            else if (_cfg.TrackFenerbahce) { teamKey = "fenerbahce"; teamName = "Fenerbahçe"; }
+            else if (_cfg.TrackBesiktas) { teamKey = "besiktas"; teamName = "Beşiktaş"; }
+            else if (_cfg.TrackTurkey) { teamKey = "turkiye"; teamName = "Türkiye"; }
+
+            TriggerGoalCelebration(teamKey, "⚽ G O O O L ! ! !", "73' " + teamName + " Gol Attı!");
+        }
+
+        public void TriggerTestFinalWhistle()
+        {
+            string teamKey = "galatasaray";
+            string teamName = "Galatasaray";
+            if (_cfg.TrackTrabzonspor) { teamKey = "trabzonspor"; teamName = "Trabzonspor"; }
+            else if (_cfg.TrackFenerbahce) { teamKey = "fenerbahce"; teamName = "Fenerbahçe"; }
+            else if (_cfg.TrackBesiktas) { teamKey = "besiktas"; teamName = "Beşiktaş"; }
+            else if (_cfg.TrackTurkey) { teamKey = "turkiye"; teamName = "Türkiye"; }
+
+            TriggerFinalWhistleAlert(teamKey, "🏁 MAÇ SONUCU (3 Düdük Çaldı)", "90+ Karşılaşma Tamamlandı · " + teamName);
+        }
+
+        public void TriggerFinalWhistleAlert(string teamKey, string header, string detail)
+        {
+            _goalCelebrationEndTime = DateTime.Now.AddSeconds(14);
+            _goalCelebrationTeamKey = teamKey ?? "galatasaray";
+            _goalCelebrationHeader = header ?? "🏁 MAÇ SONUCU (Bitiş Düdüğü)";
+            _goalCelebrationDetail = detail ?? "Karşılaşma Tamamlandı";
+
+            if (_matchBorder != null) _matchBorder.Visibility = Visibility.Collapsed;
+            WhistleService.PlayFinalWhistleAsync();
+            ShowGoalAlert(_goalCelebrationHeader, _goalCelebrationDetail, _goalCelebrationTeamKey);
+        }
+
+        public void TriggerGoalCelebration(string teamKey, string header, string detail)
+        {
+            _goalCelebrationEndTime = DateTime.Now.AddSeconds(14);
+            _goalCelebrationTeamKey = teamKey ?? "galatasaray";
+            _goalCelebrationHeader = header ?? "⚽ G O O O L ! ! !";
+
+            if (detail != null && (detail.Contains("Stadyum Coşkusu") || detail.Contains("Stadyum çoşkusu") || detail.Contains("stadyum coşkusu")))
+            {
+                detail = detail.Replace("Stadyum Coşkusu", "").Replace("Stadyum çoşkusu", "").Replace("stadyum coşkusu", "").Trim(' ', '-', '·', '!');
+                if (string.IsNullOrWhiteSpace(detail)) detail = "Gol Attı!";
+            }
+
+            _goalCelebrationDetail = detail ?? "Canlı Skor Güncellendi";
+
+            if (_matchBorder != null) _matchBorder.Visibility = Visibility.Collapsed;
+            WhistleService.PlayGoalWhistleAsync();
+            ShowGoalAlert(_goalCelebrationHeader, _goalCelebrationDetail, _goalCelebrationTeamKey);
+        }
+
+        private void ShowGoalAlert(string header, string detail, string teamKey)
+        {
+            if (_matchAlertBanner == null) return;
+
+            // Takım topunu/ağ efektini gerekiyorsa takım rengine ve efekt stiline göre yeniden oluştur
+            if (_currentAlertTeamKey != teamKey || _currentAlertStyle != _cfg.GoalEffectStyle)
+            {
+                _currentAlertTeamKey = teamKey;
+                _currentAlertStyle = _cfg.GoalEffectStyle;
+                var p = _matchAlertBanner.Child as Panel;
+                if (p != null && _bouncingBallContainer != null)
+                {
+                    p.Children.Remove(_bouncingBallContainer);
+                    FrameworkElement dummyB;
+                    Ellipse dummyS;
+                    _bouncingBallContainer = SoccerBallFactory.CreateGoalBannerVisual(teamKey, _cfg.GoalEffectStyle, out dummyB, out dummyS);
+                    if (p is Grid) Grid.SetColumn(_bouncingBallContainer, 1);
+                    p.Children.Add(_bouncingBallContainer);
+                }
+            }
+
+            System.Windows.Media.Color pColor, sColor, badgeBg, badgeBrd;
+            SoccerBallFactory.GetTeamColors(teamKey, out pColor, out sColor, out badgeBg, out badgeBrd);
+
+            _matchAlertBanner.Background = new SolidColorBrush(badgeBg);
+            _matchAlertBanner.BorderBrush = new SolidColorBrush(badgeBrd);
+            _matchAlertBanner.BorderThickness = new Thickness(1.5);
+
+            _txtAlertHeader.Text = header;
+            _txtAlertHeader.Foreground = new SolidColorBrush(pColor);
+            _txtAlertDetail.Text = detail;
+            _txtAlertDetail.Foreground = (_cfg.Theme == "light") ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42)) : System.Windows.Media.Brushes.White;
+
+            _matchAlertBanner.Visibility = Visibility.Visible;
+            if (_matchBorder != null) _matchBorder.Visibility = Visibility.Collapsed;
+        }
+
+        private void CheckMatchCountdownAndWhistle()
+        {
+            DateTime now = DateTime.Now;
+
+            // 0. Canlı Gol Kutlaması aktifse
+            if (_goalCelebrationEndTime.HasValue)
+            {
+                if (now < _goalCelebrationEndTime.Value)
+                {
+                    ShowGoalAlert(_goalCelebrationHeader, _goalCelebrationDetail, _goalCelebrationTeamKey);
+                    return;
+                }
+                else
+                {
+                    _goalCelebrationEndTime = null;
+                    if (_matchAlertBanner != null) _matchAlertBanner.Visibility = Visibility.Collapsed;
+                    if (_matchBorder != null && !_cfg.CompactMode) _matchBorder.Visibility = Visibility.Visible;
+                }
+            }
+
+            // 1. Manuel test modu aktifse
+            if (_testAlertEndTime.HasValue)
+            {
+                if (now < _testAlertEndTime.Value)
+                {
+                    string testTeamKey = "galatasaray";
+                    if (_cfg.TrackTrabzonspor) testTeamKey = "trabzonspor";
+                    else if (_cfg.TrackFenerbahce) testTeamKey = "fenerbahce";
+                    else if (_cfg.TrackBesiktas) testTeamKey = "besiktas";
+                    else if (_cfg.TrackTurkey) testTeamKey = "turkiye";
+
+                    ShowMatchAlert(null, "Örnek Karşılaşma (Canlı Test)", _testAlertEndTime.Value, testTeamKey, true);
+                    return;
+                }
+                else
+                {
+                    _testAlertEndTime = null;
+                    if (_matchAlertBanner != null) _matchAlertBanner.Visibility = Visibility.Collapsed;
+                    if (_matchBorder != null && !_cfg.CompactMode) _matchBorder.Visibility = Visibility.Visible;
+                }
+            }
+
+            if (!_cfg.ShowMatchTracker)
+            {
+                if (_matchAlertBanner != null && _matchAlertBanner.Visibility == Visibility.Visible)
+                    _matchAlertBanner.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var matchInfo = MatchService.GetCurrentMatchInfo(_cfg);
+            if (matchInfo == null || !matchInfo.HasMatch || !matchInfo.IsToday || matchInfo.TodayMatchItem == null)
+            {
+                if (_matchAlertBanner != null && _matchAlertBanner.Visibility == Visibility.Visible)
+                {
+                    _matchAlertBanner.Visibility = Visibility.Collapsed;
+                    if (_matchBorder != null && !_cfg.CompactMode && matchInfo != null && matchInfo.HasMatch)
+                    {
+                        _matchBorder.Visibility = Visibility.Visible;
+                    }
+                }
+                return;
+            }
+
+            DateTime kickoff = matchInfo.MatchDate;
+            string teamKey = matchInfo.TodayTeamKey ?? "galatasaray";
+            string matchTitle = (matchInfo.TodayMatchItem.HomeTeam ?? "") + " - " + (matchInfo.TodayMatchItem.AwayTeam ?? "");
+
+            // KULLANICI ŞARTI:
+            // "seçili takımın maç saatinden 5 dk önce widget de yukarı aşağı seken takımın renklerine ait bir futbol topu çıksın 6 dk sonra da yok olsun"
+            // Başlangıç: kickoff - 5 dakika
+            // Bitiş: (kickoff - 5 dakika) + 6 dakika = kickoff + 1 dakika
+            DateTime alertStart = kickoff.AddMinutes(-5);
+            DateTime alertEnd = kickoff.AddMinutes(1);
+
+            bool isActive = (now >= alertStart && now < alertEnd);
+
+            if (isActive)
+            {
+                ShowMatchAlert(matchInfo.TodayMatchItem, matchTitle, kickoff, teamKey, false);
+
+                // KULLANICI ŞARTI:
+                // "maç saati geldiginde maç başlangıç düdügü çal"
+                string matchKey = matchTitle + "_" + kickoff.ToString("yyyyMMdd_HHmm");
+                if (now >= kickoff && _lastWhistlePlayedKey != matchKey)
+                {
+                    _lastWhistlePlayedKey = matchKey;
+                    WhistleService.PlayAsync();
+                }
+            }
+            else
+            {
+                if (_matchAlertBanner != null && _matchAlertBanner.Visibility == Visibility.Visible)
+                {
+                    _matchAlertBanner.Visibility = Visibility.Collapsed;
+                    if (_matchBorder != null && !_cfg.CompactMode)
+                    {
+                        _matchBorder.Visibility = Visibility.Visible;
+                    }
+                }
+            }
+
+            // KULLANICI ŞARTI:
+            // "maç bittiginde de bitiş düdügü çal"
+            try
+            {
+                var allMatches = MatchService.LoadMatches(_cfg);
+                if (allMatches != null)
+                {
+                    DateTime today = now.Date;
+                    foreach (var m in allMatches)
+                    {
+                        if (m.MatchDate.Date == today && MatchService.IsMonitored(m, _cfg))
+                        {
+                            if (MatchService.IsMatchFinished(m, now))
+                            {
+                                string endKey = (m.HomeTeam ?? "") + "_" + (m.AwayTeam ?? "") + "_" + m.MatchDate.ToString("yyyyMMdd_HHmm") + "_FINISH";
+                                if (_lastFinalWhistlePlayedKey != endKey)
+                                {
+                                    _lastFinalWhistlePlayedKey = endKey;
+                                    DateTime ft = MatchService.GetMatchFinishTime(m, now);
+                                    TimeSpan diff = now - ft;
+                                    // Eğer maç son 8 dakika içinde bittiyse (canlı bitiş) bitiş düdüğünü çal!
+                                    if (diff.TotalMinutes >= 0 && diff.TotalMinutes <= 8)
+                                    {
+                                        string tk = MatchService.DetectTeamKeyByName(m.HomeTeam) ?? MatchService.DetectTeamKeyByName(m.AwayTeam) ?? teamKey;
+                                        string sc = m.HomeScore + " - " + m.AwayScore;
+                                        TriggerFinalWhistleAlert(tk, "🏁 MAÇ SONUCU (Bitiş Düdüğü)", (m.HomeTeam ?? "") + " " + sc + " " + (m.AwayTeam ?? ""));
+
+                                        // KULLANICI ŞARTI: "maç bittiginde seçili takım kazandıgında yukarıdan aşağıya bayrak insin"
+                                        string winTeam;
+                                        string winScore;
+                                        if (MatchService.GetActiveVictoryInfo(_cfg, now, out winTeam, out winScore))
+                                        {
+                                            if (OnVictoryMatchFinished != null)
+                                            {
+                                                OnVictoryMatchFinished(winTeam, winScore);
+                                            }
+                                        }
+
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void ShowMatchAlert(MatchItem match, string detail, DateTime kickoff, string teamKey, bool isTest)
+        {
+            if (_matchAlertBanner == null) return;
+
+            DateTime now = DateTime.Now;
+
+            // Takım topunu/ağ efektini gerekiyorsa takım rengine ve efekt stiline göre yeniden oluştur
+            if (_currentAlertTeamKey != teamKey || _currentAlertStyle != _cfg.GoalEffectStyle)
+            {
+                _currentAlertTeamKey = teamKey;
+                _currentAlertStyle = _cfg.GoalEffectStyle;
+                var p = _matchAlertBanner.Child as Panel;
+                if (p != null && _bouncingBallContainer != null)
+                {
+                    p.Children.Remove(_bouncingBallContainer);
+                    FrameworkElement dummyB;
+                    Ellipse dummyS;
+                    _bouncingBallContainer = SoccerBallFactory.CreateGoalBannerVisual(teamKey, _cfg.GoalEffectStyle, out dummyB, out dummyS);
+                    if (p is Grid) Grid.SetColumn(_bouncingBallContainer, 1);
+                    p.Children.Add(_bouncingBallContainer);
+                }
+            }
+
+            System.Windows.Media.Color pColor, sColor, badgeBg, badgeBrd;
+            SoccerBallFactory.GetTeamColors(teamKey, out pColor, out sColor, out badgeBg, out badgeBrd);
+
+            _matchAlertBanner.Background = new SolidColorBrush(badgeBg);
+            _matchAlertBanner.BorderBrush = new SolidColorBrush(badgeBrd);
+            _matchAlertBanner.BorderThickness = new Thickness(1.2);
+
+            if (isTest)
+            {
+                _txtAlertHeader.Text = "⚽ MAÇ BAŞLANGIÇ TESTİ (Düdük & Seken Top)";
+                _txtAlertHeader.Foreground = new SolidColorBrush(pColor);
+                _txtAlertDetail.Text = detail + " · " + teamKey.ToUpper(new CultureInfo("tr-TR"));
+                _txtAlertDetail.Foreground = (_cfg.Theme == "light") ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42)) : System.Windows.Media.Brushes.White;
+            }
+            else if (now < kickoff)
+            {
+                TimeSpan rem = kickoff - now;
+                _txtAlertHeader.Text = string.Format("🔥 MAÇ BAŞLAMAK ÜZERE! ({0:D2}:{1:D2} Kaldı)", (int)rem.TotalMinutes, rem.Seconds);
+                _txtAlertHeader.Foreground = new SolidColorBrush(pColor);
+                _txtAlertDetail.Text = detail + " · " + kickoff.ToString("HH:mm");
+                _txtAlertDetail.Foreground = (_cfg.Theme == "light") ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42)) : System.Windows.Media.Brushes.White;
+            }
+            else
+            {
+                _txtAlertHeader.Text = "⚽ MAÇ BAŞLADI! (Düdük Çaldı)";
+                _txtAlertHeader.Foreground = new SolidColorBrush(pColor);
+                _txtAlertDetail.Text = detail + " · İyi Seyirler!";
+                _txtAlertDetail.Foreground = (_cfg.Theme == "light") ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42)) : System.Windows.Media.Brushes.White;
+            }
+
+            _matchAlertBanner.Visibility = Visibility.Visible;
+            if (_matchBorder != null) _matchBorder.Visibility = Visibility.Collapsed;
+        }
+
+        public void ApplyClockTheme()
+        {
+            ApplyClockTheme(_currentTextPrimary);
+        }
+
+        public void ApplyClockTheme(System.Windows.Media.Color defaultColor)
+        {
+            if (_txtHour == null || _txtMinute == null) return;
+            bool isDark = (_cfg.Theme == "dark");
+
+            string teamKey = null;
+            if (_cfg.MatchClockThemeEnabled)
+            {
+                var matchInfo = MatchService.GetCurrentMatchInfo(_cfg);
+                if (matchInfo != null && matchInfo.IsToday)
+                {
+                    // KULLANICI KURALI: "oynanan maç bittikten 1 saat sonra saat rengini normale al"
+                    if (MatchService.IsClockThemeActive(matchInfo, DateTime.Now))
+                    {
+                        teamKey = matchInfo.TodayTeamKey;
+                    }
+                }
+            }
+
+            if (teamKey == "galatasaray")
+            {
+                // Galatasaray: Saat Sarı (#FDB912), Dakika Kırmızı (#C8102E)
+                var yellow = System.Windows.Media.Color.FromRgb(253, 185, 18);
+                var red = System.Windows.Media.Color.FromRgb(200, 16, 46);
+                _txtHour.Foreground = new SolidColorBrush(yellow);
+                _txtMinute.Foreground = new SolidColorBrush(red);
+                _txtHour.Effect = null;
+                _txtMinute.Effect = null;
+                if (_txtColon != null)
+                {
+                    _txtColon.Foreground = new SolidColorBrush(yellow);
+                    _txtColon.Visibility = Visibility.Visible;
+                }
+                if (_crescentStarBox != null) _crescentStarBox.Visibility = Visibility.Collapsed;
+            }
+            else if (teamKey == "trabzonspor")
+            {
+                // Trabzonspor: Saat Bordo (#A3002B), Dakika Mavi (#38BDF8)
+                var bordo = System.Windows.Media.Color.FromRgb(163, 0, 43);
+                var blue = isDark ? System.Windows.Media.Color.FromRgb(56, 189, 248) : System.Windows.Media.Color.FromRgb(33, 117, 217);
+                _txtHour.Foreground = new SolidColorBrush(bordo);
+                _txtMinute.Foreground = new SolidColorBrush(blue);
+                _txtHour.Effect = null;
+                _txtMinute.Effect = null;
+                if (_txtColon != null)
+                {
+                    _txtColon.Foreground = new SolidColorBrush(bordo);
+                    _txtColon.Visibility = Visibility.Visible;
+                }
+                if (_crescentStarBox != null) _crescentStarBox.Visibility = Visibility.Collapsed;
+            }
+            else if (teamKey == "besiktas")
+            {
+                // Beşiktaş: Saat Siyah (#0F0F12), Dakika Beyaz (#FFFFFF)
+                var black = System.Windows.Media.Color.FromRgb(15, 15, 18);
+                var white = System.Windows.Media.Color.FromRgb(255, 255, 255);
+                _txtHour.Foreground = new SolidColorBrush(black);
+                _txtMinute.Foreground = new SolidColorBrush(white);
+                if (isDark)
+                {
+                    _txtHour.Effect = new DropShadowEffect { Color = Colors.White, BlurRadius = 12, ShadowDepth = 0, Opacity = 0.65 };
+                    _txtMinute.Effect = null;
+                }
+                else
+                {
+                    _txtHour.Effect = null;
+                    _txtMinute.Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 8, ShadowDepth = 0, Opacity = 0.45 };
+                }
+                if (_txtColon != null)
+                {
+                    _txtColon.Foreground = new SolidColorBrush(isDark ? white : black);
+                    _txtColon.Visibility = Visibility.Visible;
+                }
+                if (_crescentStarBox != null) _crescentStarBox.Visibility = Visibility.Collapsed;
+            }
+            else if (teamKey == "fenerbahce")
+            {
+                // Fenerbahçe: Saat Sarı (#FED500), Dakika Lacivert (#1E40AF / #002D72)
+                var yellow = System.Windows.Media.Color.FromRgb(254, 213, 0);
+                var navy = isDark ? System.Windows.Media.Color.FromRgb(59, 130, 246) : System.Windows.Media.Color.FromRgb(0, 45, 114);
+                _txtHour.Foreground = new SolidColorBrush(yellow);
+                _txtMinute.Foreground = new SolidColorBrush(navy);
+                _txtHour.Effect = null;
+                _txtMinute.Effect = null;
+                if (_txtColon != null)
+                {
+                    _txtColon.Foreground = new SolidColorBrush(yellow);
+                    _txtColon.Visibility = Visibility.Visible;
+                }
+                if (_crescentStarBox != null) _crescentStarBox.Visibility = Visibility.Collapsed;
+            }
+            else if (teamKey == "turkiye")
+            {
+                // Türkiye: Saat Kırmızı (#E30A17), Dakika Beyaz (#FFFFFF), Ayraç: Minimal Türk Bayrağı Ay ve Yıldız
+                var red = System.Windows.Media.Color.FromRgb(227, 10, 23);
+                var white = System.Windows.Media.Color.FromRgb(255, 255, 255);
+                _txtHour.Foreground = new SolidColorBrush(red);
+                _txtMinute.Foreground = new SolidColorBrush(white);
+                _txtHour.Effect = null;
+                _txtMinute.Effect = isDark ? null : new DropShadowEffect { Color = Colors.Black, BlurRadius = 8, ShadowDepth = 0, Opacity = 0.45 };
+                if (_txtColon != null) _txtColon.Visibility = Visibility.Collapsed;
+                if (_crescentStarBox != null)
+                {
+                    _crescentStarBox.Visibility = Visibility.Visible;
+                    if (_pathCrescentStar != null)
+                    {
+                        _pathCrescentStar.Fill = new SolidColorBrush(white);
+                    }
+                }
+            }
+            else
+            {
+                // Normal Gün / Maç Yok
+                _txtHour.Foreground = new SolidColorBrush(defaultColor);
+                _txtMinute.Foreground = new SolidColorBrush(defaultColor);
+                _txtHour.Effect = null;
+                _txtMinute.Effect = null;
+                if (_txtColon != null)
+                {
+                    _txtColon.Foreground = new SolidColorBrush(defaultColor);
+                    _txtColon.Visibility = Visibility.Visible;
+                }
+                if (_crescentStarBox != null) _crescentStarBox.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        public void RefreshWeather()
+        {
+            _txtStatus.Text = "Güncelleniyor...";
+            WeatherService.FetchWeatherAsync(_cfg.City, delegate(WeatherData data)
+            {
+                Dispatcher.Invoke(new Action(delegate()
+                {
+                    _txtTemp.Text = data.Temperature.ToString() + "°C";
+                    _txtStatus.Text = data.ConditionText;
+                    _txtCity.Text = data.City.ToUpper(new CultureInfo("tr-TR"));
+                    SetWeatherIcon(data.ConditionType);
+                    if (OnWeatherUpdated != null) OnWeatherUpdated(data.ConditionType);
+                }));
+            });
+        }
+
+        private void SetWeatherIcon(string condition)
+        {
+            _lastWeatherCondition = condition;
+            if (_weatherIconCanvas == null) return;
+            _weatherIconCanvas.Children.Clear();
+
+            switch (condition)
+            {
+                case "clear":
+                {
+                    // Güneşli: Canlı sarı-turuncu degrade parlayan güneş ve ışınlar
+                    var glow = new Ellipse
+                    {
+                        Width = 56, Height = 56,
+                        Margin = new Thickness(4, 4, 0, 0),
+                        Fill = new RadialGradientBrush(
+                            System.Windows.Media.Color.FromArgb(90, 255, 179, 0),
+                            System.Windows.Media.Color.FromArgb(0, 255, 119, 0))
+                    };
+                    _weatherIconCanvas.Children.Add(glow);
+
+                    // Işınlar
+                    var rays = new System.Windows.Shapes.Path
+                    {
+                        Data = Geometry.Parse("M 32,6 L 32,11 M 32,53 L 32,58 M 6,32 L 11,32 M 53,32 L 58,32 M 14,14 L 18,18 M 46,46 L 50,50 M 14,50 L 18,46 M 46,18 L 50,14"),
+                        Stroke = new LinearGradientBrush(
+                            System.Windows.Media.Color.FromRgb(255, 240, 102),
+                            System.Windows.Media.Color.FromRgb(255, 120, 0),
+                            new System.Windows.Point(0, 0), new System.Windows.Point(1, 1)),
+                        StrokeThickness = 3.2,
+                        StrokeStartLineCap = PenLineCap.Round,
+                        StrokeEndLineCap = PenLineCap.Round
+                    };
+                    _weatherIconCanvas.Children.Add(rays);
+
+                    // Güneş Küresi
+                    var sun = new Ellipse
+                    {
+                        Width = 30, Height = 30,
+                        Margin = new Thickness(17, 17, 0, 0),
+                        Fill = new LinearGradientBrush(
+                            System.Windows.Media.Color.FromRgb(255, 240, 102),
+                            System.Windows.Media.Color.FromRgb(255, 85, 0),
+                            new System.Windows.Point(0, 0), new System.Windows.Point(1, 1)),
+                        Effect = new DropShadowEffect
+                        {
+                            Color = System.Windows.Media.Color.FromRgb(217, 119, 6),
+                            BlurRadius = 8,
+                            Opacity = 0.45,
+                            ShadowDepth = 2
+                        }
+                    };
+                    _weatherIconCanvas.Children.Add(sun);
+
+                    // Parlama Glint
+                    var glint = new Ellipse
+                    {
+                        Width = 8, Height = 8,
+                        Margin = new Thickness(22, 22, 0, 0),
+                        Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(100, 255, 255, 255))
+                    };
+                    _weatherIconCanvas.Children.Add(glint);
+                    break;
+                }
+
+                case "partly_cloudy":
+                default:
+                {
+                    // Parçalı Bulutlu: Kullanıcının paylaştığı görseldeki pofuduk mavi bulut arkasından doğan sıcak turuncu güneş
+                    var sunGlow = new Ellipse
+                    {
+                        Width = 34, Height = 34,
+                        Margin = new Thickness(26, 5, 0, 0),
+                        Fill = new RadialGradientBrush(
+                            System.Windows.Media.Color.FromArgb(90, 255, 174, 0),
+                            System.Windows.Media.Color.FromArgb(0, 255, 174, 0))
+                    };
+                    _weatherIconCanvas.Children.Add(sunGlow);
+
+                    var sun = new Ellipse
+                    {
+                        Width = 26, Height = 26,
+                        Margin = new Thickness(30, 9, 0, 0),
+                        Fill = new LinearGradientBrush(
+                            System.Windows.Media.Color.FromRgb(255, 224, 67),
+                            System.Windows.Media.Color.FromRgb(255, 94, 0),
+                            new System.Windows.Point(0, 0), new System.Windows.Point(1, 1)),
+                        Effect = new DropShadowEffect
+                        {
+                            Color = System.Windows.Media.Color.FromRgb(249, 115, 22),
+                            BlurRadius = 6,
+                            Opacity = 0.45,
+                            ShadowDepth = 1.5
+                        }
+                    };
+                    _weatherIconCanvas.Children.Add(sun);
+
+                    // Pofuduk Pastel Mavi Bulut
+                    var cloud = new System.Windows.Shapes.Path
+                    {
+                        Data = Geometry.Parse("M 19 49 C 13.5 49 9 44.5 9 39 C 9 34 12.8 29.8 17.7 29.1 C 19.8 21.2 27 15.5 35.5 15.5 C 44.8 15.5 52.4 22.4 53.6 31.5 C 57.6 32.8 60.5 36.6 60.5 41 C 60.5 45.4 56.9 49 52.5 49 Z"),
+                        Fill = new LinearGradientBrush(
+                            new GradientStopCollection
+                            {
+                                new GradientStop(System.Windows.Media.Color.FromRgb(226, 241, 255), 0.0),
+                                new GradientStop(System.Windows.Media.Color.FromRgb(165, 206, 255), 0.35),
+                                new GradientStop(System.Windows.Media.Color.FromRgb(94, 158, 247), 0.75),
+                                new GradientStop(System.Windows.Media.Color.FromRgb(59, 130, 246), 1.0)
+                            },
+                            new System.Windows.Point(0.25, 0), new System.Windows.Point(0.65, 1)),
+                        Effect = new DropShadowEffect
+                        {
+                            Color = System.Windows.Media.Color.FromRgb(30, 58, 138),
+                            BlurRadius = 8,
+                            Opacity = 0.3,
+                            ShadowDepth = 3
+                        }
+                    };
+                    _weatherIconCanvas.Children.Add(cloud);
+
+                    // Üst 3D Işık Yansıması
+                    var hi = new System.Windows.Shapes.Path
+                    {
+                        Data = Geometry.Parse("M 18.5 30 C 20.5 22.5 27.2 17 35.5 17 C 43.8 17 50.8 22.8 52.3 31 C 49 29.5 42 28.5 35 29 C 27 29.5 21 30.5 18.5 30 Z"),
+                        Fill = new LinearGradientBrush(
+                            System.Windows.Media.Color.FromArgb(190, 255, 255, 255),
+                            System.Windows.Media.Color.FromArgb(0, 255, 255, 255),
+                            new System.Windows.Point(0, 0), new System.Windows.Point(0, 1))
+                    };
+                    _weatherIconCanvas.Children.Add(hi);
+                    break;
+                }
+
+                case "overcast":
+                {
+                    // Bulutlu: Katmanlı gri-mavi ve pofuduk açık mavi bulutlar
+                    var backCloud = new System.Windows.Shapes.Path
+                    {
+                        Data = Geometry.Parse("M 28 38 C 24 38 21 34.5 21 30 C 21 26 24 23 28 22.5 C 29.5 16 35.5 11 42.5 11 C 50.5 11 57 17 58 24.5 C 61 25.5 63 28.5 63 32 C 63 35.5 60 38 56.5 38 Z"),
+                        Fill = new LinearGradientBrush(
+                            System.Windows.Media.Color.FromRgb(203, 213, 225),
+                            System.Windows.Media.Color.FromRgb(100, 116, 139),
+                            new System.Windows.Point(0.2, 0), new System.Windows.Point(0.8, 1)),
+                        Opacity = 0.85
+                    };
+                    _weatherIconCanvas.Children.Add(backCloud);
+
+                    var frontCloud = new System.Windows.Shapes.Path
+                    {
+                        Data = Geometry.Parse("M 18 51 C 12.5 51 8 46.5 8 41 C 8 36 11.8 31.8 16.7 31.1 C 18.8 23.2 26 17.5 34.5 17.5 C 43.8 17.5 51.4 24.4 52.6 33.5 C 56.6 34.8 59.5 38.6 59.5 43 C 59.5 47.4 55.9 51 51.5 51 Z"),
+                        Fill = new LinearGradientBrush(
+                            new GradientStopCollection
+                            {
+                                new GradientStop(System.Windows.Media.Color.FromRgb(241, 245, 249), 0.0),
+                                new GradientStop(System.Windows.Media.Color.FromRgb(191, 219, 254), 0.4),
+                                new GradientStop(System.Windows.Media.Color.FromRgb(96, 165, 250), 1.0)
+                            },
+                            new System.Windows.Point(0.2, 0), new System.Windows.Point(0.7, 1)),
+                        Effect = new DropShadowEffect
+                        {
+                            Color = System.Windows.Media.Color.FromRgb(30, 41, 59),
+                            BlurRadius = 8,
+                            Opacity = 0.28,
+                            ShadowDepth = 3
+                        }
+                    };
+                    _weatherIconCanvas.Children.Add(frontCloud);
+                    break;
+                }
+
+                case "rain":
+                {
+                    // Yağmurlu: Mavi pofuduk bulut ve canlı yuvarlak mavi damlalar
+                    var cloud = new System.Windows.Shapes.Path
+                    {
+                        Data = Geometry.Parse("M 18 43 C 12.5 43 8 38.5 8 33 C 8 28 11.8 23.8 16.7 23.1 C 18.8 15.2 26 9.5 34.5 9.5 C 43.8 9.5 51.4 16.4 52.6 25.5 C 56.6 26.8 59.5 30.6 59.5 35 C 59.5 39.4 55.9 43 51.5 43 Z"),
+                        Fill = new LinearGradientBrush(
+                            new GradientStopCollection
+                            {
+                                new GradientStop(System.Windows.Media.Color.FromRgb(226, 238, 254), 0.0),
+                                new GradientStop(System.Windows.Media.Color.FromRgb(147, 197, 253), 0.4),
+                                new GradientStop(System.Windows.Media.Color.FromRgb(59, 130, 246), 1.0)
+                            },
+                            new System.Windows.Point(0.2, 0), new System.Windows.Point(0.7, 1)),
+                        Effect = new DropShadowEffect
+                        {
+                            Color = System.Windows.Media.Color.FromRgb(30, 58, 138),
+                            BlurRadius = 8,
+                            Opacity = 0.3,
+                            ShadowDepth = 3
+                        }
+                    };
+                    _weatherIconCanvas.Children.Add(cloud);
+
+                    // Damlalar
+                    var drops = new System.Windows.Shapes.Path
+                    {
+                        Data = Geometry.Parse("M 21,48 L 18,57 M 33,48 L 30,57 M 45,48 L 42,57"),
+                        Stroke = new LinearGradientBrush(
+                            System.Windows.Media.Color.FromRgb(96, 165, 250),
+                            System.Windows.Media.Color.FromRgb(2, 132, 199),
+                            new System.Windows.Point(0, 0), new System.Windows.Point(0, 1)),
+                        StrokeThickness = 3.2,
+                        StrokeStartLineCap = PenLineCap.Round,
+                        StrokeEndLineCap = PenLineCap.Round
+                    };
+                    _weatherIconCanvas.Children.Add(drops);
+                    break;
+                }
+
+                case "thunder":
+                {
+                    // Gök Gürültülü: Koyu fırtına bulutu ve parlayan sarı şimşek
+                    var cloud = new System.Windows.Shapes.Path
+                    {
+                        Data = Geometry.Parse("M 18 43 C 12.5 43 8 38.5 8 33 C 8 28 11.8 23.8 16.7 23.1 C 18.8 15.2 26 9.5 34.5 9.5 C 43.8 9.5 51.4 16.4 52.6 25.5 C 56.6 26.8 59.5 30.6 59.5 35 C 59.5 39.4 55.9 43 51.5 43 Z"),
+                        Fill = new LinearGradientBrush(
+                            new GradientStopCollection
+                            {
+                                new GradientStop(System.Windows.Media.Color.FromRgb(148, 163, 184), 0.0),
+                                new GradientStop(System.Windows.Media.Color.FromRgb(71, 85, 105), 0.5),
+                                new GradientStop(System.Windows.Media.Color.FromRgb(30, 41, 59), 1.0)
+                            },
+                            new System.Windows.Point(0.2, 0), new System.Windows.Point(0.7, 1)),
+                        Effect = new DropShadowEffect
+                        {
+                            Color = System.Windows.Media.Color.FromRgb(15, 23, 42),
+                            BlurRadius = 8,
+                            Opacity = 0.4,
+                            ShadowDepth = 3
+                        }
+                    };
+                    _weatherIconCanvas.Children.Add(cloud);
+
+                    var bolt = new System.Windows.Shapes.Path
+                    {
+                        Data = Geometry.Parse("M 33 35 L 25 48 L 32 48 L 29 60 L 41 46 L 34 46 Z"),
+                        Fill = new LinearGradientBrush(
+                            System.Windows.Media.Color.FromRgb(254, 240, 138),
+                            System.Windows.Media.Color.FromRgb(234, 88, 12),
+                            new System.Windows.Point(0, 0), new System.Windows.Point(1, 1)),
+                        Effect = new DropShadowEffect
+                        {
+                            Color = System.Windows.Media.Color.FromRgb(251, 191, 36),
+                            BlurRadius = 6,
+                            Opacity = 0.8,
+                            ShadowDepth = 1.5
+                        }
+                    };
+                    _weatherIconCanvas.Children.Add(bolt);
+                    break;
+                }
+
+                case "snow":
+                {
+                    // Karlı: Buzul mavi bulut ve beyaz kar taneleri
+                    var cloud = new System.Windows.Shapes.Path
+                    {
+                        Data = Geometry.Parse("M 18 43 C 12.5 43 8 38.5 8 33 C 8 28 11.8 23.8 16.7 23.1 C 18.8 15.2 26 9.5 34.5 9.5 C 43.8 9.5 51.4 16.4 52.6 25.5 C 56.6 26.8 59.5 30.6 59.5 35 C 59.5 39.4 55.9 43 51.5 43 Z"),
+                        Fill = new LinearGradientBrush(
+                            new GradientStopCollection
+                            {
+                                new GradientStop(System.Windows.Media.Color.FromRgb(240, 249, 255), 0.0),
+                                new GradientStop(System.Windows.Media.Color.FromRgb(186, 230, 253), 0.4),
+                                new GradientStop(System.Windows.Media.Color.FromRgb(56, 189, 248), 1.0)
+                            },
+                            new System.Windows.Point(0.2, 0), new System.Windows.Point(0.7, 1)),
+                        Effect = new DropShadowEffect
+                        {
+                            Color = System.Windows.Media.Color.FromRgb(2, 132, 199),
+                            BlurRadius = 8,
+                            Opacity = 0.28,
+                            ShadowDepth = 3
+                        }
+                    };
+                    _weatherIconCanvas.Children.Add(cloud);
+
+                    Action<double, double> addSnowDot = delegate(double x, double y)
+                    {
+                        var dot = new Ellipse
+                        {
+                            Width = 6, Height = 6,
+                            Margin = new Thickness(x, y, 0, 0),
+                            Fill = System.Windows.Media.Brushes.White,
+                            Stroke = new SolidColorBrush(System.Windows.Media.Color.FromRgb(186, 230, 253)),
+                            StrokeThickness = 1,
+                            Effect = new DropShadowEffect
+                            {
+                                Color = System.Windows.Media.Color.FromRgb(186, 230, 253),
+                                BlurRadius = 4,
+                                Opacity = 0.7,
+                                ShadowDepth = 0
+                            }
+                        };
+                        _weatherIconCanvas.Children.Add(dot);
+                    };
+                    addSnowDot(18, 49);
+                    addSnowDot(30, 53);
+                    addSnowDot(42, 49);
+                    break;
+                }
+
+                case "fog":
+                {
+                    // Sisli: Soluk güneş ve yatay yumuşak sis çizgileri
+                    var sun = new Ellipse
+                    {
+                        Width = 26, Height = 26,
+                        Margin = new Thickness(19, 10, 0, 0),
+                        Fill = new LinearGradientBrush(
+                            System.Windows.Media.Color.FromRgb(253, 224, 71),
+                            System.Windows.Media.Color.FromRgb(251, 146, 60),
+                            new System.Windows.Point(0, 0), new System.Windows.Point(1, 1)),
+                        Opacity = 0.75
+                    };
+                    _weatherIconCanvas.Children.Add(sun);
+
+                    Action<double, double, double> addFogLine = delegate(double x, double y, double w)
+                    {
+                        var rect = new System.Windows.Shapes.Rectangle
+                        {
+                            Width = w, Height = 4.5,
+                            RadiusX = 2.25, RadiusY = 2.25,
+                            Margin = new Thickness(x, y, 0, 0),
+                            Fill = new LinearGradientBrush(
+                                System.Windows.Media.Color.FromArgb(90, 147, 197, 253),
+                                System.Windows.Media.Color.FromArgb(220, 147, 197, 253),
+                                new System.Windows.Point(0, 0), new System.Windows.Point(1, 0))
+                        };
+                        _weatherIconCanvas.Children.Add(rect);
+                    };
+                    addFogLine(12, 38, 40);
+                    addFogLine(16, 46, 32);
+                    addFogLine(20, 54, 24);
+                    break;
+                }
+            }
+        }
+
+        public void ResetPosition()
+        {
+            TopCenterWidget();
+        }
+
+        public void ApplyWindowPosition()
+        {
+            if (_cfg.WidgetPosition == "custom" && _cfg.WidgetX >= 0 && _cfg.WidgetY >= 0)
+            {
+                Left = _cfg.WidgetX;
+                Top = _cfg.WidgetY;
+            }
+            else if (_cfg.WidgetPosition == "center")
+            {
+                CenterWidget();
+            }
+            else if (_cfg.WidgetPosition == "top_center" || _cfg.WidgetPosition == "top" || _cfg.WidgetX < 0 || _cfg.WidgetY < 0)
+            {
+                TopCenterWidget();
+            }
+            else
+            {
+                Left = _cfg.WidgetX;
+                Top = _cfg.WidgetY;
+            }
+
+            var wa = Forms.Screen.PrimaryScreen.WorkingArea;
+            if (Left < wa.Left) Left = wa.Left + 10;
+            if (Top < wa.Top) Top = wa.Top + 10;
+        }
+
+        public void CenterWidget()
+        {
+            Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+            Arrange(new Rect(0, 0, DesiredSize.Width, DesiredSize.Height));
+
+            double screenW = SystemParameters.PrimaryScreenWidth;
+            double screenH = SystemParameters.PrimaryScreenHeight;
+
+            double w = ActualWidth > 0 ? ActualWidth : (DesiredSize.Width > 0 ? DesiredSize.Width : 520);
+            double h = ActualHeight > 0 ? ActualHeight : (DesiredSize.Height > 0 ? DesiredSize.Height : 160);
+
+            Left = (screenW - w) / 2;
+            Top = (screenH - h) / 2;
+
+            _cfg.WidgetPosition = "center";
+            _cfg.WidgetX = Left;
+            _cfg.WidgetY = Top;
+            _cfg.Save();
+            ApplyZOrder();
+        }
+
+        public void TopCenterWidget()
+        {
+            Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+            Arrange(new Rect(0, 0, DesiredSize.Width, DesiredSize.Height));
+
+            double screenW = SystemParameters.PrimaryScreenWidth;
+            double w = ActualWidth > 0 ? ActualWidth : (DesiredSize.Width > 0 ? DesiredSize.Width : 520);
+
+            Left = (screenW - w) / 2;
+            Top = 36; // Ekranın üst kısmında zarif mesafe
+
+            _cfg.WidgetPosition = "top_center";
+            _cfg.WidgetX = Left;
+            _cfg.WidgetY = Top;
+            _cfg.Save();
+            ApplyZOrder();
+        }
+
+        public void TogglePosition()
+        {
+            if (_cfg.WidgetPosition == "top_center")
+            {
+                CenterWidget();
+            }
+            else
+            {
+                TopCenterWidget();
+            }
+        }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            IntPtr hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                if (_cfg.WidgetPinnedToDesktop && !_cfg.WidgetAlwaysOnTop)
+                {
+                    exStyle |= Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE;
+                }
+                else
+                {
+                    exStyle |= Win32.WS_EX_TOOLWINDOW;
+                }
+                Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle);
+
+                HwndSource source = HwndSource.FromHwnd(hwnd);
+                if (source != null)
+                {
+                    source.AddHook(WidgetWndProc);
+                }
+            }
+        }
+
+        private IntPtr WidgetWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            const int WM_MOUSEACTIVATE = 0x0021;
+            const int MA_NOACTIVATE = 3;
+            const int WM_ACTIVATE = 0x0006;
+            const int WA_INACTIVE = 0;
+            const int WM_WINDOWPOSCHANGING = 0x0046;
+
+            if (!IsAmbientMode && _cfg.WidgetPinnedToDesktop && !_cfg.WidgetAlwaysOnTop)
+            {
+                if (msg == WM_MOUSEACTIVATE)
+                {
+                    handled = true;
+                    return new IntPtr(MA_NOACTIVATE);
+                }
+                else if (msg == WM_ACTIVATE)
+                {
+                    int wa = (int)wParam & 0xFFFF;
+                    if (wa != WA_INACTIVE)
+                    {
+                        handled = true;
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            ApplyZOrder();
+                        }), DispatcherPriority.Input);
+                        return IntPtr.Zero;
+                    }
+                }
+                else if (msg == WM_WINDOWPOSCHANGING)
+                {
+                    try
+                    {
+                        var pos = (Win32.WINDOWPOS)Marshal.PtrToStructure(lParam, typeof(Win32.WINDOWPOS));
+                        if ((pos.flags & Win32.SWP_NOZORDER) == 0)
+                        {
+                            if (pos.hwndInsertAfter != Win32.HWND_BOTTOM)
+                            {
+                                pos.hwndInsertAfter = Win32.HWND_BOTTOM;
+                                Marshal.StructureToPtr(pos, lParam, false);
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+            return IntPtr.Zero;
+        }
+
+        protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
+        {
+            base.OnPreviewMouseDown(e);
+            if (!IsAmbientMode && _cfg.WidgetPinnedToDesktop && !_cfg.WidgetAlwaysOnTop)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!IsAmbientMode && _cfg.WidgetPinnedToDesktop && !_cfg.WidgetAlwaysOnTop)
+                    {
+                        ApplyZOrder();
+                    }
+                }), DispatcherPriority.Input);
+            }
+        }
+
+        private bool _isApplyingZOrder = false;
+
+        public void ApplyZOrder()
+        {
+            if (_isApplyingZOrder) return;
+            _isApplyingZOrder = true;
+            try
+            {
+                IntPtr hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd == IntPtr.Zero) return;
+
+                bool isWallpaperActive = IsWallpaperActiveFunc != null && IsWallpaperActiveFunc();
+
+                if (_cfg.WidgetPinnedToDesktop)
+                {
+                    Topmost = false;
+
+                    // WS_EX_NOACTIVATE ile tıklamalarda ön plana / açık pencerelerin üstüne fırlamasını kesin olarak engelle
+                    int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                    exStyle |= Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE;
+                    Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle);
+
+                    // 1. Önce widget'ı arka plan katmanına (HWND_BOTTOM) sabitle
+                    Win32.SetWindowPos(hwnd, Win32.HWND_BOTTOM, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+
+                    // 2. İlham kartlarını da (Günün Âyeti & Hadîsi) HWND_BOTTOM seviyesine sabitle
+                    if (GetInspirationHandlesFunc != null)
+                    {
+                        foreach (var inspHwnd in GetInspirationHandlesFunc())
+                        {
+                            if (inspHwnd != IntPtr.Zero && Win32.IsWindow(inspHwnd))
+                            {
+                                int iex = Win32.GetWindowLong(inspHwnd, Win32.GWL_EXSTYLE);
+                                iex |= Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE;
+                                Win32.SetWindowLong(inspHwnd, Win32.GWL_EXSTYLE, iex);
+                                Win32.SetWindowPos(inspHwnd, Win32.HWND_BOTTOM, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+                            }
+                        }
+                    }
+
+                    // 3. Canlı duvar kağıdı açıksa, duvar kağıtlarını widget ve kartların hemen altına (en dibe) yerleştir
+                    if (isWallpaperActive)
+                    {
+                        foreach (var wHwnd in Win32.WallpaperWindowHandles)
+                        {
+                            if (wHwnd != IntPtr.Zero && Win32.IsWindow(wHwnd))
+                            {
+                                Win32.SetWindowPos(wHwnd, Win32.HWND_BOTTOM, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+                            }
+                        }
+                    }
+                }
+                else if (_cfg.WidgetAlwaysOnTop)
+                {
+                    Topmost = true;
+                    int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                    exStyle &= ~Win32.WS_EX_NOACTIVATE;
+                    exStyle |= Win32.WS_EX_TOOLWINDOW;
+                    Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle);
+
+                    Win32.SetWindowPos(hwnd, Win32.HWND_TOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+                }
+                else
+                {
+                    Topmost = false;
+                    int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                    exStyle &= ~Win32.WS_EX_NOACTIVATE;
+                    exStyle |= Win32.WS_EX_TOOLWINDOW;
+                    Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle);
+
+                    Win32.SetWindowPos(hwnd, Win32.HWND_NOTOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+                }
+            }
+            catch { }
+            finally
+            {
+                _isApplyingZOrder = false;
+            }
+        }
+    }
+
+    // ==========================================
+    // DUVAR KAĞIDI YÖNETİCİSİ VE TAM KALİTE YÜKLEYİCİ
+    // Mimari & Tasarım: Serkan ŞENTÜRK
+    // ==========================================
+    public static class WallpaperService
+    {
+        public static string GetCurrentWindowsWallpaperPath()
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop"))
+                {
+                    if (key != null)
+                    {
+                        object val = key.GetValue("Wallpaper");
+                        if (val != null)
+                        {
+                            string path = val.ToString();
+                            if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                                return path;
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                var sb = new StringBuilder(512);
+                if (Win32.SystemParametersInfo(Win32.SPI_GETDESKWALLPAPER, (uint)sb.Capacity, sb, 0))
+                {
+                    string path = sb.ToString();
+                    if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                        return path;
+                }
+            }
+            catch { }
+
+            try
+            {
+                string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                string transcoded = System.IO.Path.Combine(appData, @"Microsoft\Windows\Themes\TranscodedWallpaper");
+                if (File.Exists(transcoded)) return transcoded;
+            }
+            catch { }
+
+            return null;
+        }
+
+        public static string GetEffectiveWallpaperPath(Config cfg)
+        {
+            if (cfg != null && !string.IsNullOrEmpty(cfg.CustomWallpaperPath) && File.Exists(cfg.CustomWallpaperPath))
+            {
+                return cfg.CustomWallpaperPath;
+            }
+            return GetCurrentWindowsWallpaperPath();
+        }
+
+        public static System.Windows.Media.Imaging.BitmapImage LoadHighQualityBitmap(string path)
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
+            try
+            {
+                int maxW = 1920;
+                try
+                {
+                    foreach (var scr in System.Windows.Forms.Screen.AllScreens)
+                    {
+                        if (scr.Bounds.Width > maxW) maxW = scr.Bounds.Width;
+                    }
+                }
+                catch { maxW = (int)SystemParameters.PrimaryScreenWidth; }
+                if (maxW < 1920) maxW = 1920;
+                if (maxW > 3840) maxW = 3840;
+
+                var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                bmp.BeginInit();
+                bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                bmp.CreateOptions = System.Windows.Media.Imaging.BitmapCreateOptions.PreservePixelFormat | System.Windows.Media.Imaging.BitmapCreateOptions.IgnoreColorProfile;
+                bmp.UriSource = new Uri(path, UriKind.Absolute);
+                bmp.DecodePixelWidth = maxW;
+                bmp.EndInit();
+                bmp.Freeze();
+                return bmp;
+            }
+            catch
+            {
+                try
+                {
+                    var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                    bmp.BeginInit();
+                    bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                    bmp.UriSource = new Uri(path, UriKind.Absolute);
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    return bmp;
+                }
+                catch { return null; }
+            }
+        }
+    }
+
+    // ==========================================
+    // EXCEL COM VE YANSIMA (REFLECTION) YARDIMCISI
+    // ==========================================
+    public static class ComHelper
+    {
+        public static object Get(object target, string prop)
+        {
+            if (target == null) return null;
+            return target.GetType().InvokeMember(prop, System.Reflection.BindingFlags.GetProperty, null, target, null);
+        }
+
+        public static object Call(object target, string method, params object[] args)
+        {
+            if (target == null) return null;
+            return target.GetType().InvokeMember(method, System.Reflection.BindingFlags.InvokeMethod, null, target, args);
+        }
+
+        public static object GetItem(object target, string prop, params object[] args)
+        {
+            if (target == null) return null;
+            return target.GetType().InvokeMember(prop, System.Reflection.BindingFlags.GetProperty, null, target, args);
+        }
+
+        public static void Set(object target, string prop, object value)
+        {
+            if (target == null) return;
+            target.GetType().InvokeMember(prop, System.Reflection.BindingFlags.SetProperty, null, target, new object[] { value });
+        }
+    }
+
+    // ==========================================
+    // VARDİYA & NÖBETÇİ PERSONEL MODELLERİ
+    // ==========================================
+    public class ShiftPerson
+    {
+        public string Name { get; set; }
+        public string Role { get; set; }
+        public string ShiftCode { get; set; }
+        public string ShiftType { get; set; } // "S", "A", "G", "OFF"
+        public bool IsOvertime { get; set; }
+        public string ShiftHours { get; set; }
+        public bool IsSupervisor { get; set; }
+    }
+
+    public class ShiftDayResult
+    {
+        public DateTime Date { get; set; }
+        public string FilePath { get; set; }
+        public string SheetName { get; set; }
+        public List<ShiftPerson> Morning { get; set; }
+        public List<ShiftPerson> Evening { get; set; }
+        public List<ShiftPerson> Night { get; set; }
+        public List<ShiftPerson> AllWorking { get; set; }
+        public List<ShiftPerson> Supervisors { get; set; }
+        public string ErrorMessage { get; set; }
+
+        public ShiftDayResult()
+        {
+            Morning = new List<ShiftPerson>();
+            Evening = new List<ShiftPerson>();
+            Night = new List<ShiftPerson>();
+            AllWorking = new List<ShiftPerson>();
+            Supervisors = new List<ShiftPerson>();
+        }
+    }
+
+    public class ShiftScheduleCache
+    {
+        public string FilePath;
+        public DateTime FileLastWriteTime;
+        public int Year;
+        public int Month;
+        public string SheetName;
+        public object[,] CellValues;
+        public int NameCol = 3;
+        public int RoleCol = 4;
+        public Dictionary<int, int> DayToColMap = new Dictionary<int, int>();
+    }
+
+    // ==========================================
+    // WINDOWS KISAYOL (.LNK) VE AĞ YOLU ÇÖZÜCÜ
+    // Mimari & Tasarım: Serkan ŞENTÜRK
+    // ==========================================
+    public static class ShellLinkHelper
+    {
+        [ComImport]
+        [Guid("00021401-0000-0000-C000-000000000046")]
+        internal class ShellLink { }
+
+        [ComImport]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        [Guid("000214F9-0000-0000-C000-000000000046")]
+        internal interface IShellLinkW
+        {
+            void GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszFile, int cchMaxPath, IntPtr pfd, uint fFlags);
+            void GetIDList(out IntPtr ppidl);
+            void SetIDList(IntPtr pidl);
+            void GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszName, int cchMaxName);
+            void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string pszName);
+            void GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszDir, int cchMaxPath);
+            void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string pszDir);
+            void GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszArgs, int cchMaxPath);
+            void SetArguments([MarshalAs(UnmanagedType.LPWStr)] string pszArgs);
+            void GetHotkey(out short pwHotkey);
+            void SetHotkey(short wHotkey);
+            void GetShowCmd(out int piShowCmd);
+            void SetShowCmd(int iShowCmd);
+            void GetIconLocation([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszIconPath, int cchIconPath, out int piIcon);
+            void SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string pszIconPath, int iIcon);
+            void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string pszPathRel, uint dwReserved);
+            void Resolve(IntPtr hwnd, uint fFlags);
+            void SetPath([MarshalAs(UnmanagedType.LPWStr)] string pszFile);
+        }
+
+        [ComImport]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        [Guid("0000010b-0000-0000-C000-000000000046")]
+        internal interface IPersistFile
+        {
+            void GetClassID(out Guid pClassID);
+            [PreserveSig] int IsDirty();
+            void Load([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, uint dwMode);
+            void Save([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, [MarshalAs(UnmanagedType.Bool)] bool fRemember);
+            void SaveCompleted([MarshalAs(UnmanagedType.LPWStr)] string pszFileName);
+            void GetCurFile([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder ppszFileName);
+        }
+
+        public static string ResolveShortcut(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return path;
+            if (!path.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)) return path;
+            if (!File.Exists(path)) return path;
+
+            try
+            {
+                var link = (IShellLinkW)new ShellLink();
+                var persistFile = (IPersistFile)link;
+                persistFile.Load(path, 0); // 0 = STGM_READ
+
+                var sb = new StringBuilder(1024);
+                // 2 = SLGP_UNCPRIORITY, 4 = SLGP_RAWPATH
+                link.GetPath(sb, sb.Capacity, IntPtr.Zero, 2);
+                string target = sb.ToString();
+                if (string.IsNullOrEmpty(target))
+                {
+                    link.GetPath(sb, sb.Capacity, IntPtr.Zero, 4);
+                    target = sb.ToString();
+                }
+
+                Marshal.ReleaseComObject(link);
+
+                if (!string.IsNullOrEmpty(target)) return target;
+            }
+            catch { }
+
+            return path;
+        }
+
+        public static string FindDesktopScheduleShortcut()
+        {
+            try
+            {
+                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                if (Directory.Exists(desktop))
+                {
+                    var lnkFiles = Directory.GetFiles(desktop, "*.lnk");
+                    foreach (var f in lnkFiles)
+                    {
+                        string fname = System.IO.Path.GetFileName(f).ToUpper(new CultureInfo("tr-TR"));
+                        if (fname.Contains("CALISMA") || fname.Contains("ÇALIŞMA") || 
+                            fname.Contains("CIZELGE") || fname.Contains("ÇİZELGE") ||
+                            fname.Contains("VARDİYA") || fname.Contains("VARDIYA") ||
+                            fname.Contains("NÖBET") || fname.Contains("NOBET"))
+                        {
+                            return f;
+                        }
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        public static string PromptPickShortcutOrFile(string currentPath = "", string title = null)
+        {
+            try
+            {
+                using (var ofd = new System.Windows.Forms.OpenFileDialog())
+                {
+                    ofd.Title = !string.IsNullOrEmpty(title) ? title : "\u00C7al\u0131\u015Fma \u00C7izelgesi Masa\u00FCst\u00FC K\u0131sayolunu (.lnk) veya Excel \u00C7izelgesini Se\u00E7in";
+                    ofd.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    if (!string.IsNullOrEmpty(currentPath))
+                    {
+                        try
+                        {
+                            string resolved = ResolveShortcut(currentPath);
+                            if (File.Exists(resolved))
+                                ofd.InitialDirectory = System.IO.Path.GetDirectoryName(resolved);
+                            else if (Directory.Exists(resolved))
+                                ofd.InitialDirectory = resolved;
+                        }
+                        catch { }
+                    }
+                    ofd.Filter = "T\u00FCm Desteklenen \u00C7izelgeler (*.lnk;*.xlsx;*.xls)|*.lnk;*.xlsx;*.xls|Masa\u00FCst\u00FC K\u0131sayollar\u0131 (*.lnk)|*.lnk|Excel \u00C7al\u0131\u015Fma Kitaplar\u0131 (*.xlsx;*.xls)|*.xlsx;*.xls|T\u00FCm Dosyalar (*.*)|*.*";
+                    ofd.FilterIndex = 1;
+                    ofd.DereferenceLinks = false; // K\u0131sayol dosyas\u0131n\u0131 (.lnk) do\u011Frudan se\u00E7ebilmek i\u00E7in \u00C7OK KR\u0130T\u0130K
+                    ofd.CheckFileExists = true;
+                    ofd.Multiselect = false;
+
+                    if (ofd.ShowDialog() == System.Windows.Forms.DialogResult.OK && !string.IsNullOrEmpty(ofd.FileName))
+                    {
+                        return ofd.FileName;
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        public static string PromptPickFolder(string currentPath = "", string description = null)
+        {
+            try
+            {
+                using (var fbd = new System.Windows.Forms.FolderBrowserDialog())
+                {
+                    fbd.Description = !string.IsNullOrEmpty(description) ? description : "\u00C7al\u0131\u015Fma \u00E7izelgelerinin yer ald\u0131\u011F\u0131 ana klas\u00F6r\u00FC se\u00E7in (\u00F6rn: D:\\2026 \u00C7ALI\u015EMA \u00C7\u0130ZELGELER\u0130):";
+                    fbd.ShowNewFolderButton = false;
+                    if (!string.IsNullOrEmpty(currentPath))
+                    {
+                        string resolved = ResolveShortcut(currentPath);
+                        if (Directory.Exists(resolved)) fbd.SelectedPath = resolved;
+                    }
+                    if (fbd.ShowDialog() == System.Windows.Forms.DialogResult.OK && !string.IsNullOrEmpty(fbd.SelectedPath))
+                    {
+                        return fbd.SelectedPath;
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+    }
+
+    // ==========================================
+    // DİNAMİK VARDİYA ÇİZELGESİ OKUMA SERVİSİ
+    // ==========================================
+    public static class ShiftScheduleService
+    {
+        private static ShiftScheduleCache _kmCache = null;
+        private static ShiftScheduleCache _supCache = null;
+        private static readonly object _syncLock = new object();
+
+        private static readonly string[] MonthNames = new string[]
+        {
+            "", "OCAK", "\u015EUBAT", "MART", "N\u0130SAN", "MAYIS", "HAZ\u0130RAN", "TEMMUZ", "A\u011EUSTOS", "EYL\u00DCL", "EK\u0130M", "KASIM", "ARALIK"
+        };
+
+        public static string FindScheduleFile(DateTime targetDate, string targetFolder)
+        {
+            if (string.IsNullOrEmpty(targetFolder))
+                return null;
+
+            string effectivePath = ShellLinkHelper.ResolveShortcut(targetFolder);
+
+            if (File.Exists(effectivePath))
+                return effectivePath;
+
+            if (!Directory.Exists(effectivePath))
+                return null;
+
+            int year = targetDate.Year;
+            int month = targetDate.Month;
+            string mName = MonthNames[month];
+
+            string activeYearDir = effectivePath;
+
+            try
+            {
+                string yearStr = year.ToString();
+                var subYearDirs = Directory.GetDirectories(effectivePath, "*" + yearStr + "*", SearchOption.TopDirectoryOnly);
+                if (subYearDirs != null && subYearDirs.Length > 0)
+                {
+                    activeYearDir = subYearDirs[0];
+                }
+            }
+            catch { }
+
+            try
+            {
+                string yearStr = year.ToString();
+                if (!System.IO.Path.GetFileName(activeYearDir).Contains(yearStr))
+                {
+                    string parent = System.IO.Path.GetDirectoryName(activeYearDir.TrimEnd('\\', '/'));
+                    if (!string.IsNullOrEmpty(parent) && Directory.Exists(parent))
+                    {
+                        var parallelDirs = Directory.GetDirectories(parent, "*" + yearStr + "*", SearchOption.TopDirectoryOnly);
+                        if (parallelDirs != null && parallelDirs.Length > 0)
+                        {
+                            activeYearDir = parallelDirs[0];
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            string foundMonthDir = null;
+            try
+            {
+                var subDirs = Directory.GetDirectories(activeYearDir);
+                string mNum1 = month.ToString();
+                string mNum2 = month.ToString("D2");
+
+                foreach (var sd in subDirs)
+                {
+                    string name = System.IO.Path.GetFileName(sd).ToUpper(new CultureInfo("tr-TR"));
+                    if (name.Contains(mName) || name.StartsWith(mNum2) || name.StartsWith(mNum1))
+                    {
+                        foundMonthDir = sd;
+                        break;
+                    }
+                }
+            }
+            catch { }
+
+            if (foundMonthDir == null) foundMonthDir = activeYearDir;
+
+            try
+            {
+                var files = Directory.GetFiles(foundMonthDir, "*.xlsx");
+                string mNum2 = month.ToString("D2");
+
+                // 1. Once Ay Adini ara
+                foreach (var f in files)
+                {
+                    string fname = System.IO.Path.GetFileName(f);
+                    if (fname.StartsWith("~$")) continue;
+                    string upper = fname.ToUpper(new CultureInfo("tr-TR"));
+                    if (upper.Contains(mName))
+                    {
+                        return f;
+                    }
+                }
+
+                // 2. Ay Numarasini ara
+                foreach (var f in files)
+                {
+                    string fname = System.IO.Path.GetFileName(f);
+                    if (fname.StartsWith("~$")) continue;
+                    string upper = fname.ToUpper(new CultureInfo("tr-TR"));
+                    if (upper.StartsWith(mNum2) || upper.Contains(" " + mNum2 + " ") || upper.Contains("-" + mNum2) || upper.Contains(mNum2 + " -") || upper.Contains(mNum2 + "."))
+                    {
+                        return f;
+                    }
+                }
+
+                // 3. Calisma cizelgesi adini ara
+                foreach (var f in files)
+                {
+                    string fname = System.IO.Path.GetFileName(f);
+                    if (fname.StartsWith("~$")) continue;
+                    string upper = fname.ToUpper(new CultureInfo("tr-TR"));
+                    if (upper.Contains("\u00C7ALI\u015EMA") || upper.Contains("\u00C7\u0130ZELGE") || upper.Contains("CIZELGE") || upper.Contains("CALISMA"))
+                    {
+                        return f;
+                    }
+                }
+
+                // 4. Herhangi bir .xlsx dosyasi
+                foreach (var f in files)
+                {
+                    if (!System.IO.Path.GetFileName(f).StartsWith("~$")) return f;
+                }
+            }
+            catch { }
+
+            return null;
+        }
+
+        public static ShiftDayResult GetSchedule(DateTime targetDate, string targetFolder, bool forceRefresh)
+        {
+            return GetSchedule(targetDate, targetFolder, "", forceRefresh);
+        }
+
+        public static ShiftDayResult GetSchedule(DateTime targetDate, string kmFolder, string supFolder, bool forceRefresh)
+        {
+            lock (_syncLock)
+            {
+                var result = new ShiftDayResult { Date = targetDate };
+
+                if (string.IsNullOrEmpty(kmFolder) && string.IsNullOrEmpty(supFolder))
+                {
+                    result.ErrorMessage = "HEDEF_YOK";
+                    return result;
+                }
+
+                string kmPath = !string.IsNullOrEmpty(kmFolder) ? FindScheduleFile(targetDate, ShellLinkHelper.ResolveShortcut(kmFolder)) : null;
+                string supPath = !string.IsNullOrEmpty(supFolder) ? FindScheduleFile(targetDate, ShellLinkHelper.ResolveShortcut(supFolder)) : null;
+
+                if (string.IsNullOrEmpty(kmPath) && string.IsNullOrEmpty(supPath))
+                {
+                    result.ErrorMessage = string.Format("{0} {1} \u00E7izelge dosyas\u0131 bulunamad\u0131.", MonthNames[targetDate.Month], targetDate.Year);
+                    return result;
+                }
+
+                DateTime kmLastWrite = (!string.IsNullOrEmpty(kmPath) && File.Exists(kmPath)) ? File.GetLastWriteTime(kmPath) : DateTime.MinValue;
+                DateTime supLastWrite = (!string.IsNullOrEmpty(supPath) && File.Exists(supPath)) ? File.GetLastWriteTime(supPath) : DateTime.MinValue;
+
+                bool kmValid = string.IsNullOrEmpty(kmPath) || (!forceRefresh && _kmCache != null &&
+                    _kmCache.FilePath == kmPath &&
+                    _kmCache.Year == targetDate.Year &&
+                    _kmCache.Month == targetDate.Month &&
+                    _kmCache.FileLastWriteTime == kmLastWrite);
+
+                bool supValid = string.IsNullOrEmpty(supPath) || (!forceRefresh && _supCache != null &&
+                    _supCache.FilePath == supPath &&
+                    _supCache.Year == targetDate.Year &&
+                    _supCache.Month == targetDate.Month &&
+                    _supCache.FileLastWriteTime == supLastWrite);
+
+                if (kmValid && supValid)
+                {
+                    if (_kmCache != null) PopulateKmFromCache(_kmCache, targetDate, result);
+                    if (_supCache != null) PopulateSupervisorFromCache(_supCache, targetDate, result);
+                    result.FilePath = kmPath ?? supPath;
+                    result.SheetName = (_kmCache != null && _supCache != null) ? "ÇİZELGE & VARDİYA AMİRLİĞİ" : (_supCache != null ? "VARDİYA AMİRLİĞİ" : "ÇİZELGE");
+                    return result;
+                }
+
+                Type excelType = Type.GetTypeFromProgID("Excel.Application");
+                if (excelType == null)
+                {
+                    result.ErrorMessage = "Microsoft Excel uygulaması yüklü değil.";
+                    return result;
+                }
+
+                object excel = null;
+                object workbooks = null;
+
+                try
+                {
+                    excel = Activator.CreateInstance(excelType);
+                    ComHelper.Set(excel, "Visible", false);
+                    ComHelper.Set(excel, "DisplayAlerts", false);
+                    try { ComHelper.Set(excel, "ScreenUpdating", false); } catch { }
+
+                    workbooks = ComHelper.Get(excel, "Workbooks");
+
+                    // 1. Çizelgeyi Oku
+                    if (!kmValid && !string.IsNullOrEmpty(kmPath) && File.Exists(kmPath))
+                    {
+                        object wb = null;
+                        try
+                        {
+                            wb = ComHelper.Call(workbooks, "Open", kmPath, false, true);
+                            object sheets = ComHelper.Get(wb, "Sheets");
+                            int sheetCount = Convert.ToInt32(ComHelper.Get(sheets, "Count"));
+
+                            object targetSheet = null;
+                            string targetSheetName = "";
+
+                            for (int i = 1; i <= sheetCount; i++)
+                            {
+                                object s = ComHelper.GetItem(sheets, "Item", i);
+                                string sName = ((ComHelper.Get(s, "Name") ?? "").ToString()).Trim();
+                                string upper = sName.ToUpper(new CultureInfo("tr-TR"));
+                                if (upper == "ÇİZELGE" || upper == "CIZELGE" || upper == "ÇİZELGE 1" || upper == "CIZELGE 1" || upper == "KUMANDA MERKEZİ" || upper == "KUMANDA MERKEZI")
+                                {
+                                    targetSheet = s;
+                                    targetSheetName = sName;
+                                    break;
+                                }
+                            }
+
+                            if (targetSheet == null)
+                            {
+                                for (int i = 1; i <= sheetCount; i++)
+                                {
+                                    object s = ComHelper.GetItem(sheets, "Item", i);
+                                    string sName = ((ComHelper.Get(s, "Name") ?? "").ToString()).Trim();
+                                    string upper = sName.ToUpper(new CultureInfo("tr-TR"));
+                                    if ((upper.Contains("ÇİZELGE") || upper.Contains("CIZELGE") || upper.Contains("KUMANDA MERKEZİ")) && !upper.Contains("3+3"))
+                                    {
+                                        targetSheet = s;
+                                        targetSheetName = sName;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (targetSheet == null)
+                            {
+                                for (int i = 1; i <= sheetCount; i++)
+                                {
+                                    object s = ComHelper.GetItem(sheets, "Item", i);
+                                    string sName = ((ComHelper.Get(s, "Name") ?? "").ToString()).Trim();
+                                    string upper = sName.ToUpper(new CultureInfo("tr-TR"));
+                                    if (upper.Contains("ÇİZELGE") || upper.Contains("CIZELGE") || upper.Contains("KUMANDA MERKEZİ"))
+                                    {
+                                        targetSheet = s;
+                                        targetSheetName = sName;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (targetSheet == null)
+                            {
+                                int fallbackIdx = (sheetCount >= 2) ? 2 : 1;
+                                targetSheet = ComHelper.GetItem(sheets, "Item", fallbackIdx);
+                                targetSheetName = (ComHelper.Get(targetSheet, "Name") ?? "").ToString();
+                            }
+
+                            object range = ComHelper.GetItem(targetSheet, "Range", "B5:AZ60");
+                            object[,] vals = ComHelper.Get(range, "Value2") as object[,];
+
+                            if (vals != null)
+                            {
+                                int colCount = vals.GetLength(1);
+                                var newCache = new ShiftScheduleCache
+                                {
+                                    FilePath = kmPath,
+                                    FileLastWriteTime = kmLastWrite,
+                                    Year = targetDate.Year,
+                                    Month = targetDate.Month,
+                                    SheetName = targetSheetName,
+                                    CellValues = vals
+                                };
+
+                                int nameCol = 3;
+                                int roleCol = 4;
+                                int expectedDay = 1;
+                                int maxDaysInMonth = DateTime.DaysInMonth(targetDate.Year, targetDate.Month);
+
+                                for (int c = 1; c <= colCount; c++)
+                                {
+                                    object hObj = vals[1, c];
+                                    if (hObj == null) continue;
+                                    string hTxt = hObj.ToString().Trim();
+                                    string upper = hTxt.ToUpper(new CultureInfo("tr-TR"));
+
+                                    if (upper.Contains("ADI") || upper.Contains("\u0130S\u0130M") || upper.Contains("ISIM")) nameCol = c;
+                                    else if (upper.Contains("G\u00D6REV") || upper.Contains("GOREV")) roleCol = c;
+
+                                    string cleanDay = hTxt.TrimEnd('.');
+                                    int dayNum;
+                                    if (int.TryParse(cleanDay, out dayNum))
+                                    {
+                                        if (dayNum == expectedDay && expectedDay <= maxDaysInMonth)
+                                        {
+                                            newCache.DayToColMap[expectedDay] = c;
+                                            expectedDay++;
+                                        }
+                                    }
+                                }
+
+                                newCache.NameCol = nameCol;
+                                newCache.RoleCol = roleCol;
+                                _kmCache = newCache;
+                            }
+                        }
+                        catch { }
+                        finally
+                        {
+                            if (wb != null)
+                            {
+                                try { ComHelper.Call(wb, "Close", false); } catch { }
+                                try { Marshal.ReleaseComObject(wb); } catch { }
+                            }
+                        }
+                    }
+
+                    // 2. Vardiya Amirligi Cizelgesini Oku (Sheet: AMIR)
+                    if (!supValid && !string.IsNullOrEmpty(supPath) && File.Exists(supPath))
+                    {
+                        object wb = null;
+                        try
+                        {
+                            wb = ComHelper.Call(workbooks, "Open", supPath, false, true);
+                            object sheets = ComHelper.Get(wb, "Sheets");
+                            int sheetCount = Convert.ToInt32(ComHelper.Get(sheets, "Count"));
+
+                            object targetSheet = null;
+                            string targetSheetName = "";
+
+                            for (int i = 1; i <= sheetCount; i++)
+                            {
+                                object s = ComHelper.GetItem(sheets, "Item", i);
+                                string sName = ((ComHelper.Get(s, "Name") ?? "").ToString()).Trim();
+                                string upper = sName.ToUpper(new CultureInfo("tr-TR"));
+                                if (upper == "AM\u0130R" || upper == "AMIR" || upper.Contains("AM\u0130R") || upper.Contains("AMIR"))
+                                {
+                                    targetSheet = s;
+                                    targetSheetName = sName;
+                                    break;
+                                }
+                            }
+
+                            if (targetSheet == null)
+                            {
+                                targetSheet = ComHelper.GetItem(sheets, "Item", 1);
+                                targetSheetName = (ComHelper.Get(targetSheet, "Name") ?? "").ToString();
+                            }
+
+                            // AMIR sayfasinda Row 4 header, Row 5..25 personel -> Range: A4:AR25
+                            object range = ComHelper.GetItem(targetSheet, "Range", "A4:AR25");
+                            object[,] vals = ComHelper.Get(range, "Value2") as object[,];
+
+                            if (vals != null)
+                            {
+                                int colCount = vals.GetLength(1);
+                                var newCache = new ShiftScheduleCache
+                                {
+                                    FilePath = supPath,
+                                    FileLastWriteTime = supLastWrite,
+                                    Year = targetDate.Year,
+                                    Month = targetDate.Month,
+                                    SheetName = targetSheetName,
+                                    CellValues = vals
+                                };
+
+                                int nameCol = 3;
+                                int roleCol = 4;
+                                int expectedDay = 1;
+                                int maxDaysInMonth = DateTime.DaysInMonth(targetDate.Year, targetDate.Month);
+
+                                for (int c = 1; c <= colCount; c++)
+                                {
+                                    object hObj = vals[1, c];
+                                    if (hObj == null) continue;
+                                    string hTxt = hObj.ToString().Trim();
+                                    string upper = hTxt.ToUpper(new CultureInfo("tr-TR"));
+
+                                    if (upper.Contains("ADI") || upper.Contains("\u0130S\u0130M") || upper.Contains("ISIM")) nameCol = c;
+                                    else if (upper.Contains("G\u00D6REV") || upper.Contains("GOREV")) roleCol = c;
+
+                                    string cleanDay = hTxt.TrimEnd('.');
+                                    int dayNum;
+                                    if (int.TryParse(cleanDay, out dayNum))
+                                    {
+                                        if (dayNum == expectedDay && expectedDay <= maxDaysInMonth)
+                                        {
+                                            newCache.DayToColMap[expectedDay] = c;
+                                            expectedDay++;
+                                        }
+                                    }
+                                }
+
+                                newCache.NameCol = nameCol;
+                                newCache.RoleCol = roleCol;
+                                _supCache = newCache;
+                            }
+                        }
+                        catch { }
+                        finally
+                        {
+                            if (wb != null)
+                            {
+                                try { ComHelper.Call(wb, "Close", false); } catch { }
+                                try { Marshal.ReleaseComObject(wb); } catch { }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    result.ErrorMessage = "\u00C7izelge okuma hatas\u0131: " + ex.Message;
+                }
+                finally
+                {
+                    if (excel != null)
+                    {
+                        try { ComHelper.Call(excel, "Quit"); } catch { }
+                        try { Marshal.ReleaseComObject(excel); } catch { }
+                    }
+                }
+
+                if (_kmCache != null) PopulateKmFromCache(_kmCache, targetDate, result);
+                if (_supCache != null) PopulateSupervisorFromCache(_supCache, targetDate, result);
+
+                result.FilePath = kmPath ?? supPath;
+                result.SheetName = (_kmCache != null && _supCache != null) ? "ÇİZELGE & VARDİYA AMİRLİĞİ" : (_supCache != null ? "VARDİYA AMİRLİĞİ" : "ÇİZELGE");
+
+                return result;
+            }
+        }
+
+        private static void PopulateKmFromCache(ShiftScheduleCache cache, DateTime targetDate, ShiftDayResult res)
+        {
+            if (cache == null || cache.CellValues == null) return;
+
+            object[,] vals = cache.CellValues;
+            int rowCount = vals.GetLength(0);
+            int colCount = vals.GetLength(1);
+
+            int dayCol = -1;
+            if (cache.DayToColMap.ContainsKey(targetDate.Day))
+            {
+                dayCol = cache.DayToColMap[targetDate.Day];
+            }
+            else
+            {
+                dayCol = 4 + targetDate.Day;
+                if (dayCol > colCount) dayCol = colCount;
+            }
+
+            for (int r = 2; r <= rowCount; r++)
+            {
+                object nameObj = (cache.NameCol <= colCount) ? vals[r, cache.NameCol] : null;
+                if (nameObj == null) continue;
+                string name = nameObj.ToString().Trim();
+                if (string.IsNullOrEmpty(name)) continue;
+
+                string upperName = name.ToUpper(new CultureInfo("tr-TR"));
+                if (upperName.Contains("YILLIK \u0130Z\u0130N") || upperName.Contains("TOPLAM") ||
+                    upperName.Contains("FAZLA MESA\u0130") || upperName.Contains("SABAH") ||
+                    upperName.Contains("AK\u015EAM") || upperName.Contains("GECE") ||
+                    upperName.Contains("\u0130Z\u0130NL\u0130") || upperName.Contains("HAFTANIN"))
+                {
+                    continue;
+                }
+
+                int dummy;
+                if (int.TryParse(name, out dummy)) continue;
+
+                object roleObj = (cache.RoleCol <= colCount) ? vals[r, cache.RoleCol] : null;
+                string role = (roleObj != null) ? roleObj.ToString().Trim() : "";
+
+                object shiftObj = (dayCol <= colCount) ? vals[r, dayCol] : null;
+                string shiftCode = (shiftObj != null) ? shiftObj.ToString().Trim().ToUpper(new CultureInfo("tr-TR")) : "";
+
+                if (string.IsNullOrEmpty(shiftCode)) continue;
+
+                var p = new ShiftPerson
+                {
+                    Name = name,
+                    Role = role,
+                    ShiftCode = shiftCode,
+                    IsOvertime = shiftCode.StartsWith("F"),
+                    IsSupervisor = false
+                };
+
+                if (shiftCode == "S" || shiftCode == "FS" || shiftCode.Contains("SABAH"))
+                {
+                    p.ShiftType = "S";
+                    p.ShiftHours = "07:00 - 15:00";
+                    res.Morning.Add(p);
+                    res.AllWorking.Add(p);
+                }
+                else if (shiftCode == "A" || shiftCode == "FA" || shiftCode.Contains("AK\u015EAM") || shiftCode.Contains("AKSAM"))
+                {
+                    p.ShiftType = "A";
+                    p.ShiftHours = "15:00 - 23:00";
+                    res.Evening.Add(p);
+                    res.AllWorking.Add(p);
+                }
+                else if (shiftCode == "G" || shiftCode == "FG" || shiftCode.Contains("GECE"))
+                {
+                    p.ShiftType = "G";
+                    p.ShiftHours = "23:00 - 07:00";
+                    res.Night.Add(p);
+                    res.AllWorking.Add(p);
+                }
+                else
+                {
+                    p.ShiftType = shiftCode;
+                    res.AllWorking.Add(p);
+                }
+            }
+        }
+
+        private static void PopulateSupervisorFromCache(ShiftScheduleCache cache, DateTime targetDate, ShiftDayResult res)
+        {
+            if (cache == null || cache.CellValues == null) return;
+
+            object[,] vals = cache.CellValues;
+            int rowCount = vals.GetLength(0);
+            int colCount = vals.GetLength(1);
+
+            int dayCol = -1;
+            if (cache.DayToColMap.ContainsKey(targetDate.Day))
+            {
+                dayCol = cache.DayToColMap[targetDate.Day];
+            }
+            else
+            {
+                dayCol = 5 + targetDate.Day;
+                if (dayCol > colCount) dayCol = colCount;
+            }
+
+            if (dayCol <= 0 || dayCol > colCount) return;
+
+            var supMorning = new List<ShiftPerson>();
+            var supEvening = new List<ShiftPerson>();
+            var supNight = new List<ShiftPerson>();
+
+            for (int r = 2; r <= rowCount; r++)
+            {
+                object nameObj = (cache.NameCol <= colCount) ? vals[r, cache.NameCol] : null;
+                if (nameObj == null) continue;
+                string name = nameObj.ToString().Trim();
+                if (string.IsNullOrEmpty(name)) continue;
+
+                string upperName = name.ToUpper(new CultureInfo("tr-TR"));
+                if (upperName.Contains("YILLIK \u0130Z\u0130N") || upperName.Contains("TOPLAM") ||
+                    upperName.Contains("G\u00DCN") || upperName.Contains("S.NO") ||
+                    upperName.Contains("FAZLA MESA\u0130"))
+                {
+                    continue;
+                }
+
+                int dummy;
+                if (int.TryParse(name, out dummy)) continue;
+
+                object roleObj = (cache.RoleCol <= colCount) ? vals[r, cache.RoleCol] : null;
+                string role = (roleObj != null) ? roleObj.ToString().Trim() : "Vardiya Amiri";
+                if (string.IsNullOrEmpty(role)) role = "Vardiya Amiri";
+
+                object shiftObj = (dayCol <= colCount) ? vals[r, dayCol] : null;
+                string shiftCode = (shiftObj != null) ? shiftObj.ToString().Trim().ToUpper(new CultureInfo("tr-TR")) : "";
+
+                if (string.IsNullOrEmpty(shiftCode)) continue;
+
+                if (shiftCode == "OFF" || shiftCode == "Y\u0130" || shiftCode == "R" || 
+                    shiftCode == "E\u011ET" || shiftCode == "EGT" || shiftCode == "\u00DC\u0130" || 
+                    shiftCode == "D" || shiftCode == "\u0130Z\u0130N" || shiftCode == "IZIN" || 
+                    shiftCode.Contains("\u0130Z\u0130N") || shiftCode.Contains("RAPOR"))
+                {
+                    continue;
+                }
+
+                var p = new ShiftPerson
+                {
+                    Name = name,
+                    Role = role,
+                    ShiftCode = shiftCode,
+                    IsSupervisor = true,
+                    IsOvertime = shiftCode.StartsWith("F")
+                };
+
+                // KULLANICI KURALI:
+                // S nobeti 07:00 16:00
+                // A nobeti 14:00 23:00
+                // NS nobeti 08:00 16:00
+                if (shiftCode == "S" || shiftCode == "S1" || shiftCode.StartsWith("S"))
+                {
+                    p.ShiftType = "S";
+                    p.ShiftHours = "07:00 - 16:00";
+                    supMorning.Add(p);
+                    res.Supervisors.Add(p);
+                    res.AllWorking.Add(p);
+                }
+                else if (shiftCode == "A" || shiftCode.StartsWith("A"))
+                {
+                    p.ShiftType = "A";
+                    p.ShiftHours = "14:00 - 23:00";
+                    supEvening.Add(p);
+                    res.Supervisors.Add(p);
+                    res.AllWorking.Add(p);
+                }
+                else if (shiftCode == "NS" || shiftCode == "N" || shiftCode.Contains("NORMAL"))
+                {
+                    p.ShiftType = "NS";
+                    p.ShiftHours = "08:00 - 16:00";
+                    supMorning.Add(p);
+                    res.Supervisors.Add(p);
+                    res.AllWorking.Add(p);
+                }
+                else if (shiftCode == "G" || shiftCode.StartsWith("G"))
+                {
+                    p.ShiftType = "G";
+                    p.ShiftHours = "23:00 - 07:00";
+                    supNight.Add(p);
+                    res.Supervisors.Add(p);
+                    res.AllWorking.Add(p);
+                }
+                else
+                {
+                    p.ShiftType = shiftCode;
+                    p.ShiftHours = "";
+                    res.Supervisors.Add(p);
+                    res.AllWorking.Add(p);
+                }
+            }
+
+            if (supMorning.Count > 0)
+            {
+                res.Morning.InsertRange(0, supMorning);
+            }
+            if (supEvening.Count > 0)
+            {
+                res.Evening.InsertRange(0, supEvening);
+            }
+            if (supNight.Count > 0)
+            {
+                res.Night.InsertRange(0, supNight);
+            }
+        }
+
+        public static List<ShiftPerson> GetActiveSupervisors(DateTime now, List<ShiftPerson> supervisors)
+        {
+            var active = new List<ShiftPerson>();
+            if (supervisors == null || supervisors.Count == 0) return active;
+
+            TimeSpan t = now.TimeOfDay;
+
+            foreach (var p in supervisors)
+            {
+                if (p == null || !p.IsSupervisor) continue;
+
+                string code = (p.ShiftCode ?? "").Trim().ToUpperInvariant();
+                string type = (p.ShiftType ?? "").Trim().ToUpperInvariant();
+
+                // S nobeti: 07:00 - 16:00
+                if (type == "S" || code == "S" || code == "S1")
+                {
+                    if (t >= TimeSpan.FromHours(7) && t < TimeSpan.FromHours(16))
+                    {
+                        active.Add(p);
+                    }
+                }
+                // NS nobeti: 08:00 - 16:00
+                else if (type == "NS" || code == "NS" || code == "N")
+                {
+                    if (t >= TimeSpan.FromHours(8) && t < TimeSpan.FromHours(16))
+                    {
+                        active.Add(p);
+                    }
+                }
+                // A nobeti: 14:00 - 23:00
+                else if (type == "A" || code == "A")
+                {
+                    if (t >= TimeSpan.FromHours(14) && t < TimeSpan.FromHours(23))
+                    {
+                        active.Add(p);
+                    }
+                }
+                // Gece: 23:00 - 07:00
+                else if (type == "G" || code == "G")
+                {
+                    if (t >= TimeSpan.FromHours(23) || t < TimeSpan.FromHours(7))
+                    {
+                        active.Add(p);
+                    }
+                }
+            }
+
+            return active;
+        }
+
+        public static void GetShiftContext(DateTime now, 
+            out string curShiftName, 
+            out string incShiftName, 
+            out string handoverTime, 
+            out DateTime curDate, 
+            out string curShiftCode, 
+            out DateTime incDate, 
+            out string incShiftCode)
+        {
+            int h = now.Hour;
+            if (h >= 7 && h < 15)
+            {
+                curShiftName = "Sabah (07:00 - 15:00)";
+                curDate = now.Date;
+                curShiftCode = "S";
+
+                incShiftName = "Ak\u015Fam (15:00 - 23:00)";
+                handoverTime = "15:00";
+                incDate = now.Date;
+                incShiftCode = "A";
+            }
+            else if (h >= 15 && h < 23)
+            {
+                curShiftName = "Ak\u015Fam (15:00 - 23:00)";
+                curDate = now.Date;
+                curShiftCode = "A";
+
+                incShiftName = "Gece (23:00 - 07:00)";
+                handoverTime = "23:00";
+                incDate = now.Date;
+                incShiftCode = "G";
+            }
+            else if (h >= 23)
+            {
+                curShiftName = "Gece (23:00 - 07:00)";
+                curDate = now.Date;
+                curShiftCode = "G";
+
+                incShiftName = "Sabah (07:00 - 15:00)";
+                handoverTime = "07:00";
+                incDate = now.Date.AddDays(1);
+                incShiftCode = "S";
+            }
+            else
+            {
+                curShiftName = "Gece (23:00 - 07:00)";
+                curDate = now.Date.AddDays(-1);
+                curShiftCode = "G";
+
+                incShiftName = "Sabah (07:00 - 15:00)";
+                handoverTime = "07:00";
+                incDate = now.Date;
+                incShiftCode = "S";
+            }
+        }
+
+        public static void GetShiftContext(DateTime now, out string curShiftName, out string incShiftName, out DateTime incDate, out string incShiftCode)
+        {
+            string handoverTime, curShiftCode;
+            DateTime curDate;
+            GetShiftContext(now, out curShiftName, out incShiftName, out handoverTime, out curDate, out curShiftCode, out incDate, out incShiftCode);
+        }
+    }
+
+    public class ShiftWidgetWindow : Window
+    {
+        private readonly Config _cfg;
+        private DateTime _viewDate;
+        private int _selectedTab = 0; // 0: Devralacak, 1: Sabah, 2: Aksam, 3: Gece
+        private ShiftDayResult _currentResult = null;
+        private bool _isLoading = false;
+
+        private Border _cardBorder;
+        private Grid _headerGrid;
+        private Border _headerDivider;
+        private Border _footerDivider;
+        private TextBlock _txtTitle;
+        private TextBlock _txtSubtitle;
+        private Border _btnFolder;
+        private TextBlock _txtFolderIcon;
+        private Border _btnRefresh;
+        private TextBlock _txtRefreshIcon;
+        private Border _btnLock;
+        private TextBlock _txtLockIcon;
+        private Border _btnClose;
+        private TextBlock _txtCloseIcon;
+
+        private Border _dateStrip;
+        private TextBlock _txtDateDisplay;
+        private Border _btnPrevDay;
+        private TextBlock _txtPrevDay;
+        private Border _btnNextDay;
+        private TextBlock _txtNextDay;
+        private Border _btnToday;
+        private TextBlock _txtToday;
+
+        private Border _statusBanner;
+        private TextBlock _txtCurrentShift;
+        private TextBlock _txtIncomingShift;
+        private Border _borderCountdownPill;
+        private TextBlock _txtHandoverCountdown;
+        private Border _supervisorDivider;
+        private Border _borderSupervisorCard;
+        private TextBlock _txtSupervisorShift;
+
+        private Border[] _tabBorders = new Border[4];
+        private TextBlock[] _tabTexts = new TextBlock[4];
+
+        private StackPanel _listPanel;
+        private ScrollViewer _scrollViewer;
+        private TextBlock _txtEmpty;
+        private TextBlock _txtFooterCount;
+        private TextBlock _txtFooterSheet;
+
+        private DispatcherTimer _autoUpdateTimer;
+        public Action OnLockChanged;
+
+        public void ResetPosition()
+        {
+            SetInitialPosition();
+        }
+
+        public ShiftWidgetWindow(Config cfg)
+        {
+            _cfg = cfg;
+            _viewDate = DateTime.Today;
+
+            Title = "Vardiya & Nöbetçi Çizelgesi";
+            WindowStyle = WindowStyle.None;
+            AllowsTransparency = true;
+            Background = System.Windows.Media.Brushes.Transparent;
+            ShowInTaskbar = false;
+            SizeToContent = SizeToContent.WidthAndHeight;
+            ResizeMode = ResizeMode.NoResize;
+            ShowActivated = false;
+            Topmost = false;
+
+            BuildUI();
+            SetInitialPosition();
+
+            PreviewMouseWheel += delegate(object s, MouseWheelEventArgs e)
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                {
+                    double delta = (e.Delta > 0) ? 0.05 : -0.05;
+                    double newScale = Math.Round((_cfg.ShiftWidgetScale + delta) * 20.0) / 20.0;
+                    if (newScale < 0.50) newScale = 0.50;
+                    if (newScale > 1.00) newScale = 1.00;
+                    if (Math.Abs(newScale - _cfg.ShiftWidgetScale) > 0.001)
+                    {
+                        _cfg.ShiftWidgetScale = newScale;
+                        _cfg.Save();
+                        ApplyThemeAndSurface();
+                    }
+                    e.Handled = true;
+                }
+            };
+
+            SizeChanged += delegate
+            {
+                try
+                {
+                    var wa = Forms.Screen.PrimaryScreen.WorkingArea;
+                    if (Top + ActualHeight > wa.Bottom - 10)
+                    {
+                        double newTop = wa.Bottom - ActualHeight - 10;
+                        if (newTop >= wa.Top + 10)
+                        {
+                            Top = newTop;
+                        }
+                    }
+                }
+                catch { }
+            };
+
+            SourceInitialized += delegate
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                    Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle | Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE);
+
+                    var source = HwndSource.FromHwnd(hwnd);
+                    if (source != null) source.AddHook(WndProc);
+
+                    ApplyZOrder();
+                }
+            };
+
+            _autoUpdateTimer = new DispatcherTimer(DispatcherPriority.Normal);
+            _autoUpdateTimer.Interval = TimeSpan.FromMilliseconds(500);
+            _autoUpdateTimer.Tick += delegate
+            {
+                UpdateShiftBanner();
+                if (DateTime.Now.Second == 0 && _selectedTab == 0)
+                {
+                    RenderStaffList();
+                }
+            };
+            _autoUpdateTimer.Start();
+
+            if (string.IsNullOrEmpty(_cfg.ShiftFolderPath))
+            {
+                string autoLnk = ShellLinkHelper.FindDesktopScheduleShortcut();
+                if (!string.IsNullOrEmpty(autoLnk))
+                {
+                    _cfg.ShiftFolderPath = autoLnk;
+                    _cfg.Save();
+                }
+            }
+
+            LoadScheduleAsync(false);
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == 0x0021) // WM_MOUSEACTIVATE
+            {
+                handled = true;
+                return (IntPtr)3; // MA_NOACTIVATE
+            }
+            return IntPtr.Zero;
+        }
+
+        private void SetInitialPosition()
+        {
+            var wa = Forms.Screen.PrimaryScreen.WorkingArea;
+            double defaultW = 360;
+            double defaultH = 460;
+
+            if (_cfg.ShiftWidgetX >= 0 && _cfg.ShiftWidgetY >= 0)
+            {
+                Left = _cfg.ShiftWidgetX;
+                Top = _cfg.ShiftWidgetY;
+            }
+            else
+            {
+                Left = wa.Right - defaultW - 20;
+                Top = wa.Top + (wa.Height - defaultH) / 2.0;
+            }
+        }
+
+        private string _lastKmFolder = null;
+        private string _lastSupFolder = null;
+
+        public void ApplyConfig()
+        {
+            ApplyThemeAndSurface();
+            if (_lastKmFolder != _cfg.ShiftFolderPath || _lastSupFolder != _cfg.SupervisorFolderPath)
+            {
+                _lastKmFolder = _cfg.ShiftFolderPath;
+                _lastSupFolder = _cfg.SupervisorFolderPath;
+                LoadScheduleAsync(true);
+            }
+        }
+
+        public void ReloadSettings()
+        {
+            ApplyThemeAndSurface();
+            LoadScheduleAsync(true);
+        }
+
+        private void BuildUI()
+        {
+            _cardBorder = new Border
+            {
+                Width = 360,
+                CornerRadius = new CornerRadius(24),
+                Padding = new Thickness(15, 14, 15, 14),
+                Margin = new Thickness(10),
+                BorderThickness = new Thickness(1),
+                Effect = new DropShadowEffect
+                {
+                    BlurRadius = 24,
+                    ShadowDepth = 6,
+                    Direction = 270
+                }
+            };
+
+            _cardBorder.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                if (!_cfg.LockShiftWidgetPosition)
+                {
+                    DragMove();
+                    _cfg.ShiftWidgetX = Left;
+                    _cfg.ShiftWidgetY = Top;
+                    _cfg.Save();
+                }
+            };
+
+            _cardBorder.MouseRightButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                OpenShiftTargetMenu(_cardBorder);
+            };
+
+            var rootStack = new StackPanel { Orientation = Orientation.Vertical };
+
+            // 1. BASLIK VE ARAC BUTONLARI
+            _headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            _headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            _headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var titleStack = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
+            _txtTitle = new TextBlock
+            {
+                Text = "ÇİZELGE",
+                FontWeight = FontWeights.Bold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 14.5,
+                // LetterSpacing removed
+            };
+            _txtSubtitle = new TextBlock
+            {
+                Text = "Günlük Vardiya & Nöbet Çizelgesi",
+                FontWeight = FontWeights.Normal,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 11.0,
+                Opacity = 0.75,
+                Margin = new Thickness(0, 1, 0, 0)
+            };
+            titleStack.Children.Add(_txtTitle);
+            titleStack.Children.Add(_txtSubtitle);
+            Grid.SetColumn(titleStack, 0);
+            _headerGrid.Children.Add(titleStack);
+
+            var btnStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+
+            _btnFolder = CreateToolButton("📁", "Çizelge Hedefini Seç / Değiştir", out _txtFolderIcon, delegate
+            {
+                OpenShiftTargetMenu(_btnFolder);
+            });
+            btnStack.Children.Add(_btnFolder);
+
+            _btnRefresh = CreateToolButton("↻", "Çizelgeleri Yeniden Oku / Güncelle", out _txtRefreshIcon, delegate
+            {
+                LoadScheduleAsync(true);
+            });
+            btnStack.Children.Add(_btnRefresh);
+
+            _txtLockIcon = new TextBlock { Text = _cfg.LockShiftWidgetPosition ? "🔒" : "🔓", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+            _btnLock = new Border
+            {
+                Width = 26,
+                Height = 26,
+                CornerRadius = new CornerRadius(7),
+                Margin = new Thickness(4, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = _cfg.LockShiftWidgetPosition ? "Konum Kilitli (Serbest bırakmak için tıklayın)" : "Konum Serbest (Kilitlemek için tıklayın)",
+                Child = _txtLockIcon
+            };
+            _btnLock.MouseEnter += delegate { _btnLock.Opacity = 0.75; };
+            _btnLock.MouseLeave += delegate { _btnLock.Opacity = 1.0; };
+            _btnLock.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+            };
+            _btnLock.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                _cfg.LockShiftWidgetPosition = !_cfg.LockShiftWidgetPosition;
+                _cfg.Save();
+                UpdateLockStateVisuals();
+                if (OnLockChanged != null) OnLockChanged();
+            };
+            btnStack.Children.Add(_btnLock);
+
+            _btnClose = CreateToolButton("✕", "Kapat (Ayarlardan açabilirsiniz)", out _txtCloseIcon, delegate
+            {
+                _cfg.ShowShiftWidget = false;
+                _cfg.Save();
+                this.Hide();
+            });
+            btnStack.Children.Add(_btnClose);
+
+            Grid.SetColumn(btnStack, 1);
+            _headerGrid.Children.Add(btnStack);
+            rootStack.Children.Add(_headerGrid);
+
+            _headerDivider = new Border
+            {
+                Height = 1,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            rootStack.Children.Add(_headerDivider);
+
+            // 2. AKTIF VARDIYA & DEVRALACAK DURUM CUBUGU
+            _statusBanner = new Border
+            {
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(14, 10, 14, 10),
+                Margin = new Thickness(0, 0, 0, 9),
+                BorderThickness = new Thickness(1)
+            };
+            var statusStack = new StackPanel { Orientation = Orientation.Vertical };
+
+            var curRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 0, 5) };
+            var curDot = new Border
+            {
+                Width = 8,
+                Height = 8,
+                CornerRadius = new CornerRadius(4),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(34, 197, 94)),
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _txtCurrentShift = new TextBlock
+            {
+                Text = "Şu An Nöbette: Nöbetçi Personel",
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 12.5,
+                FontWeight = FontWeights.Medium,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            curRow.Children.Add(curDot);
+            curRow.Children.Add(_txtCurrentShift);
+            statusStack.Children.Add(curRow);
+
+            var incRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 0, 6) };
+            var incDot = new Border
+            {
+                Width = 8,
+                Height = 8,
+                CornerRadius = new CornerRadius(4),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248)),
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _txtIncomingShift = new TextBlock
+            {
+                Text = "Devralacak: Vardiya",
+                FontWeight = FontWeights.Bold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 13.5,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            incRow.Children.Add(incDot);
+            incRow.Children.Add(_txtIncomingShift);
+            statusStack.Children.Add(incRow);
+
+            _borderCountdownPill = new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(8, 3, 8, 3),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 0, 0, 7)
+            };
+            _txtHandoverCountdown = new TextBlock
+            {
+                Text = "",
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 12.5
+            };
+            _borderCountdownPill.Child = _txtHandoverCountdown;
+            statusStack.Children.Add(_borderCountdownPill);
+
+            _supervisorDivider = new Border { Height = 0, Visibility = Visibility.Collapsed };
+            statusStack.Children.Add(_supervisorDivider);
+
+            _borderSupervisorCard = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(10, 7, 10, 7),
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(0, 1, 0, 0)
+            };
+            _txtSupervisorShift = new TextBlock
+            {
+                Text = "👷 Nöbetçi Amir: Yükleniyor...",
+                FontWeight = FontWeights.Bold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 13.0,
+                TextWrapping = TextWrapping.Wrap
+            };
+            _borderSupervisorCard.Child = _txtSupervisorShift;
+            statusStack.Children.Add(_borderSupervisorCard);
+
+            _statusBanner.Child = statusStack;
+            rootStack.Children.Add(_statusBanner);
+
+            // 3. TARIH SECICI SERIDI
+            _dateStrip = new Border
+            {
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(6, 4, 6, 4),
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var dateGrid = new Grid();
+            dateGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            dateGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            dateGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            dateGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            _btnPrevDay = CreateNavButton("◀", "Önceki Gün", out _txtPrevDay, delegate
+            {
+                _viewDate = _viewDate.AddDays(-1);
+                UpdateDateDisplay();
+                LoadScheduleAsync(false);
+            });
+            Grid.SetColumn(_btnPrevDay, 0);
+            dateGrid.Children.Add(_btnPrevDay);
+
+            _txtDateDisplay = new TextBlock
+            {
+                Text = "",
+                FontWeight = FontWeights.Bold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 12.5,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(_txtDateDisplay, 1);
+            dateGrid.Children.Add(_txtDateDisplay);
+
+            _btnToday = new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(6, 2, 6, 2),
+                Margin = new Thickness(0, 0, 4, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Bugüne Dön"
+            };
+            _txtToday = new TextBlock
+            {
+                Text = "Bugün",
+                FontSize = 11.0,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _btnToday.Child = _txtToday;
+            _btnToday.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+            };
+            _btnToday.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                _viewDate = DateTime.Today;
+                UpdateDateDisplay();
+                LoadScheduleAsync(false);
+            };
+            Grid.SetColumn(_btnToday, 2);
+            dateGrid.Children.Add(_btnToday);
+
+            _btnNextDay = CreateNavButton("▶", "Sonraki Gün", out _txtNextDay, delegate
+            {
+                _viewDate = _viewDate.AddDays(1);
+                UpdateDateDisplay();
+                LoadScheduleAsync(false);
+            });
+            Grid.SetColumn(_btnNextDay, 3);
+            dateGrid.Children.Add(_btnNextDay);
+
+            _dateStrip.Child = dateGrid;
+            rootStack.Children.Add(_dateStrip);
+
+            // 4. SEKME BUTONLARI (Devralacak, Sabah, Aksam, Gece)
+            var tabGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            for (int i = 0; i < 4; i++) tabGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            string[] tabTitles = new string[] { "Devralacak", "Sabah", "Akşam", "Gece" };
+            for (int i = 0; i < 4; i++)
+            {
+                int tabIdx = i;
+                var tText = new TextBlock
+                {
+                    Text = tabTitles[i],
+                    FontSize = 11.8,
+                    FontWeight = FontWeights.SemiBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                var tBorder = new Border
+                {
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(2, 6, 2, 6),
+                    Margin = new Thickness(i == 0 ? 0 : 2, 0, i == 3 ? 0 : 2, 0),
+                    Cursor = Cursors.Hand,
+                    Child = tText
+                };
+                tBorder.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+                {
+                    e.Handled = true;
+                };
+                tBorder.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+                {
+                    e.Handled = true;
+                    _selectedTab = tabIdx;
+                    UpdateTabStyles();
+                    RenderStaffList();
+                };
+
+                _tabBorders[i] = tBorder;
+                _tabTexts[i] = tText;
+                Grid.SetColumn(tBorder, i);
+                tabGrid.Children.Add(tBorder);
+            }
+            rootStack.Children.Add(tabGrid);
+
+            // 5. PERSONEL LISTESI
+            _listPanel = new StackPanel { Orientation = Orientation.Vertical };
+            _txtEmpty = new TextBlock
+            {
+                Text = "Çizelgeler Excel'den okunuyor...",
+                FontSize = 12.0,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 20, 0, 20)
+            };
+            _listPanel.Children.Add(_txtEmpty);
+
+            _scrollViewer = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = _listPanel
+            };
+            rootStack.Children.Add(_scrollViewer);
+
+            _footerDivider = new Border
+            {
+                Height = 1,
+                Margin = new Thickness(0, 10, 0, 8)
+            };
+            rootStack.Children.Add(_footerDivider);
+
+            // 6. FOOTER
+            var footerGrid = new Grid { Margin = new Thickness(0, 0, 0, 0) };
+            footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            _txtFooterCount = new TextBlock
+            {
+                Text = "0 Personel",
+                FontSize = 12.0,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI")
+            };
+            Grid.SetColumn(_txtFooterCount, 0);
+            footerGrid.Children.Add(_txtFooterCount);
+
+            _txtFooterSheet = new TextBlock
+            {
+                Text = "ÇİZELGE",
+                FontSize = 12.0,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI")
+            };
+            Grid.SetColumn(_txtFooterSheet, 1);
+            footerGrid.Children.Add(_txtFooterSheet);
+
+            rootStack.Children.Add(footerGrid);
+
+            _cardBorder.Child = rootStack;
+            Content = _cardBorder;
+
+            ApplyThemeAndSurface();
+            UpdateDateDisplay();
+            UpdateShiftBanner();
+        }
+
+        private Border CreateToolButton(string icon, string tooltip, out TextBlock txtOut, Action onClick)
+        {
+            var txt = new TextBlock
+            {
+                Text = icon,
+                FontSize = 11,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            txtOut = txt;
+            var b = new Border
+            {
+                Width = 26,
+                Height = 26,
+                CornerRadius = new CornerRadius(7),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255)),
+                Margin = new Thickness(4, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = tooltip,
+                Child = txt
+            };
+            b.MouseEnter += delegate { b.Opacity = 0.75; };
+            b.MouseLeave += delegate { b.Opacity = 1.0; };
+            b.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+            };
+            b.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                onClick();
+            };
+            return b;
+        }
+
+        private void PickShiftShortcutOrFile()
+        {
+            string chosen = ShellLinkHelper.PromptPickShortcutOrFile(_cfg.ShiftFolderPath);
+            if (!string.IsNullOrEmpty(chosen))
+            {
+                _cfg.ShiftFolderPath = chosen;
+                _cfg.Save();
+                LoadScheduleAsync(true);
+            }
+        }
+
+        private void PickShiftFolder()
+        {
+            string chosen = ShellLinkHelper.PromptPickFolder(_cfg.ShiftFolderPath);
+            if (!string.IsNullOrEmpty(chosen))
+            {
+                _cfg.ShiftFolderPath = chosen;
+                _cfg.Save();
+                LoadScheduleAsync(true);
+            }
+        }
+
+        private void OpenShiftTargetMenu(FrameworkElement anchor)
+        {
+            var cm = new System.Windows.Controls.ContextMenu();
+
+            var miKmHeader = new System.Windows.Controls.MenuItem { Header = "⚙️ ÇİZELGE HEDEFİ", IsEnabled = false };
+            cm.Items.Add(miKmHeader);
+
+            string autoLnk = ShellLinkHelper.FindDesktopScheduleShortcut();
+            if (!string.IsNullOrEmpty(autoLnk))
+            {
+                string sName = System.IO.Path.GetFileNameWithoutExtension(autoLnk);
+                var miAuto = new System.Windows.Controls.MenuItem
+                {
+                    Header = "Masaüstündeki Kısayolu Bağla: '" + sName + "'"
+                };
+                miAuto.Click += delegate
+                {
+                    _cfg.ShiftFolderPath = autoLnk;
+                    _cfg.Save();
+                    LoadScheduleAsync(true);
+                };
+                cm.Items.Add(miAuto);
+            }
+
+            var miLnk = new System.Windows.Controls.MenuItem
+            {
+                Header = "Çizelge: Kısayol (.lnk) veya Excel Seç..."
+            };
+            miLnk.Click += delegate { PickShiftShortcutOrFile(); };
+            cm.Items.Add(miLnk);
+
+            var miFolder = new System.Windows.Controls.MenuItem
+            {
+                Header = "Çizelge: Klasör Seç..."
+            };
+            miFolder.Click += delegate { PickShiftFolder(); };
+            cm.Items.Add(miFolder);
+
+            cm.Items.Add(new System.Windows.Controls.Separator());
+
+            var miSupHeader = new System.Windows.Controls.MenuItem { Header = "👮 VARDİYA AMİRLİĞİ ÇİZELGE HEDEFİ", IsEnabled = false };
+            cm.Items.Add(miSupHeader);
+
+            var miSupPick = new System.Windows.Controls.MenuItem
+            {
+                Header = "Vardiya Amirliği: Klasör / Excel Seç..."
+            };
+            miSupPick.Click += delegate
+            {
+                string chosen = ShellLinkHelper.PromptPickShortcutOrFile(_cfg.SupervisorFolderPath);
+                if (string.IsNullOrEmpty(chosen)) chosen = ShellLinkHelper.PromptPickFolder(_cfg.SupervisorFolderPath);
+                if (!string.IsNullOrEmpty(chosen))
+                {
+                    _cfg.SupervisorFolderPath = chosen;
+                    _cfg.Save();
+                    LoadScheduleAsync(true);
+                }
+            };
+            cm.Items.Add(miSupPick);
+
+            var miSupClear = new System.Windows.Controls.MenuItem
+            {
+                Header = "❌ Vardiya Amirliği Hedefini Sıfırla"
+            };
+            miSupClear.Click += delegate
+            {
+                _cfg.SupervisorFolderPath = "";
+                _cfg.Save();
+                LoadScheduleAsync(true);
+            };
+            cm.Items.Add(miSupClear);
+
+            cm.Items.Add(new System.Windows.Controls.Separator());
+
+            var miRefresh = new System.Windows.Controls.MenuItem { Header = "\u21BB \u00C7izelgeleri Yeniden Oku / G\u00FCncelle" };
+            miRefresh.Click += delegate { LoadScheduleAsync(true); };
+            cm.Items.Add(miRefresh);
+
+            cm.Items.Add(new System.Windows.Controls.Separator());
+
+            var miScaleHeader = new System.Windows.Controls.MenuItem { Header = "\uD83D\uDCD0 W\u0130DGET BOYUTU (K\u00DC\u00C7\u00DCLTME)", IsEnabled = false };
+            cm.Items.Add(miScaleHeader);
+
+            double[] scaleOptions = new double[] { 1.0, 0.90, 0.85, 0.80, 0.75, 0.70, 0.60, 0.50 };
+            string[] scaleLabels = new string[] { "%100 (Varsay\u0131lan - En B\u00FCy\u00FCk)", "%90", "%85", "%80", "%75", "%70", "%60", "%50 (En K\u00FC\u00E7\u00FCk)" };
+
+            for (int sIdx = 0; sIdx < scaleOptions.Length; sIdx++)
+            {
+                double targetScale = scaleOptions[sIdx];
+                string label = scaleLabels[sIdx];
+                bool isCurrent = Math.Abs(_cfg.ShiftWidgetScale - targetScale) < 0.02;
+                var miScaleItem = new System.Windows.Controls.MenuItem
+                {
+                    Header = (isCurrent ? "\u2714 " : "   ") + label,
+                    FontWeight = isCurrent ? FontWeights.Bold : FontWeights.Normal
+                };
+                miScaleItem.Click += delegate
+                {
+                    _cfg.ShiftWidgetScale = targetScale;
+                    _cfg.Save();
+                    ApplyThemeAndSurface();
+                };
+                cm.Items.Add(miScaleItem);
+            }
+
+            if (anchor != null) cm.PlacementTarget = anchor;
+            cm.IsOpen = true;
+        }
+
+        private Border CreateNavButton(string icon, string tooltip, out TextBlock txtOut, Action onClick)
+        {
+            var txt = new TextBlock
+            {
+                Text = icon,
+                FontSize = 12,
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 229, 255)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            txtOut = txt;
+            var b = new Border
+            {
+                Width = 26,
+                Height = 26,
+                CornerRadius = new CornerRadius(6),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(25, 255, 255, 255)),
+                Cursor = Cursors.Hand,
+                ToolTip = tooltip,
+                Child = txt
+            };
+            b.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+            };
+            b.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                onClick();
+            };
+            return b;
+        }
+
+        private void UpdateDateDisplay()
+        {
+            if (_txtDateDisplay != null)
+            {
+                _txtDateDisplay.Text = _viewDate.ToString("dd MMMM yyyy, dddd", new CultureInfo("tr-TR"));
+            }
+            if (_btnToday != null)
+            {
+                _btnToday.Visibility = (_viewDate.Date == DateTime.Today) ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        private void UpdateShiftBanner()
+        {
+            DateTime now = DateTime.Now;
+            string curName, incName, handoverTime, curShiftCode, incShiftCode;
+            DateTime curDate, incDate;
+            ShiftScheduleService.GetShiftContext(now, out curName, out incName, out handoverTime, out curDate, out curShiftCode, out incDate, out incShiftCode);
+
+            bool isLight = (_cfg != null && _cfg.Theme == "light");
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg != null ? _cfg.TextColor : "beyaz", isLight, out textPrimary, out textSecondary, out textMuted);
+
+            if (_txtCurrentShift != null)
+            {
+                _txtCurrentShift.Text = "Şu An Nöbette: " + curName;
+                _txtCurrentShift.Foreground = new SolidColorBrush(textPrimary);
+            }
+            if (_txtIncomingShift != null)
+            {
+                string targetDateStr = "";
+                if (incDate.Date == now.Date.AddDays(1))
+                    targetDateStr = "Yarın ";
+                else if (incDate.Date != now.Date)
+                    targetDateStr = incDate.ToString("dd MMMM ", new CultureInfo("tr-TR"));
+
+                _txtIncomingShift.Text = string.Format("{0}'de Devralacak: {1}{2}", handoverTime, targetDateStr, incName);
+                _txtIncomingShift.Foreground = new SolidColorBrush(textPrimary);
+            }
+
+            if (_txtHandoverCountdown != null)
+            {
+                if (_cfg != null && !_cfg.ShiftHandoverCountdown)
+                {
+                    if (_borderCountdownPill != null) _borderCountdownPill.Visibility = Visibility.Collapsed;
+                    _txtHandoverCountdown.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    if (_borderCountdownPill != null) _borderCountdownPill.Visibility = Visibility.Visible;
+                    _txtHandoverCountdown.Visibility = Visibility.Visible;
+
+                    DateTime targetHandover;
+                    if (now.Hour >= 7 && now.Hour < 15)
+                    {
+                        targetHandover = new DateTime(now.Year, now.Month, now.Day, 15, 0, 0);
+                    }
+                    else if (now.Hour >= 15 && now.Hour < 23)
+                    {
+                        targetHandover = new DateTime(now.Year, now.Month, now.Day, 23, 0, 0);
+                    }
+                    else
+                    {
+                        if (now.Hour >= 23)
+                        {
+                            targetHandover = now.Date.AddDays(1).AddHours(7);
+                        }
+                        else
+                        {
+                            targetHandover = now.Date.AddHours(7);
+                        }
+                    }
+
+                    TimeSpan rem = targetHandover - now;
+                    if (rem.TotalSeconds < 0) rem = TimeSpan.Zero;
+
+                    if (rem.TotalMinutes <= 15)
+                    {
+                        _txtHandoverCountdown.Text = string.Format("\u26A0\uFE0F DEV\u0130R VAKT\u0130 YAKLA\u015ETI! ({0} dk {1:D2} sn)", (int)rem.TotalMinutes, rem.Seconds);
+                        _txtHandoverCountdown.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11));
+                        if (_borderCountdownPill != null)
+                        {
+                            _borderCountdownPill.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(45, 245, 158, 11));
+                            _borderCountdownPill.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(140, 245, 158, 11));
+                        }
+                    }
+                    else
+                    {
+                        _txtHandoverCountdown.Text = string.Format("\u23F3 Devre Kalan S\u00FCre: {0:D2}:{1:D2}:{2:D2}", (int)rem.TotalHours, rem.Minutes, rem.Seconds);
+                        _txtHandoverCountdown.Foreground = new SolidColorBrush(textPrimary);
+                        if (_borderCountdownPill != null)
+                        {
+                            _borderCountdownPill.Background = new SolidColorBrush(isLight 
+                                ? System.Windows.Media.Color.FromArgb(20, 0, 0, 0) 
+                                : System.Windows.Media.Color.FromArgb(30, 255, 255, 255));
+                            _borderCountdownPill.BorderBrush = new SolidColorBrush(isLight 
+                                ? System.Windows.Media.Color.FromArgb(35, 0, 0, 0) 
+                                : System.Windows.Media.Color.FromArgb(40, 255, 255, 255));
+                        }
+                    }
+                }
+            }
+
+            if (_txtSupervisorShift != null)
+            {
+                var activeSups = ShiftScheduleService.GetActiveSupervisors(now, _currentResult != null ? _currentResult.Supervisors : null);
+
+                if (activeSups != null && activeSups.Count > 0)
+                {
+                    var names = new System.Collections.Generic.List<string>();
+                    foreach (var s in activeSups)
+                    {
+                        string codeLabel = s.ShiftCode;
+                        if (codeLabel == "S") codeLabel = "S N\u00F6beti";
+                        else if (codeLabel == "A") codeLabel = "A N\u00F6beti";
+                        else if (codeLabel == "NS") codeLabel = "NS N\u00F6beti";
+                        else if (codeLabel == "G") codeLabel = "Gece N\u00F6beti";
+                        names.Add(string.Format("{0} ({1})", s.Name, codeLabel));
+                    }
+                    _txtSupervisorShift.Text = "\uD83D\uDC77 N\u00F6bet\u00E7i Amir: " + string.Join(", ", names);
+                    var tooltips = new System.Collections.Generic.List<string>();
+                    foreach (var x in activeSups)
+                    {
+                        tooltips.Add(string.Format("\u2022 {0} - {1} ({2})", x.Name, x.Role, x.ShiftHours));
+                    }
+                    _txtSupervisorShift.ToolTip = "\u0130lgili saat diliminde aktif g\u00F6revdeki \u0130stasyon Vardiya Amiri:\n" + string.Join("\n", tooltips);
+                }
+                else
+                {
+                    if (now.Hour >= 23 || now.Hour < 7)
+                    {
+                        _txtSupervisorShift.Text = "\uD83D\uDC77 N\u00F6bet\u00E7i Amir: Gece N\u00F6beti Yok (07:00'de Ba\u015Flar)";
+                    }
+                    else if (_currentResult == null || _currentResult.Supervisors == null || _currentResult.Supervisors.Count == 0)
+                    {
+                        _txtSupervisorShift.Text = "\uD83D\uDC77 N\u00F6bet\u00E7i Amir: \u00C7izelge Y\u00FCkleniyor...";
+                    }
+                    else
+                    {
+                        _txtSupervisorShift.Text = "\uD83D\uDC77 N\u00F6bet\u00E7i Amir: Bu Saatte N\u00F6bet\u00E7i Yok";
+                    }
+                    _txtSupervisorShift.ToolTip = "\u0130stasyon Vardiya Amirli\u011Fi \u00C7al\u0131\u015Fma Saatleri:\n\u2022 S N\u00F6beti: 07:00 - 16:00\n\u2022 A N\u00F6beti: 14:00 - 23:00\n\u2022 NS N\u00F6beti: 08:00 - 16:00";
+                }
+            }
+        }
+
+        private void UpdateTabStyles()
+        {
+            bool isLight = (_cfg.Theme == "light");
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            for (int i = 0; i < 4; i++)
+            {
+                if (_tabBorders[i] == null || _tabTexts[i] == null) continue;
+
+                if (i == _selectedTab)
+                {
+                    _tabBorders[i].Background = new SolidColorBrush(isLight 
+                        ? System.Windows.Media.Color.FromRgb(2, 132, 199) 
+                        : System.Windows.Media.Color.FromRgb(2, 132, 199));
+                    _tabBorders[i].BorderBrush = new SolidColorBrush(isLight
+                        ? System.Windows.Media.Color.FromRgb(2, 132, 199)
+                        : System.Windows.Media.Color.FromRgb(56, 189, 248));
+                    _tabBorders[i].BorderThickness = new Thickness(1);
+                    _tabTexts[i].Foreground = System.Windows.Media.Brushes.White;
+                    _tabTexts[i].FontWeight = FontWeights.Bold;
+                }
+                else
+                {
+                    _tabBorders[i].Background = System.Windows.Media.Brushes.Transparent;
+                    _tabBorders[i].BorderThickness = new Thickness(0);
+                    _tabTexts[i].Foreground = new SolidColorBrush(isLight
+                        ? System.Windows.Media.Color.FromArgb(140, 100, 116, 139)
+                        : System.Windows.Media.Color.FromArgb(140, 148, 163, 184));
+                    _tabTexts[i].FontWeight = FontWeights.Medium;
+                }
+            }
+        }
+
+        private void UpdateLockStateVisuals()
+        {
+            if (_btnLock == null || _txtLockIcon == null) return;
+            bool isLight = (_cfg.Theme == "light");
+            _txtLockIcon.Text = _cfg.LockShiftWidgetPosition ? "\uD83D\uDD12" : "\uD83D\uDD13";
+            _btnLock.ToolTip = _cfg.LockShiftWidgetPosition 
+                ? "Konum Kilitli (Serbest b\u0131rakmak i\u00E7in t\u0131klay\u0131n)" 
+                : "Konum Serbest (Kilitlemek i\u00E7in t\u0131klay\u0131n)";
+
+            if (_cfg.LockShiftWidgetPosition)
+            {
+                _btnLock.Background = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromArgb(30, 2, 132, 199) 
+                    : System.Windows.Media.Color.FromArgb(40, 0, 229, 255));
+            }
+            else
+            {
+                _btnLock.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(20, 0, 0, 0)
+                    : System.Windows.Media.Color.FromArgb(25, 255, 255, 255));
+            }
+        }
+
+        private void ApplyThemeAndSurface()
+        {
+            bool isLight = (_cfg.Theme == "light");
+            double op = _cfg.ShiftWidgetOpacity;
+            byte bgAlpha = (byte)Math.Min(255, (int)(op * 255));
+            byte borderAlpha = (byte)Math.Min(255, (int)(op * (isLight ? 200 : 120)));
+
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            System.Windows.Media.Color bg;
+            System.Windows.Media.Color border;
+            if (isLight)
+            {
+                bg = System.Windows.Media.Color.FromArgb(bgAlpha, 248, 250, 252);
+                border = System.Windows.Media.Color.FromArgb(borderAlpha, 215, 220, 230);
+            }
+            else
+            {
+                bg = System.Windows.Media.Color.FromArgb(bgAlpha, 20, 22, 30);
+                border = System.Windows.Media.Color.FromArgb(borderAlpha, 45, 50, 65);
+            }
+
+            if (_cardBorder != null)
+            {
+                _cardBorder.Background = new SolidColorBrush(bg);
+                _cardBorder.BorderBrush = new SolidColorBrush(border);
+                _cardBorder.BorderThickness = new Thickness(1);
+                _cardBorder.Effect = new DropShadowEffect
+                {
+                    Color = isLight ? System.Windows.Media.Color.FromRgb(140, 150, 160) : System.Windows.Media.Colors.Black,
+                    BlurRadius = 24,
+                    ShadowDepth = 6,
+                    Opacity = isLight ? (0.15 * op) : (0.35 * op)
+                };
+
+                double scale = _cfg.ShiftWidgetScale;
+                if (scale < 0.50) scale = 0.50;
+                if (scale > 1.00) scale = 1.00; // En buyuk boyutu suanki (%100)
+                _cardBorder.LayoutTransform = new ScaleTransform(scale, scale);
+            }
+
+            var divBrush = new SolidColorBrush(border);
+            if (_headerDivider != null) _headerDivider.Background = divBrush;
+            if (_footerDivider != null) _footerDivider.Background = divBrush;
+
+            if (_txtTitle != null) _txtTitle.Foreground = new SolidColorBrush(textPrimary);
+            if (_txtSubtitle != null) _txtSubtitle.Foreground = new SolidColorBrush(textSecondary);
+
+            var btnBg = new SolidColorBrush(isLight
+                ? System.Windows.Media.Color.FromArgb(20, 0, 0, 0)
+                : System.Windows.Media.Color.FromArgb(25, 255, 255, 255));
+            var btnFg = new SolidColorBrush(textPrimary);
+
+            if (_btnFolder != null) _btnFolder.Background = btnBg;
+            if (_txtFolderIcon != null) _txtFolderIcon.Foreground = btnFg;
+
+            if (_btnRefresh != null) _btnRefresh.Background = btnBg;
+            if (_txtRefreshIcon != null) _txtRefreshIcon.Foreground = btnFg;
+
+            if (_btnLock != null) _btnLock.Background = btnBg;
+            if (_txtLockIcon != null) _txtLockIcon.Foreground = btnFg;
+
+            if (_btnClose != null) _btnClose.Background = btnBg;
+            if (_txtCloseIcon != null) _txtCloseIcon.Foreground = btnFg;
+
+            if (_statusBanner != null)
+            {
+                _statusBanner.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(140, 255, 255, 255)
+                    : System.Windows.Media.Color.FromArgb(28, 255, 255, 255));
+                _statusBanner.BorderBrush = divBrush;
+            }
+            if (_txtCurrentShift != null) _txtCurrentShift.Foreground = new SolidColorBrush(textPrimary);
+            if (_txtIncomingShift != null) _txtIncomingShift.Foreground = new SolidColorBrush(textPrimary);
+            if (_borderCountdownPill != null)
+            {
+                _borderCountdownPill.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(20, 0, 0, 0)
+                    : System.Windows.Media.Color.FromArgb(30, 255, 255, 255));
+                _borderCountdownPill.BorderBrush = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(35, 0, 0, 0)
+                    : System.Windows.Media.Color.FromArgb(40, 255, 255, 255));
+                _borderCountdownPill.BorderThickness = new Thickness(1);
+            }
+            if (_txtHandoverCountdown != null && !_txtHandoverCountdown.Text.StartsWith("\u26A0\uFE0F"))
+            {
+                _txtHandoverCountdown.Foreground = new SolidColorBrush(textPrimary);
+            }
+            if (_supervisorDivider != null) _supervisorDivider.Background = divBrush;
+            if (_borderSupervisorCard != null)
+            {
+                _borderSupervisorCard.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(30, 245, 158, 11)
+                    : System.Windows.Media.Color.FromArgb(35, 245, 158, 11));
+                _borderSupervisorCard.BorderBrush = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(100, 217, 119, 6)
+                    : System.Windows.Media.Color.FromArgb(90, 245, 158, 11));
+                _borderSupervisorCard.BorderThickness = new Thickness(1);
+            }
+            if (_txtSupervisorShift != null)
+            {
+                _txtSupervisorShift.Foreground = isLight 
+                    ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(180, 83, 9)) 
+                    : new SolidColorBrush(System.Windows.Media.Color.FromRgb(251, 191, 36));
+            }
+
+            if (_dateStrip != null)
+            {
+                _dateStrip.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(15, 0, 0, 0)
+                    : System.Windows.Media.Color.FromArgb(20, 255, 255, 255));
+            }
+            if (_txtDateDisplay != null) _txtDateDisplay.Foreground = new SolidColorBrush(textPrimary);
+
+            var navBtnBg = System.Windows.Media.Brushes.Transparent;
+            var navBtnFg = new SolidColorBrush(textSecondary);
+
+            if (_btnPrevDay != null) _btnPrevDay.Background = navBtnBg;
+            if (_txtPrevDay != null) _txtPrevDay.Foreground = navBtnFg;
+
+            if (_btnNextDay != null) _btnNextDay.Background = navBtnBg;
+            if (_txtNextDay != null) _txtNextDay.Foreground = navBtnFg;
+
+            if (_btnToday != null)
+            {
+                _btnToday.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(30, 2, 132, 199)
+                    : System.Windows.Media.Color.FromArgb(40, 14, 165, 233));
+            }
+            if (_txtToday != null)
+            {
+                _txtToday.Foreground = isLight
+                    ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(2, 132, 199))
+                    : new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
+            }
+
+            UpdateTabStyles();
+
+            if (_txtFooterCount != null) _txtFooterCount.Foreground = new SolidColorBrush(textSecondary);
+            if (_txtFooterSheet != null) _txtFooterSheet.Foreground = new SolidColorBrush(textSecondary);
+
+            UpdateLockStateVisuals();
+            RenderStaffList();
+        }
+
+        private void LoadScheduleAsync(bool forceRefresh)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+
+            if (_txtEmpty != null)
+            {
+                _txtEmpty.Text = "\u00C7izelgeler Excel'den okunuyor...";
+                _txtEmpty.Visibility = Visibility.Visible;
+            }
+
+            DateTime targetDate = _viewDate;
+            string targetFolder = _cfg.ShiftFolderPath;
+            string supFolder = _cfg.SupervisorFolderPath;
+
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                var result = ShiftScheduleService.GetSchedule(targetDate, targetFolder, supFolder, forceRefresh);
+
+                Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    _isLoading = false;
+                    _currentResult = result;
+                    UpdateShiftBanner();
+                    RenderStaffList();
+                }));
+            });
+        }
+
+        private void RenderStaffList()
+        {
+            _listPanel.Children.Clear();
+            bool isLight = (_cfg.Theme == "light");
+
+            if (_currentResult == null)
+            {
+                _listPanel.Children.Add(new TextBlock
+                {
+                    Text = "Y\u00FCkleniyor...",
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(100, 116, 139) : System.Windows.Media.Color.FromRgb(160, 174, 192)),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 15, 0, 15)
+                });
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(_currentResult.ErrorMessage))
+            {
+                if (_currentResult.ErrorMessage == "HEDEF_YOK")
+                {
+                    var noTargetStack = new StackPanel
+                    {
+                        Orientation = Orientation.Vertical,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Margin = new Thickness(10, 16, 10, 16)
+                    };
+
+                    noTargetStack.Children.Add(new TextBlock
+                    {
+                        Text = "\u00C7al\u0131\u015Fma \u00C7izelgesi Hedefi Tan\u0131mlanmad\u0131",
+                        FontWeight = FontWeights.Bold,
+                        FontSize = 12,
+                        FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                        Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(30, 41, 59) : System.Windows.Media.Brushes.White.Color),
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Margin = new Thickness(0, 0, 0, 6)
+                    });
+
+                    string autoLnk = ShellLinkHelper.FindDesktopScheduleShortcut();
+                    if (!string.IsNullOrEmpty(autoLnk))
+                    {
+                        string sName = System.IO.Path.GetFileNameWithoutExtension(autoLnk);
+                        var autoBtn = new Border
+                        {
+                            CornerRadius = new CornerRadius(8),
+                            Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(16, 185, 129) : System.Windows.Media.Color.FromRgb(5, 150, 105)),
+                            Padding = new Thickness(14, 7, 14, 7),
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            Margin = new Thickness(0, 0, 0, 8),
+                            Cursor = Cursors.Hand,
+                            ToolTip = "Masa\u00FCst\u00FCndeki k\u0131sayol hedefini do\u011Frudan ba\u011Flar",
+                            Child = new TextBlock
+                            {
+                                Text = "\u2705 Masa\u00FCst\u00FCndeki K\u0131sayolu Ba\u011Fla: '" + sName + "'",
+                                FontSize = 11,
+                                FontWeight = FontWeights.SemiBold,
+                                Foreground = System.Windows.Media.Brushes.White
+                            }
+                        };
+                        autoBtn.MouseLeftButtonUp += delegate
+                        {
+                            _cfg.ShiftFolderPath = autoLnk;
+                            _cfg.Save();
+                            LoadScheduleAsync(true);
+                        };
+                        noTargetStack.Children.Add(autoBtn);
+                    }
+
+                    var btnPickLnk = new Border
+                    {
+                        CornerRadius = new CornerRadius(8),
+                        Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(0, 229, 255)),
+                        Padding = new Thickness(14, 7, 14, 7),
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Margin = new Thickness(0, 0, 0, 6),
+                        Cursor = Cursors.Hand,
+                        ToolTip = "Masa\u00FCst\u00FCndeki .lnk k\u0131sayollar\u0131n\u0131 veya .xlsx dosyas\u0131n\u0131 se\u00E7menizi sa\u011Flar",
+                        Child = new TextBlock
+                        {
+                            Text = "\uD83D\uDD17 K\u0131sayol (.lnk) veya Excel Se\u00E7",
+                            FontSize = 11,
+                            FontWeight = FontWeights.SemiBold,
+                            Foreground = System.Windows.Media.Brushes.White
+                        }
+                    };
+                    btnPickLnk.MouseLeftButtonUp += delegate
+                    {
+                        PickShiftShortcutOrFile();
+                    };
+                    noTargetStack.Children.Add(btnPickLnk);
+
+                    var btnPickFolder = new Border
+                    {
+                        CornerRadius = new CornerRadius(8),
+                        Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(25, 0, 0, 0) : System.Windows.Media.Color.FromArgb(35, 255, 255, 255)),
+                        Padding = new Thickness(14, 6, 14, 6),
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Cursor = Cursors.Hand,
+                        ToolTip = "\u00C7al\u0131\u015Fma \u00E7izelgelerinin yer ald\u0131\u011F\u0131 ana klas\u00F6r\u00FC se\u00E7in",
+                        Child = new TextBlock
+                        {
+                            Text = "\uD83D\uDCC1 Klas\u00F6r Se\u00E7...",
+                            FontSize = 10.5,
+                            FontWeight = FontWeights.Normal,
+                            Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(51, 65, 85) : System.Windows.Media.Color.FromRgb(203, 213, 225))
+                        }
+                    };
+                    btnPickFolder.MouseLeftButtonUp += delegate
+                    {
+                        PickShiftFolder();
+                    };
+                    noTargetStack.Children.Add(btnPickFolder);
+
+                    _listPanel.Children.Add(noTargetStack);
+                    return;
+                }
+
+                var errStack = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(10, 16, 10, 16)
+                };
+
+                errStack.Children.Add(new TextBlock
+                {
+                    Text = _currentResult.ErrorMessage,
+                    FontSize = 11,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(220, 38, 38) : System.Windows.Media.Color.FromRgb(248, 113, 113)),
+                    TextWrapping = TextWrapping.Wrap,
+                    TextAlignment = TextAlignment.Center,
+                    Margin = new Thickness(0, 0, 0, 8)
+                });
+
+                var btnFixTarget = new Border
+                {
+                    CornerRadius = new CornerRadius(8),
+                    Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(25, 2, 132, 199) : System.Windows.Media.Color.FromArgb(35, 0, 229, 255)),
+                    Padding = new Thickness(12, 6, 12, 6),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Cursor = Cursors.Hand,
+                    Child = new TextBlock
+                    {
+                        Text = "\uD83D\uDCC1 Hedef Se\u00E7eneklerini A\u00E7",
+                        FontSize = 10.5,
+                        FontWeight = FontWeights.SemiBold,
+                        Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(0, 229, 255))
+                    }
+                };
+                btnFixTarget.MouseLeftButtonUp += delegate
+                {
+                    OpenShiftTargetMenu(btnFixTarget);
+                };
+                errStack.Children.Add(btnFixTarget);
+
+                _listPanel.Children.Add(errStack);
+                return;
+            }
+
+            List<ShiftPerson> displayList = new List<ShiftPerson>();
+            string commonHours = null;
+
+            if (_selectedTab == 0)
+            {
+                DateTime now = DateTime.Now;
+                string curName, incName, handoverTime, curShiftCode, incShiftCode;
+                DateTime curDate, incDate;
+                ShiftScheduleService.GetShiftContext(now, out curName, out incName, out handoverTime, out curDate, out curShiftCode, out incDate, out incShiftCode);
+
+                ShiftDayResult incResult;
+                if (incDate.Date != _currentResult.Date.Date)
+                {
+                    incResult = ShiftScheduleService.GetSchedule(incDate, _cfg.ShiftFolderPath, _cfg.SupervisorFolderPath, false);
+                }
+                else
+                {
+                    incResult = _currentResult;
+                }
+
+                if (incShiftCode == "S") { displayList = incResult.Morning; commonHours = "07:00 - 15:00"; }
+                else if (incShiftCode == "A") { displayList = incResult.Evening; commonHours = "15:00 - 23:00"; }
+                else if (incShiftCode == "G") { displayList = incResult.Night; commonHours = "23:00 - 07:00"; }
+
+                string targetDateStr = (incDate.Date == now.Date) ? "Bugün" : (incDate.Date == now.Date.AddDays(1) ? "Yarın" : incDate.ToString("dd MMMM", new CultureInfo("tr-TR")));
+                string shiftName = (incShiftCode == "S" ? "Sabah" : (incShiftCode == "A" ? "Akşam" : "Gece"));
+
+                var devirHeader = new Border
+                {
+                    Background = new SolidColorBrush(isLight 
+                        ? System.Windows.Media.Color.FromArgb(240, 240, 249, 255) 
+                        : System.Windows.Media.Color.FromArgb(220, 15, 23, 42)),
+                    BorderBrush = new SolidColorBrush(isLight 
+                        ? System.Windows.Media.Color.FromRgb(186, 230, 253) 
+                        : System.Windows.Media.Color.FromArgb(140, 14, 165, 233)),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(8, 7, 8, 7),
+                    Margin = new Thickness(0, 0, 0, 8)
+                };
+                var devirText = new TextBlock
+                {
+                    Text = string.Format("🕒 {0} · Devralacak Kadro ({1} {2})", commonHours ?? ("Saat " + handoverTime), targetDateStr, shiftName),
+                    FontSize = 11.8,
+                    FontWeight = FontWeights.SemiBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    Foreground = new SolidColorBrush(isLight 
+                        ? System.Windows.Media.Color.FromRgb(3, 105, 161) 
+                        : System.Windows.Media.Color.FromRgb(240, 249, 255)),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                devirHeader.Child = devirText;
+                _listPanel.Children.Add(devirHeader);
+            }
+            else
+            {
+                string tabNameStr;
+                if (_selectedTab == 1) { displayList = _currentResult.Morning; commonHours = "07:00 - 15:00"; tabNameStr = "Sabah"; }
+                else if (_selectedTab == 2) { displayList = _currentResult.Evening; commonHours = "15:00 - 23:00"; tabNameStr = "Akşam"; }
+                else { displayList = _currentResult.Night; commonHours = "23:00 - 07:00"; tabNameStr = "Gece"; }
+
+                var tabHeader = new Border
+                {
+                    Background = new SolidColorBrush(isLight 
+                        ? System.Windows.Media.Color.FromArgb(240, 240, 249, 255) 
+                        : System.Windows.Media.Color.FromArgb(220, 15, 23, 42)),
+                    BorderBrush = new SolidColorBrush(isLight 
+                        ? System.Windows.Media.Color.FromRgb(186, 230, 253) 
+                        : System.Windows.Media.Color.FromArgb(140, 14, 165, 233)),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(8, 7, 8, 7),
+                    Margin = new Thickness(0, 0, 0, 8)
+                };
+                var tabHeaderText = new TextBlock
+                {
+                    Text = string.Format("🕒 {0} · {1} Vardiyası Kadrosu", commonHours, tabNameStr),
+                    FontSize = 11.8,
+                    FontWeight = FontWeights.SemiBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    Foreground = new SolidColorBrush(isLight 
+                        ? System.Windows.Media.Color.FromRgb(3, 105, 161) 
+                        : System.Windows.Media.Color.FromRgb(240, 249, 255)),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                tabHeader.Child = tabHeaderText;
+                _listPanel.Children.Add(tabHeader);
+            }
+
+            if (displayList == null || displayList.Count == 0)
+            {
+                _listPanel.Children.Add(new TextBlock
+                {
+                    Text = (_selectedTab == 0) ? "Devralacak vardiyada kayıtlı nöbetçi personel bulunamadı." : "Bu vardiyada kayıtlı nöbetçi personel bulunamadı.",
+                    FontSize = 12,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(100, 116, 139) : System.Windows.Media.Color.FromRgb(160, 174, 192)),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 20, 0, 20)
+                });
+                if (_txtFooterCount != null) _txtFooterCount.Text = (_selectedTab == 0) ? "0 Personel Devralacak" : "0 Personel Görevde";
+                return;
+            }
+
+            if (_txtFooterCount != null)
+            {
+                if (_selectedTab == 0)
+                {
+                    _txtFooterCount.Text = string.Format("{0} Personel Devralacak", displayList.Count);
+                }
+                else
+                {
+                    _txtFooterCount.Text = string.Format("{0} Personel Görevde", displayList.Count);
+                }
+            }
+            if (_txtFooterSheet != null)
+            {
+                _txtFooterSheet.Text = _currentResult.SheetName ?? "ÇİZELGE";
+            }
+
+            foreach (var person in displayList)
+            {
+                _listPanel.Children.Add(CreatePersonCard(person, commonHours));
+            }
+        }
+
+        private Border CreatePersonCard(ShiftPerson p, string commonHours = null)
+        {
+            bool isLight = (_cfg.Theme == "light");
+            double op = _cfg.ShiftWidgetOpacity;
+            byte borderAlpha = (byte)Math.Min(255, (int)(op * (isLight ? 180 : 80)));
+
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            System.Windows.Media.Brush cardBg;
+            System.Windows.Media.Brush cardBorder;
+
+            if (p.IsSupervisor)
+            {
+                if (isLight)
+                {
+                    cardBg = new SolidColorBrush(System.Windows.Media.Color.FromArgb(170, 254, 243, 199));
+                    cardBorder = new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 217, 119, 6));
+                }
+                else
+                {
+                    cardBg = new SolidColorBrush(System.Windows.Media.Color.FromArgb(45, 245, 158, 11));
+                    cardBorder = new SolidColorBrush(System.Windows.Media.Color.FromArgb(140, 245, 158, 11));
+                }
+            }
+            else
+            {
+                cardBg = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromArgb(140, 255, 255, 255) 
+                    : System.Windows.Media.Color.FromArgb(20, 255, 255, 255));
+                cardBorder = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(borderAlpha, 215, 220, 230)
+                    : System.Windows.Media.Color.FromArgb(borderAlpha, 45, 50, 65));
+            }
+
+            var card = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(10, 6, 10, 6),
+                Margin = new Thickness(0, 2, 0, 3),
+                Background = cardBg,
+                BorderThickness = new Thickness(p.IsSupervisor ? 1.5 : 1),
+                BorderBrush = cardBorder
+            };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            string personHours = null;
+            if (p.IsSupervisor)
+            {
+                if (p.ShiftType == "S") personHours = "07:00 - 16:00";
+                else if (p.ShiftType == "NS") personHours = "08:00 - 16:00";
+                else if (p.ShiftType == "A") personHours = "14:00 - 23:00";
+                else if (p.ShiftType == "G") personHours = "23:00 - 07:00";
+                else personHours = !string.IsNullOrEmpty(p.ShiftHours) ? p.ShiftHours : p.ShiftCode;
+            }
+            else if (p.IsOvertime)
+            {
+                personHours = "FM";
+            }
+            else
+            {
+                if (p.ShiftType == "S") personHours = "07:00 - 15:00";
+                else if (p.ShiftType == "A") personHours = "15:00 - 23:00";
+                else if (p.ShiftType == "G") personHours = "23:00 - 07:00";
+                else personHours = !string.IsNullOrEmpty(p.ShiftHours) ? p.ShiftHours : p.ShiftCode;
+            }
+
+            bool showBadge = p.IsOvertime || (commonHours == null) || (personHours != commonHours);
+
+            var nameStack = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
+            string displayName = p.IsSupervisor ? ("👮 " + p.Name) : p.Name;
+            var nameTxt = new TextBlock
+            {
+                Text = displayName,
+                FontWeight = p.IsSupervisor ? FontWeights.Bold : FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 13.2,
+                Foreground = new SolidColorBrush(textPrimary),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = showBadge ? 220 : 310
+            };
+            var roleTxt = new TextBlock
+            {
+                Text = p.Role,
+                FontWeight = p.IsSupervisor ? FontWeights.SemiBold : FontWeights.Normal,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 11.2,
+                Margin = new Thickness(0, 1, 0, 0),
+                Foreground = p.IsSupervisor
+                    ? new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(180, 83, 9) : System.Windows.Media.Color.FromRgb(251, 191, 36))
+                    : new SolidColorBrush(textMuted),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = showBadge ? 220 : 310
+            };
+            nameStack.Children.Add(nameTxt);
+            nameStack.Children.Add(roleTxt);
+
+            if (showBadge)
+            {
+                Grid.SetColumn(nameStack, 0);
+                grid.Children.Add(nameStack);
+
+                var badge = CreateShiftBadge(p.ShiftCode, p.ShiftType, p.IsOvertime, p.IsSupervisor, p.ShiftHours);
+                Grid.SetColumn(badge, 1);
+                grid.Children.Add(badge);
+            }
+            else
+            {
+                Grid.SetColumn(nameStack, 0);
+                Grid.SetColumnSpan(nameStack, 2);
+                grid.Children.Add(nameStack);
+            }
+
+            card.Child = grid;
+            return card;
+        }
+
+        private Border CreateShiftBadge(string code, string type, bool isOvertime, bool isSupervisor = false, string hours = null)
+        {
+            bool isLight = (_cfg.Theme == "light");
+            string label;
+            System.Windows.Media.Color bg, border, fg;
+
+            if (isSupervisor)
+            {
+                if (type == "S")
+                {
+                    label = "07:00 - 16:00";
+                    if (isLight)
+                    {
+                        bg = System.Windows.Media.Color.FromArgb(40, 2, 132, 199);
+                        border = System.Windows.Media.Color.FromRgb(2, 132, 199);
+                        fg = System.Windows.Media.Color.FromRgb(3, 105, 161);
+                    }
+                    else
+                    {
+                        bg = System.Windows.Media.Color.FromArgb(80, 30, 64, 175);
+                        border = System.Windows.Media.Color.FromRgb(59, 130, 246);
+                        fg = System.Windows.Media.Color.FromRgb(191, 219, 254);
+                    }
+                }
+                else if (type == "NS")
+                {
+                    label = "08:00 - 16:00";
+                    if (isLight)
+                    {
+                        bg = System.Windows.Media.Color.FromArgb(35, 16, 185, 129);
+                        border = System.Windows.Media.Color.FromRgb(16, 185, 129);
+                        fg = System.Windows.Media.Color.FromRgb(4, 120, 87);
+                    }
+                    else
+                    {
+                        bg = System.Windows.Media.Color.FromArgb(70, 5, 150, 105);
+                        border = System.Windows.Media.Color.FromRgb(52, 211, 153);
+                        fg = System.Windows.Media.Color.FromRgb(167, 243, 208);
+                    }
+                }
+                else if (type == "A")
+                {
+                    label = "14:00 - 23:00";
+                    if (isLight)
+                    {
+                        bg = System.Windows.Media.Color.FromArgb(35, 249, 115, 22);
+                        border = System.Windows.Media.Color.FromRgb(234, 88, 12);
+                        fg = System.Windows.Media.Color.FromRgb(194, 65, 12);
+                    }
+                    else
+                    {
+                        bg = System.Windows.Media.Color.FromArgb(70, 194, 65, 12);
+                        border = System.Windows.Media.Color.FromRgb(249, 115, 22);
+                        fg = System.Windows.Media.Color.FromRgb(254, 215, 170);
+                    }
+                }
+                else if (type == "G")
+                {
+                    label = "23:00 - 07:00";
+                    if (isLight)
+                    {
+                        bg = System.Windows.Media.Color.FromArgb(35, 147, 51, 234);
+                        border = System.Windows.Media.Color.FromRgb(126, 34, 206);
+                        fg = System.Windows.Media.Color.FromRgb(107, 33, 168);
+                    }
+                    else
+                    {
+                        bg = System.Windows.Media.Color.FromArgb(70, 107, 33, 168);
+                        border = System.Windows.Media.Color.FromRgb(168, 85, 247);
+                        fg = System.Windows.Media.Color.FromRgb(233, 213, 255);
+                    }
+                }
+                else
+                {
+                    label = !string.IsNullOrEmpty(hours) ? hours : code;
+                    bg = System.Windows.Media.Color.FromArgb(40, 245, 158, 11);
+                    border = System.Windows.Media.Color.FromRgb(217, 119, 6);
+                    fg = isLight ? System.Windows.Media.Color.FromRgb(180, 83, 9) : System.Windows.Media.Color.FromRgb(254, 240, 138);
+                }
+            }
+            else if (isOvertime)
+            {
+                if (type == "S") label = "FM (07-15)";
+                else if (type == "A") label = "FM (15-23)";
+                else if (type == "G") label = "FM (23-07)";
+                else label = "FM (" + code + ")";
+
+                if (isLight)
+                {
+                    bg = System.Windows.Media.Color.FromArgb(40, 245, 158, 11);
+                    border = System.Windows.Media.Color.FromRgb(217, 119, 6);
+                    fg = System.Windows.Media.Color.FromRgb(180, 83, 9);
+                }
+                else
+                {
+                    bg = System.Windows.Media.Color.FromArgb(90, 217, 119, 6);
+                    border = System.Windows.Media.Color.FromRgb(250, 204, 21);
+                    fg = System.Windows.Media.Color.FromRgb(254, 240, 138);
+                }
+            }
+            else if (type == "S")
+            {
+                label = "07:00 - 15:00";
+                if (isLight)
+                {
+                    bg = System.Windows.Media.Color.FromArgb(35, 14, 165, 233);
+                    border = System.Windows.Media.Color.FromRgb(2, 132, 199);
+                    fg = System.Windows.Media.Color.FromRgb(3, 105, 161);
+                }
+                else
+                {
+                    bg = System.Windows.Media.Color.FromArgb(70, 30, 64, 175);
+                    border = System.Windows.Media.Color.FromRgb(59, 130, 246);
+                    fg = System.Windows.Media.Color.FromRgb(191, 219, 254);
+                }
+            }
+            else if (type == "A")
+            {
+                label = "15:00 - 23:00";
+                if (isLight)
+                {
+                    bg = System.Windows.Media.Color.FromArgb(35, 249, 115, 22);
+                    border = System.Windows.Media.Color.FromRgb(234, 88, 12);
+                    fg = System.Windows.Media.Color.FromRgb(194, 65, 12);
+                }
+                else
+                {
+                    bg = System.Windows.Media.Color.FromArgb(70, 194, 65, 12);
+                    border = System.Windows.Media.Color.FromRgb(249, 115, 22);
+                    fg = System.Windows.Media.Color.FromRgb(254, 215, 170);
+                }
+            }
+            else if (type == "G")
+            {
+                label = "23:00 - 07:00";
+                if (isLight)
+                {
+                    bg = System.Windows.Media.Color.FromArgb(35, 147, 51, 234);
+                    border = System.Windows.Media.Color.FromRgb(126, 34, 206);
+                    fg = System.Windows.Media.Color.FromRgb(107, 33, 168);
+                }
+                else
+                {
+                    bg = System.Windows.Media.Color.FromArgb(70, 107, 33, 168);
+                    border = System.Windows.Media.Color.FromRgb(168, 85, 247);
+                    fg = System.Windows.Media.Color.FromRgb(233, 213, 255);
+                }
+            }
+            else
+            {
+                label = code;
+                if (isLight)
+                {
+                    bg = System.Windows.Media.Color.FromArgb(30, 0, 0, 0);
+                    border = System.Windows.Media.Color.FromArgb(60, 0, 0, 0);
+                    fg = System.Windows.Media.Color.FromRgb(15, 23, 42);
+                }
+                else
+                {
+                    bg = System.Windows.Media.Color.FromArgb(40, 255, 255, 255);
+                    border = System.Windows.Media.Color.FromArgb(80, 255, 255, 255);
+                    fg = System.Windows.Media.Brushes.White.Color;
+                }
+            }
+
+            return new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(8, 3, 8, 3),
+                VerticalAlignment = VerticalAlignment.Center,
+                Background = new SolidColorBrush(bg),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new SolidColorBrush(border),
+                Child = new TextBlock
+                {
+                    Text = label,
+                    FontSize = 10.8,
+                    FontWeight = (isOvertime || isSupervisor) ? FontWeights.Bold : FontWeights.SemiBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    Foreground = new SolidColorBrush(fg)
+                }
+            };
+        }
+
+        private bool _isApplyingZOrder = false;
+        public void ApplyZOrder()
+        {
+            if (_isApplyingZOrder) return;
+            _isApplyingZOrder = true;
+            try
+            {
+                IntPtr hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd == IntPtr.Zero) return;
+
+                int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                exStyle |= Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE;
+                Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle);
+
+                Win32.SetWindowPos(hwnd, Win32.HWND_BOTTOM, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+            }
+            catch { }
+            finally
+            {
+                _isApplyingZOrder = false;
+            }
+        }
+    }
+
+    public class WallpaperSingleWindow : Window
+    {
+        private readonly Config _cfg;
+        private readonly Action _onRestoreIcons;
+        private readonly Action _onToggleIcons;
+        private readonly System.Windows.Controls.Image _imgWallpaper;
+        private readonly Canvas _particleCanvas;
+        private readonly DispatcherTimer _particleTimer;
+        private readonly List<WeatherParticle> _particles = new List<WeatherParticle>();
+        private readonly Random _rand = new Random();
+        private string _activeWeatherEffect = null;
+
+        private class WeatherParticle
+        {
+            public FrameworkElement Element;
+            public double X;
+            public double Y;
+            public double SpeedY;
+            public double SpeedX;
+            public double Size;
+            public double Phase;
+            public double Rotation;
+            public double RotSpeed;
+            public double BaseOpacity;
+        }
+
+        public WallpaperSingleWindow(Config cfg, Action onRestoreIcons, Action onToggleIcons)
+        {
+            _cfg = cfg;
+            _onRestoreIcons = onRestoreIcons;
+            _onToggleIcons = onToggleIcons;
+
+            Title = "ModernAutoHideIcons_WallpaperScreen";
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.NoResize;
+            ShowInTaskbar = false;
+            ShowActivated = false;
+            Focusable = false;
+            AllowsTransparency = false;
+            Background = System.Windows.Media.Brushes.Black;
+            MaxWidth = double.PositiveInfinity;
+            MaxHeight = double.PositiveInfinity;
+
+            _imgWallpaper = new System.Windows.Controls.Image
+            {
+                Stretch = Stretch.UniformToFill, // Windows "Doldur" (Fill) modu: En boy oranını koruyarak ekranı tam doldurur
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            RenderOptions.SetBitmapScalingMode(_imgWallpaper, BitmapScalingMode.HighQuality);
+            RenderOptions.SetEdgeMode(_imgWallpaper, EdgeMode.Aliased);
+
+            var grid = new Grid { Background = System.Windows.Media.Brushes.Black };
+            grid.Children.Add(_imgWallpaper);
+
+            _particleCanvas = new Canvas
+            {
+                IsHitTestVisible = false,
+                ClipToBounds = true
+            };
+            grid.Children.Add(_particleCanvas);
+
+            Content = grid;
+
+            _particleTimer = new DispatcherTimer(DispatcherPriority.Render);
+            _particleTimer.Interval = TimeSpan.FromMilliseconds(33); // ~30 FPS, ultra hafif ve GPU dostu
+            _particleTimer.Tick += OnParticleTick;
+        }
+
+        public void SetImageSource(System.Windows.Media.Imaging.BitmapImage bmp)
+        {
+            if (_imgWallpaper != null)
+            {
+                _imgWallpaper.Source = bmp;
+            }
+        }
+
+        public void SetWeatherCondition(string conditionType)
+        {
+            if (_cfg == null || !_cfg.ShowWeatherWallpaperEffects)
+            {
+                StopWeatherParticles();
+                return;
+            }
+
+            string eff = (!string.IsNullOrEmpty(_cfg.CustomParticleEffect) && _cfg.CustomParticleEffect != "auto")
+                ? _cfg.CustomParticleEffect.ToLowerInvariant()
+                : (conditionType ?? "").ToLowerInvariant();
+
+            if (eff == "none")
+            {
+                StopWeatherParticles();
+                return;
+            }
+
+            if (eff == "rain" || eff == "storm" || eff == "drizzle")
+            {
+                if (_activeWeatherEffect != "rain")
+                {
+                    SetupRainParticles();
+                }
+            }
+            else if (eff == "snow")
+            {
+                if (_activeWeatherEffect != "snow")
+                {
+                    SetupSnowParticles();
+                }
+            }
+            else if (eff == "fireflies" || eff == "stars")
+            {
+                if (_activeWeatherEffect != "fireflies")
+                {
+                    SetupFireflyParticles();
+                }
+            }
+            else if (eff == "leaves" || eff == "autumn")
+            {
+                if (_activeWeatherEffect != "leaves")
+                {
+                    SetupAutumnLeavesParticles();
+                }
+            }
+            else
+            {
+                StopWeatherParticles();
+            }
+        }
+
+        private void SetupRainParticles()
+        {
+            StopWeatherParticles();
+            _activeWeatherEffect = "rain";
+
+            double w = ActualWidth > 0 ? ActualWidth : (SystemParameters.PrimaryScreenWidth > 0 ? SystemParameters.PrimaryScreenWidth : 1920);
+            double h = ActualHeight > 0 ? ActualHeight : (SystemParameters.PrimaryScreenHeight > 0 ? SystemParameters.PrimaryScreenHeight : 1080);
+
+            // 45 adet zarif, şeffaf yağmur damlası çizgisi (GPU dostu, sıfır gecikme)
+            int count = 45;
+            for (int i = 0; i < count; i++)
+            {
+                double speedY = 16 + _rand.NextDouble() * 12;
+                double speedX = 1.5 + _rand.NextDouble() * 2.0;
+                double len = 12 + _rand.NextDouble() * 14;
+
+                var drop = new System.Windows.Shapes.Rectangle
+                {
+                    Width = 1.5,
+                    Height = len,
+                    Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(70 + _rand.Next(60)), 180, 215, 255)),
+                    Opacity = 0.65,
+                    RenderTransform = new System.Windows.Media.RotateTransform(-7)
+                };
+
+                double x = _rand.NextDouble() * (w + 100) - 50;
+                double y = _rand.NextDouble() * h;
+
+                Canvas.SetLeft(drop, x);
+                Canvas.SetTop(drop, y);
+                _particleCanvas.Children.Add(drop);
+
+                _particles.Add(new WeatherParticle
+                {
+                    Element = drop,
+                    X = x,
+                    Y = y,
+                    SpeedY = speedY,
+                    SpeedX = speedX,
+                    Size = len
+                });
+            }
+
+            _particleTimer.Start();
+        }
+
+        private void SetupSnowParticles()
+        {
+            StopWeatherParticles();
+            _activeWeatherEffect = "snow";
+
+            double w = ActualWidth > 0 ? ActualWidth : (SystemParameters.PrimaryScreenWidth > 0 ? SystemParameters.PrimaryScreenWidth : 1920);
+            double h = ActualHeight > 0 ? ActualHeight : (SystemParameters.PrimaryScreenHeight > 0 ? SystemParameters.PrimaryScreenHeight : 1080);
+
+            // 38 adet hafif, süzülen kar tanesi (GPU dostu, sıfır gecikme)
+            int count = 38;
+            for (int i = 0; i < count; i++)
+            {
+                double sz = 3 + _rand.NextDouble() * 5.0;
+                double speedY = 1.2 + _rand.NextDouble() * 2.2;
+
+                var flake = new System.Windows.Shapes.Ellipse
+                {
+                    Width = sz,
+                    Height = sz,
+                    Fill = System.Windows.Media.Brushes.White,
+                    Opacity = 0.4 + _rand.NextDouble() * 0.45
+                };
+
+                double x = _rand.NextDouble() * w;
+                double y = _rand.NextDouble() * h;
+
+                Canvas.SetLeft(flake, x);
+                Canvas.SetTop(flake, y);
+                _particleCanvas.Children.Add(flake);
+
+                _particles.Add(new WeatherParticle
+                {
+                    Element = flake,
+                    X = x,
+                    Y = y,
+                    SpeedY = speedY,
+                    SpeedX = 0,
+                    Size = sz,
+                    Phase = _rand.NextDouble() * Math.PI * 2
+                });
+            }
+
+            _particleTimer.Start();
+        }
+
+        private void SetupFireflyParticles()
+        {
+            StopWeatherParticles();
+            _activeWeatherEffect = "fireflies";
+
+            double w = ActualWidth > 0 ? ActualWidth : (SystemParameters.PrimaryScreenWidth > 0 ? SystemParameters.PrimaryScreenWidth : 1920);
+            double h = ActualHeight > 0 ? ActualHeight : (SystemParameters.PrimaryScreenHeight > 0 ? SystemParameters.PrimaryScreenHeight : 1080);
+
+            int count = 36; // 36 adet parlayan ateş böceği / yıldız tozu
+            for (int i = 0; i < count; i++)
+            {
+                double sz = 4 + _rand.NextDouble() * 7.0;
+                var el = new Ellipse
+                {
+                    Width = sz,
+                    Height = sz,
+                    Fill = new RadialGradientBrush
+                    {
+                        GradientStops = new GradientStopCollection
+                        {
+                            new GradientStop(System.Windows.Media.Color.FromArgb(245, 254, 240, 138), 0.0), // Parlak sıcak altın sarısı #FEF08A
+                            new GradientStop(System.Windows.Media.Color.FromArgb(160, 234, 179, 8), 0.45), // Kehribar
+                            new GradientStop(System.Windows.Media.Color.FromArgb(0, 234, 179, 8), 1.0)
+                        }
+                    },
+                    Opacity = 0.4 + _rand.NextDouble() * 0.5
+                };
+
+                double x = _rand.NextDouble() * w;
+                double y = _rand.NextDouble() * h;
+
+                Canvas.SetLeft(el, x);
+                Canvas.SetTop(el, y);
+                _particleCanvas.Children.Add(el);
+
+                _particles.Add(new WeatherParticle
+                {
+                    Element = el,
+                    X = x,
+                    Y = y,
+                    SpeedX = (_rand.NextDouble() - 0.5) * 0.9,
+                    SpeedY = (_rand.NextDouble() - 0.5) * 0.9,
+                    Size = sz,
+                    Phase = _rand.NextDouble() * Math.PI * 2,
+                    BaseOpacity = 0.35 + _rand.NextDouble() * 0.45
+                });
+            }
+
+            _particleTimer.Start();
+        }
+
+        private void SetupAutumnLeavesParticles()
+        {
+            StopWeatherParticles();
+            _activeWeatherEffect = "leaves";
+
+            double w = ActualWidth > 0 ? ActualWidth : (SystemParameters.PrimaryScreenWidth > 0 ? SystemParameters.PrimaryScreenWidth : 1920);
+            double h = ActualHeight > 0 ? ActualHeight : (SystemParameters.PrimaryScreenHeight > 0 ? SystemParameters.PrimaryScreenHeight : 1080);
+
+            // Sonbahar yaprak renkleri: Kızıl, turuncu, altın sarısı, koyu kehribar
+            System.Windows.Media.Color[] leafColors = new System.Windows.Media.Color[]
+            {
+                System.Windows.Media.Color.FromArgb(220, 234, 88, 12),   // Kızıl turuncu #EA580C
+                System.Windows.Media.Color.FromArgb(210, 217, 119, 6),   // Kehribar #D97706
+                System.Windows.Media.Color.FromArgb(215, 180, 83, 9),    // Koyu altın
+                System.Windows.Media.Color.FromArgb(210, 220, 38, 38),   // Kızıl yaprak #DC2626
+                System.Windows.Media.Color.FromArgb(195, 161, 98, 7)     // Kahve sarı
+            };
+
+            int count = 28; // 28 adet zarif süzülen sonbahar yaprağı
+            for (int i = 0; i < count; i++)
+            {
+                double sz = 13 + _rand.NextDouble() * 11;
+                var leafPath = new System.Windows.Shapes.Path
+                {
+                    Data = Geometry.Parse("M 0,10 C 2,4 8,0 16,0 C 14,8 10,14 0,20 C 0,14 -2,8 0,10 Z"),
+                    Fill = new SolidColorBrush(leafColors[_rand.Next(leafColors.Length)]),
+                    Width = sz,
+                    Height = sz,
+                    Stretch = Stretch.Uniform,
+                    Opacity = 0.70 + _rand.NextDouble() * 0.25,
+                    RenderTransformOrigin = new System.Windows.Point(0.5, 0.5)
+                };
+
+                double x = _rand.NextDouble() * w;
+                double y = _rand.NextDouble() * h;
+
+                Canvas.SetLeft(leafPath, x);
+                Canvas.SetTop(leafPath, y);
+                _particleCanvas.Children.Add(leafPath);
+
+                _particles.Add(new WeatherParticle
+                {
+                    Element = leafPath,
+                    X = x,
+                    Y = y,
+                    SpeedX = 0.8 + _rand.NextDouble() * 1.3,
+                    SpeedY = 1.3 + _rand.NextDouble() * 1.8,
+                    Size = sz,
+                    Phase = _rand.NextDouble() * Math.PI * 2,
+                    Rotation = _rand.NextDouble() * 360,
+                    RotSpeed = (_rand.NextDouble() - 0.5) * 3.6,
+                    BaseOpacity = 0.8
+                });
+            }
+
+            _particleTimer.Start();
+        }
+
+        public void StopWeatherParticles()
+        {
+            if (_particleTimer != null && _particleTimer.IsEnabled)
+            {
+                _particleTimer.Stop();
+            }
+            if (_particleCanvas != null)
+            {
+                _particleCanvas.Children.Clear();
+            }
+            _particles.Clear();
+            _activeWeatherEffect = null;
+        }
+
+        private void OnParticleTick(object sender, EventArgs e)
+        {
+            if (!IsVisible || _particles.Count == 0)
+            {
+                if (_particleTimer != null && _particleTimer.IsEnabled) _particleTimer.Stop();
+                return;
+            }
+
+            double w = ActualWidth > 0 ? ActualWidth : 1920;
+            double h = ActualHeight > 0 ? ActualHeight : 1080;
+
+            if (_activeWeatherEffect == "rain")
+            {
+                for (int i = 0; i < _particles.Count; i++)
+                {
+                    var p = _particles[i];
+                    p.Y += p.SpeedY;
+                    p.X += p.SpeedX;
+
+                    if (p.Y > h + p.Size)
+                    {
+                        p.Y = -p.Size;
+                        p.X = _rand.NextDouble() * (w + 100) - 50;
+                    }
+                    if (p.X > w + 50)
+                    {
+                        p.X = -30;
+                    }
+
+                    Canvas.SetLeft(p.Element, p.X);
+                    Canvas.SetTop(p.Element, p.Y);
+                }
+            }
+            else if (_activeWeatherEffect == "snow")
+            {
+                for (int i = 0; i < _particles.Count; i++)
+                {
+                    var p = _particles[i];
+                    p.Phase += 0.045;
+                    p.Y += p.SpeedY;
+                    p.X += Math.Sin(p.Phase) * 1.1;
+
+                    if (p.Y > h + p.Size)
+                    {
+                        p.Y = -p.Size;
+                        p.X = _rand.NextDouble() * w;
+                    }
+
+                    Canvas.SetLeft(p.Element, p.X);
+                    Canvas.SetTop(p.Element, p.Y);
+                }
+            }
+            else if (_activeWeatherEffect == "fireflies")
+            {
+                for (int i = 0; i < _particles.Count; i++)
+                {
+                    var p = _particles[i];
+                    p.Phase += 0.035;
+                    p.X += Math.Sin(p.Phase * 0.8) * 1.4 + p.SpeedX;
+                    p.Y += Math.Cos(p.Phase * 0.6) * 1.1 + p.SpeedY;
+
+                    // Nefes alan yumuşak parıltı (Pulsing glowing opacity)
+                    double op = p.BaseOpacity + Math.Sin(p.Phase * 1.8) * 0.35;
+                    if (op < 0.1) op = 0.1;
+                    if (op > 0.95) op = 0.95;
+                    p.Element.Opacity = op;
+
+                    if (p.X < -20) p.X = w + 10;
+                    else if (p.X > w + 20) p.X = -10;
+                    if (p.Y < -20) p.Y = h + 10;
+                    else if (p.Y > h + 20) p.Y = -10;
+
+                    Canvas.SetLeft(p.Element, p.X);
+                    Canvas.SetTop(p.Element, p.Y);
+                }
+            }
+            else if (_activeWeatherEffect == "leaves")
+            {
+                for (int i = 0; i < _particles.Count; i++)
+                {
+                    var p = _particles[i];
+                    p.Phase += 0.038;
+                    p.Y += p.SpeedY;
+                    p.X += Math.Sin(p.Phase) * 2.2 + p.SpeedX;
+                    p.Rotation += p.RotSpeed;
+
+                    p.Element.RenderTransform = new RotateTransform(p.Rotation);
+
+                    if (p.Y > h + 30)
+                    {
+                        p.Y = -30;
+                        p.X = _rand.NextDouble() * (w + 100) - 50;
+                    }
+                    if (p.X > w + 50) p.X = -30;
+                    else if (p.X < -50) p.X = w + 30;
+
+                    Canvas.SetLeft(p.Element, p.X);
+                    Canvas.SetTop(p.Element, p.Y);
+                }
+            }
+        }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            var helper = new WindowInteropHelper(this);
+            IntPtr hwnd = helper.Handle;
+            if (hwnd != IntPtr.Zero && !Win32.WallpaperWindowHandles.Contains(hwnd))
+            {
+                Win32.WallpaperWindowHandles.Add(hwnd);
+            }
+
+            int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+            exStyle |= Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE;
+            Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle);
+
+            HwndSource source = HwndSource.FromHwnd(hwnd);
+            if (source != null)
+            {
+                source.AddHook(WndProc);
+            }
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            const int WM_MOUSEACTIVATE = 0x0021;
+            const int MA_NOACTIVATE = 3;
+
+            if (msg == WM_MOUSEACTIVATE)
+            {
+                handled = true;
+                return new IntPtr(MA_NOACTIVATE);
+            }
+            return IntPtr.Zero;
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            StopWeatherParticles();
+            var helper = new WindowInteropHelper(this);
+            IntPtr hwnd = helper.Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                Win32.WallpaperWindowHandles.Remove(hwnd);
+            }
+            base.OnClosed(e);
+        }
+
+        private void OnWallpaperMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            // Tıklamalar artık App içerisindeki WH_MOUSE_LL global kancası üzerinden
+            // çift tıklama ve sağ tıklama geri getirme olarak %100 senkron ve hatasız yönetilmektedir.
+        }
+    }
+
+    // ==========================================
+    // ÇOKLU MONİTÖR DUVAR KAĞIDI YÖNETİCİSİ
+    // Mimari & Tasarım: Serkan ŞENTÜRK
+    // ==========================================
+    public class WallpaperWindow
+    {
+        private readonly Config _cfg;
+        private readonly Action _onRestoreIcons;
+        private readonly Action _onToggleIcons;
+        private readonly List<WallpaperSingleWindow> _screenWindows = new List<WallpaperSingleWindow>();
+        private string _loadedPath = "";
+        private System.Windows.Media.Imaging.BitmapImage _cachedBmp = null;
+
+        public bool IsShowing { get; private set; }
+        public Func<IntPtr> GetWidgetHwndFunc { get; set; }
+        public Func<List<IntPtr>> GetInspirationHandlesFunc { get; set; }
+        public string CurrentWeatherCondition { get; private set; }
+
+        public WallpaperWindow(Config cfg, Action onRestoreIcons, Action onToggleIcons)
+        {
+            _cfg = cfg;
+            _onRestoreIcons = onRestoreIcons;
+            _onToggleIcons = onToggleIcons;
+            CurrentWeatherCondition = "clear";
+        }
+
+        public string GetEffectiveWallpaperPath()
+        {
+            if (_cfg != null && _cfg.DynamicWallpaperEnabled)
+            {
+                int hour = DateTime.Now.Hour;
+                string dynamicPath = "";
+                if (hour >= 6 && hour < 11) dynamicPath = _cfg.WallpaperMorning;
+                else if (hour >= 11 && hour < 17) dynamicPath = _cfg.WallpaperNoon;
+                else if (hour >= 17 && hour < 21) dynamicPath = _cfg.WallpaperEvening;
+                else dynamicPath = _cfg.WallpaperNight;
+
+                if (!string.IsNullOrWhiteSpace(dynamicPath) && File.Exists(dynamicPath))
+                {
+                    return dynamicPath;
+                }
+            }
+            return _cfg != null ? _cfg.CustomWallpaperPath : "";
+        }
+
+        public bool HasCustomWallpaper()
+        {
+            string path = GetEffectiveWallpaperPath();
+            return !string.IsNullOrWhiteSpace(path) && File.Exists(path);
+        }
+
+        public void ReloadWallpaper()
+        {
+            if (!HasCustomWallpaper())
+            {
+                _loadedPath = "";
+                _cachedBmp = null;
+                HideWallpaper();
+                return;
+            }
+
+            string path = GetEffectiveWallpaperPath();
+            if (path != _loadedPath || _cachedBmp == null)
+            {
+                _loadedPath = path;
+                _cachedBmp = WallpaperService.LoadHighQualityBitmap(path);
+                foreach (var win in _screenWindows)
+                {
+                    win.SetImageSource(_cachedBmp);
+                }
+            }
+        }
+
+        public void UpdateWeatherCondition(string type)
+        {
+            CurrentWeatherCondition = type;
+            if (IsShowing)
+            {
+                foreach (var win in _screenWindows)
+                {
+                    win.SetWeatherCondition(type);
+                }
+            }
+        }
+
+        public void ApplyWeatherSetting()
+        {
+            if (_cfg == null || !_cfg.ShowWeatherWallpaperEffects)
+            {
+                foreach (var win in _screenWindows)
+                {
+                    win.StopWeatherParticles();
+                }
+            }
+            else if (IsShowing)
+            {
+                foreach (var win in _screenWindows)
+                {
+                    win.SetWeatherCondition(CurrentWeatherCondition);
+                }
+            }
+        }
+
+        public void TestWeatherEffect(string type)
+        {
+            CurrentWeatherCondition = type;
+            if (type == "clear")
+            {
+                foreach (var win in _screenWindows)
+                {
+                    win.StopWeatherParticles();
+                }
+                return;
+            }
+
+            if (!_cfg.ShowWeatherWallpaperEffects)
+            {
+                _cfg.ShowWeatherWallpaperEffects = true;
+                _cfg.Save();
+            }
+
+            if (!IsShowing)
+            {
+                ShowWallpaper();
+            }
+            else
+            {
+                foreach (var win in _screenWindows)
+                {
+                    win.SetWeatherCondition(type);
+                }
+            }
+        }
+
+        public void ShowWallpaper()
+        {
+            // KULLANICI KURALI:
+            // "eger duvar kagıdı seçilmemiş ise varsayılan duvar kagıdında hıcbır degısıklık yapma sadece duvar kagıdı seçilmiş ise duvar kagıdını göster"
+            if (!_cfg.ShowWallpaperOnHide || !HasCustomWallpaper())
+            {
+                HideWallpaper();
+                return;
+            }
+
+            ReloadWallpaper();
+            if (_cachedBmp == null)
+            {
+                HideWallpaper();
+                return;
+            }
+
+            var screens = Forms.Screen.AllScreens;
+
+            // Ekran sayısı kadar pencere hazırla
+            while (_screenWindows.Count < screens.Length)
+            {
+                var win = new WallpaperSingleWindow(_cfg, _onRestoreIcons, _onToggleIcons);
+                win.SetImageSource(_cachedBmp);
+                _screenWindows.Add(win);
+            }
+            while (_screenWindows.Count > screens.Length)
+            {
+                int lastIdx = _screenWindows.Count - 1;
+                var extra = _screenWindows[lastIdx];
+                _screenWindows.RemoveAt(lastIdx);
+                try { extra.Close(); } catch { }
+            }
+
+            // KULLANICI KURALI:
+            // "duvar kagıdının ekran sıgdırma durumu windows daki Doldur modunda olsun"
+            // "2 monitör kullanıyorum varsayılan duvar kagıdını goster dedıgımde ortalıyor görüntü bozuluyor"
+            // Her monitör bağımsız olarak o monitörün tam çözünürlüğüne 'Doldur' (UniformToFill) modunda yerleştirilir!
+            for (int i = 0; i < screens.Length; i++)
+            {
+                var scr = screens[i];
+                var win = _screenWindows[i];
+
+                win.SetImageSource(_cachedBmp);
+
+                if (!win.IsVisible)
+                {
+                    win.Show();
+                }
+
+                if (_cfg.ShowWeatherWallpaperEffects)
+                {
+                    win.SetWeatherCondition(CurrentWeatherCondition);
+                }
+                else
+                {
+                    win.StopWeatherParticles();
+                }
+
+                IntPtr hwnd = new WindowInteropHelper(win).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    // Görev çubuğunun (Taskbar) hiçbir zaman örtülmemesi ve Windows'un tam ekran moduna geçip çubuğu gizlememesi için Bounds yerine kesinlikle WorkingArea kullanılır!
+                    var area = scr.WorkingArea;
+                    var source = PresentationSource.FromVisual(win);
+                    if (source != null && source.CompositionTarget != null)
+                    {
+                        var m = source.CompositionTarget.TransformFromDevice;
+                        win.Left = area.Left * m.M11;
+                        win.Top = area.Top * m.M22;
+                        win.Width = area.Width * m.M11;
+                        win.Height = area.Height * m.M22;
+                    }
+                    else
+                    {
+                        win.Left = area.Left;
+                        win.Top = area.Top;
+                        win.Width = area.Width;
+                        win.Height = area.Height;
+                    }
+
+                    Win32.SetWindowPos(hwnd, Win32.HWND_BOTTOM, area.Left, area.Top, area.Width, area.Height, Win32.SWP_NOACTIVATE);
+                }
+            }
+
+            IsShowing = true;
+            Win32.EnsureTaskbarVisible();
+
+            // Widget ve ilham kartları pencerelerinin katman seviyesini ayara göre koru (asla normal pencerelerin önüne fırlatmadan)
+            IntPtr widgetHwnd = GetWidgetHwndFunc != null ? GetWidgetHwndFunc() : IntPtr.Zero;
+            var inspHandles = GetInspirationHandlesFunc != null ? GetInspirationHandlesFunc() : null;
+
+            if (_cfg != null && _cfg.WidgetPinnedToDesktop)
+            {
+                // 1. Önce widget'ı HWND_BOTTOM seviyesine al
+                if (widgetHwnd != IntPtr.Zero && Win32.IsWindow(widgetHwnd))
+                {
+                    Win32.SetWindowPos(widgetHwnd, Win32.HWND_BOTTOM, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+                }
+
+                // 2. İlham kartlarını da (Günün Âyeti & Hadîsi) HWND_BOTTOM seviyesine al
+                if (inspHandles != null)
+                {
+                    foreach (var inspHwnd in inspHandles)
+                    {
+                        if (inspHwnd != IntPtr.Zero && Win32.IsWindow(inspHwnd))
+                        {
+                            Win32.SetWindowPos(inspHwnd, Win32.HWND_BOTTOM, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+                        }
+                    }
+                }
+
+                // 3. Duvar kağıdı pencerelerini tekrar HWND_BOTTOM'a alarak widget ve kartların hemen altına yerleştir
+                foreach (var win in _screenWindows)
+                {
+                    IntPtr wHwnd = new WindowInteropHelper(win).Handle;
+                    if (wHwnd != IntPtr.Zero && Win32.IsWindow(wHwnd))
+                    {
+                        Win32.SetWindowPos(wHwnd, Win32.HWND_BOTTOM, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+                    }
+                }
+            }
+            else if (_cfg != null && _cfg.WidgetAlwaysOnTop)
+            {
+                if (widgetHwnd != IntPtr.Zero && Win32.IsWindow(widgetHwnd))
+                {
+                    Win32.SetWindowPos(widgetHwnd, Win32.HWND_TOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+                }
+            }
+            else
+            {
+                if (widgetHwnd != IntPtr.Zero && Win32.IsWindow(widgetHwnd))
+                {
+                    Win32.SetWindowPos(widgetHwnd, Win32.HWND_NOTOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+                }
+            }
+        }
+
+        public void ShowWallpaperAmbient()
+        {
+            string path = GetEffectiveWallpaperPath();
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                path = WallpaperService.GetCurrentWindowsWallpaperPath();
+            }
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                return;
+            }
+
+            if (path != _loadedPath || _cachedBmp == null)
+            {
+                _loadedPath = path;
+                _cachedBmp = WallpaperService.LoadHighQualityBitmap(path);
+                foreach (var w in _screenWindows)
+                {
+                    w.SetImageSource(_cachedBmp);
+                }
+            }
+            if (_cachedBmp == null) return;
+
+            var screens = Forms.Screen.AllScreens;
+            while (_screenWindows.Count < screens.Length)
+            {
+                var win = new WallpaperSingleWindow(_cfg, _onRestoreIcons, _onToggleIcons);
+                win.SetImageSource(_cachedBmp);
+                _screenWindows.Add(win);
+            }
+            while (_screenWindows.Count > screens.Length)
+            {
+                int lastIdx = _screenWindows.Count - 1;
+                var extra = _screenWindows[lastIdx];
+                _screenWindows.RemoveAt(lastIdx);
+                try { extra.Close(); } catch { }
+            }
+
+            for (int i = 0; i < screens.Length; i++)
+            {
+                var scr = screens[i];
+                var win = _screenWindows[i];
+                win.SetImageSource(_cachedBmp);
+                if (!win.IsVisible) win.Show();
+
+                if (_cfg.ShowWeatherWallpaperEffects)
+                    win.SetWeatherCondition(CurrentWeatherCondition);
+                else
+                    win.StopWeatherParticles();
+
+                IntPtr hwnd = new WindowInteropHelper(win).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    var area = scr.WorkingArea;
+                    var source = PresentationSource.FromVisual(win);
+                    if (source != null && source.CompositionTarget != null)
+                    {
+                        var m = source.CompositionTarget.TransformFromDevice;
+                        win.Left = area.Left * m.M11;
+                        win.Top = area.Top * m.M22;
+                        win.Width = area.Width * m.M11;
+                        win.Height = area.Height * m.M22;
+                    }
+                    else
+                    {
+                        win.Left = area.Left;
+                        win.Top = area.Top;
+                        win.Width = area.Width;
+                        win.Height = area.Height;
+                    }
+
+                    // Açık pencerelerin üzerine çıkar (HWND_TOPMOST)
+                    Win32.SetWindowPos(hwnd, Win32.HWND_TOPMOST, area.Left, area.Top, area.Width, area.Height, Win32.SWP_NOACTIVATE | Win32.SWP_SHOWWINDOW);
+                }
+            }
+
+            IsShowing = true;
+        }
+
+        public void HideWallpaper()
+        {
+            IsShowing = false;
+            foreach (var win in _screenWindows)
+            {
+                win.StopWeatherParticles();
+                if (win.IsVisible)
+                {
+                    win.Hide();
+                }
+            }
+            MemoryOptimizer.TrimWorkingSet(false);
+        }
+
+        public void Close()
+        {
+            IsShowing = false;
+            foreach (var win in _screenWindows)
+            {
+                try { win.StopWeatherParticles(); win.Close(); } catch { }
+            }
+            _screenWindows.Clear();
+        }
+    }
+
+    // ==========================================
+    // WINDOWS 11 FLUENT STİLİ TOGGLE SWITCH
+    // Tasarım & Mimari: Serkan ŞENTÜRK
+    // ==========================================
+    public class PowerToggleSwitch : Grid
+    {
+        private Border _track;
+        private System.Windows.Shapes.Ellipse _thumb;
+        private TextBlock _label;
+        private bool _isChecked;
+        private Action<bool> _onChanged;
+        private bool _isDark;
+
+        public PowerToggleSwitch(bool initialValue, Action<bool> onChanged, bool isDark)
+        {
+            _isChecked = initialValue;
+            _onChanged = onChanged;
+            _isDark = isDark;
+
+            Cursor = Cursors.Hand;
+            VerticalAlignment = VerticalAlignment.Center;
+
+            ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            _label = new TextBlock
+            {
+                Text = _isChecked ? "Açık" : "Kapalı",
+                FontSize = 12,
+                Foreground = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(220, 220, 220))
+                                     : new SolidColorBrush(System.Windows.Media.Color.FromRgb(60, 60, 60)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+            Grid.SetColumn(_label, 0);
+            Children.Add(_label);
+
+            _track = new Border
+            {
+                Width = 40,
+                Height = 20,
+                CornerRadius = new CornerRadius(10),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            _thumb = new System.Windows.Shapes.Ellipse
+            {
+                Width = 12,
+                Height = 12,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _track.Child = _thumb;
+
+            Grid.SetColumn(_track, 1);
+            Children.Add(_track);
+
+            UpdateVisuals();
+
+            MouseDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                _isChecked = !_isChecked;
+                UpdateVisuals();
+                if (_onChanged != null) _onChanged(_isChecked);
+                e.Handled = true;
+            };
+        }
+
+        public bool IsChecked
+        {
+            get { return _isChecked; }
+            set
+            {
+                if (_isChecked != value)
+                {
+                    _isChecked = value;
+                    UpdateVisuals();
+                }
+            }
+        }
+
+        public void SetTheme(bool isDark)
+        {
+            _isDark = isDark;
+            UpdateVisuals();
+        }
+
+        private void UpdateVisuals()
+        {
+            _label.Text = _isChecked ? "Açık" : "Kapalı";
+            _label.Foreground = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(220, 220, 220))
+                                         : new SolidColorBrush(System.Windows.Media.Color.FromRgb(60, 60, 60));
+            if (_isChecked)
+            {
+                _track.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 103, 192));
+                _track.BorderThickness = new Thickness(0);
+                _thumb.Fill = System.Windows.Media.Brushes.White;
+                _thumb.HorizontalAlignment = HorizontalAlignment.Right;
+                _thumb.Margin = new Thickness(0, 0, 4, 0);
+            }
+            else
+            {
+                _track.Background = System.Windows.Media.Brushes.Transparent;
+                _track.BorderBrush = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(140, 140, 140))
+                                             : new SolidColorBrush(System.Windows.Media.Color.FromRgb(130, 130, 130));
+                _track.BorderThickness = new Thickness(1.5);
+                _thumb.Fill = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(200, 200, 200))
+                                      : new SolidColorBrush(System.Windows.Media.Color.FromRgb(110, 110, 110));
+                _thumb.HorizontalAlignment = HorizontalAlignment.Left;
+                _thumb.Margin = new Thickness(4, 0, 0, 0);
+            }
+        }
+    }
+
+    // ==========================================
+    // MODERN DESKTOP ZEN AYARLAR PENCERESİ
+    // Geliştirici & Mimar: Serkan ŞENTÜRK
+    // ==========================================
+    public class SettingsWindow : Window
+    {
+        private Config _cfg;
+        private Action _onConfigChanged;
+        private Action _onToggleIcons;
+        private Action _onTestWhistleAlert;
+        private Action _onTestGoalAlert;
+        private Action<string> _onTestWeather;
+
+        // Tema Fırçaları
+        private bool _isDark;
+        private SolidColorBrush _windowBgBrush;
+        private SolidColorBrush _topBarBgBrush;
+        private SolidColorBrush _sidebarBgBrush;
+        private SolidColorBrush _contentBgBrush;
+        private SolidColorBrush _cardBgBrush;
+        private SolidColorBrush _cardBorderBrush;
+        private SolidColorBrush _textPrimaryBrush;
+        private SolidColorBrush _textSecondaryBrush;
+        private SolidColorBrush _accentBrush;
+        private SolidColorBrush _hoverBrush;
+
+        // Navigasyon ve İçerik
+        private System.Windows.Controls.TextBox _txtSearch;
+        private ScrollViewer _contentScroll;
+        private StackPanel _mainContentPanel;
+        private string _activeTabKey = "home";
+        private Dictionary<string, Border> _navButtons = new Dictionary<string, Border>();
+        private Dictionary<string, Border> _navPills = new Dictionary<string, Border>();
+
+        // Canlı Durum Elemanları (Giriş Tabı)
+        private TextBlock _lblIconStatus;
+        private System.Windows.Controls.Button _btnToggleNow;
+        private DispatcherTimer _statusTimer;
+        private Action _onTestAmbient;
+        private Action<string> _onTestVictoryFlag;
+        private Action _onTestFinalWhistle;
+
+        public SettingsWindow(Config cfg, Action onConfigChanged, Action onToggleIcons, Action onTestWhistleAlert = null, Action onTestGoalAlert = null, Action<string> onTestWeather = null, Action onTestAmbient = null, Action<string> onTestVictoryFlag = null, Action onTestFinalWhistle = null)
+        {
+            _cfg = cfg;
+            _onConfigChanged = onConfigChanged;
+            _onToggleIcons = onToggleIcons;
+            _onTestWhistleAlert = onTestWhistleAlert;
+            _onTestGoalAlert = onTestGoalAlert;
+            _onTestWeather = onTestWeather;
+            _onTestAmbient = onTestAmbient;
+            _onTestVictoryFlag = onTestVictoryFlag;
+            _onTestFinalWhistle = onTestFinalWhistle;
+
+            Title = "Desktop Zen - Ayarlar (Geliştirici: Serkan ŞENTÜRK)";
+            try { Icon = GetZenAppIconSource(); } catch { }
+            Width = 1040;
+            Height = 720;
+            MinWidth = 880;
+            MinHeight = 580;
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            ShowInTaskbar = true;
+            FontFamily = new System.Windows.Media.FontFamily("Segoe UI Variable Text, Segoe UI, -apple-system, Inter, sans-serif");
+
+            InitTheme();
+            BuildUI();
+
+            Loaded += delegate(object s, RoutedEventArgs e)
+            {
+                ApplyDwmBackdrop();
+            };
+
+            _statusTimer = new DispatcherTimer();
+            _statusTimer.Interval = TimeSpan.FromMilliseconds(500);
+            _statusTimer.Tick += delegate(object s, EventArgs e) { UpdateLiveStatus(); };
+            _statusTimer.Start();
+        }
+
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            e.Cancel = true;
+            Hide();
+            MemoryOptimizer.TrimWorkingSet(true);
+        }
+
+        private void InitTheme()
+        {
+            _isDark = (_cfg.Theme != "light");
+            if (_isDark)
+            {
+                // Koyu Tema (Varsayılan Dark)
+                _windowBgBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(32, 32, 32));
+                _topBarBgBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(28, 28, 28));
+                _sidebarBgBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 24));
+                _contentBgBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(32, 32, 32));
+                _cardBgBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(43, 43, 43));
+                _cardBorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 255, 255, 255));
+                _textPrimaryBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
+                _textSecondaryBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(165, 165, 165));
+                _accentBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
+                _hoverBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255));
+            }
+            else
+            {
+                // Açık Tema
+                _windowBgBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(243, 243, 243));
+                _topBarBgBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(248, 248, 248));
+                _sidebarBgBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(238, 238, 238));
+                _contentBgBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(249, 249, 249));
+                _cardBgBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
+                _cardBorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(210, 220, 220, 220));
+                _textPrimaryBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(25, 25, 25));
+                _textSecondaryBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(95, 99, 104));
+                _accentBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 103, 192));
+                _hoverBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(25, 0, 0, 0));
+            }
+            Background = _windowBgBrush;
+            ApplyDwmBackdrop();
+        }
+
+        public void ApplyDwmBackdrop()
+        {
+            try
+            {
+                var helper = new WindowInteropHelper(this);
+                if (helper.Handle == IntPtr.Zero) return;
+
+                int dark = _isDark ? 1 : 0;
+                Win32.DwmSetWindowAttribute(helper.Handle, Win32.DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
+            }
+            catch { }
+        }
+
+        private void BuildUI()
+        {
+            var root = new Grid();
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(48) });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+            // 1. ÜST ARAMA VE BAŞLIK ÇUBUĞU
+            var topBar = BuildTopBar();
+            Grid.SetRow(topBar, 0);
+            root.Children.Add(topBar);
+
+            // 2. ANA ALAN: SOL KENAR ÇUBUĞU + SAĞ İÇERİK
+            var bodyGrid = new Grid();
+            bodyGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(260) });
+            bodyGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var sidebar = BuildSidebar();
+            Grid.SetColumn(sidebar, 0);
+            bodyGrid.Children.Add(sidebar);
+
+            var contentArea = BuildContentArea();
+            Grid.SetColumn(contentArea, 1);
+            bodyGrid.Children.Add(contentArea);
+
+            Grid.SetRow(bodyGrid, 1);
+            root.Children.Add(bodyGrid);
+
+            Content = root;
+
+            // İlk sekme olarak "home" yükle
+            SwitchTab("home");
+        }
+
+        private Border BuildTopBar()
+        {
+            var bar = new Border
+            {
+                Background = _topBarBgBrush,
+                BorderBrush = _cardBorderBrush,
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Padding = new Thickness(16, 0, 16, 0)
+            };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(240) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            // Sol: Desktop Zen Logosu + Başlık
+            var brandStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+
+            var logoBorder = new Border
+            {
+                Width = 24,
+                Height = 24,
+                CornerRadius = new CornerRadius(6),
+                Margin = new Thickness(0, 0, 9, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                BorderBrush = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(50, 255, 255, 255))
+                                      : new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 0, 0, 0)),
+                BorderThickness = new Thickness(1),
+                ClipToBounds = true
+            };
+
+            var dogSource = GetDogAvatarSource();
+            if (dogSource != null)
+            {
+                logoBorder.Background = new ImageBrush(dogSource) { Stretch = Stretch.UniformToFill };
+            }
+            else
+            {
+                logoBorder.Background = _accentBrush;
+            }
+            brandStack.Children.Add(logoBorder);
+
+            var titleText = new TextBlock
+            {
+                Text = "Desktop Zen Ayarları",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = _textPrimaryBrush,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            brandStack.Children.Add(titleText);
+            Grid.SetColumn(brandStack, 0);
+            grid.Children.Add(brandStack);
+
+            // Orta: Centered Search Box ("Ayarları arama")
+            var searchBoxContainer = new Border
+            {
+                Width = 360,
+                Height = 32,
+                CornerRadius = new CornerRadius(6),
+                Background = _cardBgBrush,
+                BorderBrush = _cardBorderBrush,
+                BorderThickness = new Thickness(1),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var searchGrid = new Grid();
+            searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            _txtSearch = new System.Windows.Controls.TextBox
+            {
+                Background = System.Windows.Media.Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Foreground = _textPrimaryBrush,
+                FontSize = 12,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(10, 0, 6, 0)
+            };
+
+            var placeholder = new TextBlock
+            {
+                Text = "Ayarları arama",
+                FontSize = 12,
+                Foreground = _textSecondaryBrush,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 0, 0),
+                IsHitTestVisible = false
+            };
+
+            _txtSearch.GotFocus += delegate(object s, RoutedEventArgs e) { placeholder.Visibility = Visibility.Collapsed; };
+            _txtSearch.LostFocus += delegate(object s, RoutedEventArgs e)
+            {
+                if (string.IsNullOrEmpty(_txtSearch.Text)) placeholder.Visibility = Visibility.Visible;
+            };
+            _txtSearch.TextChanged += delegate(object s, TextChangedEventArgs e)
+            {
+                placeholder.Visibility = string.IsNullOrEmpty(_txtSearch.Text) ? Visibility.Visible : Visibility.Collapsed;
+                OnSearchChanged();
+            };
+
+            var searchIcon = new TextBlock
+            {
+                Text = "🔍",
+                FontSize = 12,
+                Foreground = _textSecondaryBrush,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+
+            Grid.SetColumn(_txtSearch, 0);
+            Grid.SetColumn(placeholder, 0);
+            Grid.SetColumn(searchIcon, 1);
+            searchGrid.Children.Add(_txtSearch);
+            searchGrid.Children.Add(placeholder);
+            searchGrid.Children.Add(searchIcon);
+
+            searchBoxContainer.Child = searchGrid;
+            Grid.SetColumn(searchBoxContainer, 1);
+            grid.Children.Add(searchBoxContainer);
+
+            // Sağ: Hızlı Kısayol Butonları
+            var rightStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+
+            var btnWeb = new System.Windows.Controls.Button
+            {
+                Content = "🌐 Web Widget",
+                Height = 28,
+                Padding = new Thickness(10, 0, 10, 0),
+                Margin = new Thickness(0, 0, 8, 0),
+                Background = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 255, 255, 255))
+                                     : new SolidColorBrush(System.Windows.Media.Color.FromRgb(240, 240, 240)),
+                Foreground = _textPrimaryBrush,
+                BorderBrush = _cardBorderBrush,
+                BorderThickness = new Thickness(1),
+                FontSize = 11.5,
+                Cursor = Cursors.Hand
+            };
+            btnWeb.Click += delegate(object s, RoutedEventArgs e)
+            {
+                string path = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "widget.html");
+                if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            };
+            rightStack.Children.Add(btnWeb);
+
+            Grid.SetColumn(rightStack, 2);
+            grid.Children.Add(rightStack);
+
+            bar.Child = grid;
+            return bar;
+        }
+
+        private Border BuildSidebar()
+        {
+            var sidebar = new Border
+            {
+                Background = _sidebarBgBrush,
+                BorderBrush = _cardBorderBrush,
+                BorderThickness = new Thickness(0, 0, 1, 0)
+            };
+
+            var grid = new Grid();
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            // Navigasyon Öğeleri Kaydırma Alanı
+            var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            var listStack = new StackPanel { Margin = new Thickness(4, 10, 4, 10) };
+
+            listStack.Children.Add(CreateNavCategoryHeader("TEMEL AYARLAR"));
+            listStack.Children.Add(CreateNavItem("home", "🏠", "Giriş & Canlı Durum"));
+            listStack.Children.Add(CreateNavItem("general", "⚙️", "Genel Ayarlar"));
+
+            listStack.Children.Add(CreateNavCategoryHeader("MASAÜSTÜ & GÖRÜNÜM"));
+            listStack.Children.Add(CreateNavItem("autohide", "👁️", "İkon Otomatik Gizleme"));
+            listStack.Children.Add(CreateNavItem("wallpaper", "🖼️", "Duvar Kâğıdı & Efektler"));
+            listStack.Children.Add(CreateNavItem("widget", "⏰", "Saat & Hava Durumu"));
+
+            listStack.Children.Add(CreateNavCategoryHeader("MASAÜSTÜ ARAÇLARI"));
+            listStack.Children.Add(CreateNavItem("desktop_cards", "🗂️", "Masaüstü Kartları & Dock"));
+            listStack.Children.Add(CreateNavItem("guidance", "🕌", "Manevî Rehber & Tatiller"));
+
+            listStack.Children.Add(CreateNavCategoryHeader("CANLI TAKİP & SİSTEM"));
+            listStack.Children.Add(CreateNavItem("finance", "📈", "Finans & Pariteler"));
+            listStack.Children.Add(CreateNavItem("matches", "⚽", "Maç Takipçisi"));
+            listStack.Children.Add(CreateNavItem("system", "⚡", "Performans & Donanım"));
+
+            listStack.Children.Add(CreateNavCategoryHeader("BİLGİ & YARDIM"));
+            listStack.Children.Add(CreateNavItem("about", "ℹ️", "Hakkında & Geliştirici"));
+
+            scroll.Content = listStack;
+            Grid.SetRow(scroll, 0);
+            grid.Children.Add(scroll);
+
+            // Alt Kısım: GELİŞTİRİCİ SERKAN ŞENTÜRK ÖZEL KARTI (HER ZAMAN GÖRÜNÜR)
+            var creatorCard = new Border
+            {
+                Background = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(25, 255, 255, 255))
+                                     : new SolidColorBrush(System.Windows.Media.Color.FromRgb(240, 244, 250)),
+                BorderBrush = _accentBrush,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(10, 8, 10, 8),
+                Margin = new Thickness(10, 6, 10, 10),
+                Cursor = Cursors.Hand
+            };
+            var creatorGrid = new Grid();
+            creatorGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            creatorGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var avatarBorder = new Border
+            {
+                Width = 28,
+                Height = 28,
+                CornerRadius = new CornerRadius(14),
+                Background = _accentBrush,
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var avatarTxt = new TextBlock
+            {
+                Text = "⚡",
+                FontSize = 14,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            avatarBorder.Child = avatarTxt;
+            Grid.SetColumn(avatarBorder, 0);
+            creatorGrid.Children.Add(avatarBorder);
+
+            var creatorTexts = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            var creatorRole = new TextBlock
+            {
+                Text = "DEVELOPER",
+                FontSize = 9,
+                FontWeight = FontWeights.Bold,
+                Foreground = _accentBrush
+            };
+            var creatorName = new TextBlock
+            {
+                Text = "Serkan ŞENTÜRK",
+                FontSize = 12.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = _textPrimaryBrush
+            };
+            creatorTexts.Children.Add(creatorRole);
+            creatorTexts.Children.Add(creatorName);
+            Grid.SetColumn(creatorTexts, 1);
+            creatorGrid.Children.Add(creatorTexts);
+
+            creatorCard.Child = creatorGrid;
+            creatorCard.MouseDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                SwitchTab("about");
+            };
+
+            Grid.SetRow(creatorCard, 1);
+            grid.Children.Add(creatorCard);
+
+            sidebar.Child = grid;
+            return sidebar;
+        }
+
+        private Border CreateNavCategoryHeader(string title)
+        {
+            var b = new Border { Margin = new Thickness(14, 14, 8, 4) };
+            var tb = new TextBlock
+            {
+                Text = title,
+                FontSize = 10.5,
+                FontWeight = FontWeights.Bold,
+                Foreground = _accentBrush,
+                Opacity = 0.85
+            };
+            b.Child = tb;
+            return b;
+        }
+
+        private Border CreateNavItem(string key, string icon, string title)
+        {
+            var border = new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                Margin = new Thickness(6, 2, 6, 2),
+                Padding = new Thickness(0, 4, 10, 4),
+                Cursor = Cursors.Hand,
+                Background = System.Windows.Media.Brushes.Transparent
+            };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(38) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            // Sol Aktiflik Gösterge Çubuğu (Accent Pill)
+            var pill = new Border
+            {
+                Width = 3,
+                Height = 18,
+                CornerRadius = new CornerRadius(1.5),
+                Background = _accentBrush,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Visibility = Visibility.Hidden
+            };
+            Grid.SetColumn(pill, 0);
+            grid.Children.Add(pill);
+
+            System.Windows.Media.Color itemColor;
+            if (key == "home") itemColor = System.Windows.Media.Color.FromRgb(56, 189, 248);            // Gök Mavisi (#38BDF8)
+            else if (key == "general") itemColor = System.Windows.Media.Color.FromRgb(167, 139, 250);      // Menekşe Moru (#A78BFA)
+            else if (key == "autohide") itemColor = System.Windows.Media.Color.FromRgb(52, 211, 153);      // Zümrüt Yeşili (#34D399)
+            else if (key == "wallpaper") itemColor = System.Windows.Media.Color.FromRgb(244, 114, 182);     // Gül Pembesi (#F472B6)
+            else if (key == "widget") itemColor = System.Windows.Media.Color.FromRgb(96, 165, 250);        // Masaüstü Mavisi (#60A5FA)
+            else if (key == "desktop_cards") itemColor = System.Windows.Media.Color.FromRgb(45, 212, 191); // Turkuaz (#2DD4BF)
+            else if (key == "guidance") itemColor = System.Windows.Media.Color.FromRgb(16, 185, 129);      // Huzur Yeşili (#10B981)
+            else if (key == "finance") itemColor = System.Windows.Media.Color.FromRgb(251, 191, 36);       // Altın Sarısı (#FBBF24)
+            else if (key == "matches") itemColor = System.Windows.Media.Color.FromRgb(251, 113, 133);      // Mercan Kırmızısı (#FB7185)
+            else if (key == "system") itemColor = System.Windows.Media.Color.FromRgb(250, 204, 21);        // Şimşek Sarısı (#FACC15)
+            else itemColor = System.Windows.Media.Color.FromRgb(129, 140, 248);                             // İndigo (#818CF8)
+
+            // Simetrik & Belirgin İkon Rozeti (28x28 yumuşak kenarlı kare)
+            var iconContainer = new Border
+            {
+                Width = 28,
+                Height = 28,
+                CornerRadius = new CornerRadius(6),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(_isDark ? (byte)36 : (byte)24, itemColor.R, itemColor.G, itemColor.B)),
+                BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(_isDark ? (byte)60 : (byte)45, itemColor.R, itemColor.G, itemColor.B)),
+                BorderThickness = new Thickness(1),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var iconTb = new TextBlock
+            {
+                Text = icon,
+                FontSize = 13.5,
+                FontFamily = new System.Windows.Media.FontFamily("Segoe UI Emoji, Segoe UI Symbol, Segoe MDL2 Assets, Arial"),
+                Foreground = new SolidColorBrush(itemColor),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            iconContainer.Child = iconTb;
+            Grid.SetColumn(iconContainer, 1);
+            grid.Children.Add(iconContainer);
+
+            var textTb = new TextBlock
+            {
+                Text = title,
+                FontSize = 12.5,
+                FontWeight = FontWeights.Medium,
+                Foreground = _textPrimaryBrush,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0)
+            };
+            Grid.SetColumn(textTb, 2);
+            grid.Children.Add(textTb);
+
+            border.Child = grid;
+
+            _navButtons[key] = border;
+            _navPills[key] = pill;
+
+            border.MouseEnter += delegate(object s, MouseEventArgs e)
+            {
+                if (_activeTabKey != key)
+                {
+                    border.Background = _hoverBrush;
+                }
+            };
+            border.MouseLeave += delegate(object s, MouseEventArgs e)
+            {
+                if (_activeTabKey != key)
+                {
+                    border.Background = System.Windows.Media.Brushes.Transparent;
+                }
+            };
+            border.MouseDown += delegate(object s, MouseButtonEventArgs e)
+            {
+                SwitchTab(key);
+            };
+
+            return border;
+        }
+
+        private Border BuildContentArea()
+        {
+            var area = new Border
+            {
+                Background = _contentBgBrush,
+                Padding = new Thickness(36, 24, 36, 24)
+            };
+
+            _contentScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            _mainContentPanel = new StackPanel { MaxWidth = 820, HorizontalAlignment = HorizontalAlignment.Left };
+
+            _contentScroll.Content = _mainContentPanel;
+            area.Child = _contentScroll;
+            return area;
+        }
+
+        public void SelectTab(string tabKey)
+        {
+            if (tabKey == "tools") tabKey = "guidance";
+            if (tabKey == "widgets") tabKey = "desktop_cards";
+            SwitchTab(tabKey);
+        }
+
+        private void SwitchTab(string tabKey)
+        {
+            if (tabKey == "tools") tabKey = "guidance";
+            if (tabKey == "widgets") tabKey = "desktop_cards";
+            _activeTabKey = tabKey;
+
+            // Nav butonlarının durumunu güncelle
+            foreach (var kv in _navButtons)
+            {
+                bool isSel = (kv.Key == tabKey);
+                if (_navPills.ContainsKey(kv.Key))
+                {
+                    _navPills[kv.Key].Visibility = isSel ? Visibility.Visible : Visibility.Hidden;
+                }
+                kv.Value.Background = isSel ? (_isDark ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 255, 255, 255))
+                                                       : new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255)))
+                                            : System.Windows.Media.Brushes.Transparent;
+            }
+
+            _mainContentPanel.Children.Clear();
+            _contentScroll.ScrollToTop();
+
+            if (tabKey == "home") BuildHomeTab();
+            else if (tabKey == "general") BuildGeneralTab();
+            else if (tabKey == "autohide") BuildAutoHideTab();
+            else if (tabKey == "wallpaper") BuildWallpaperTab();
+            else if (tabKey == "widget") BuildWidgetTab();
+            else if (tabKey == "desktop_cards") BuildDesktopCardsTab();
+            else if (tabKey == "guidance") BuildGuidanceTab();
+            else if (tabKey == "finance") BuildFinanceTab();
+            else if (tabKey == "matches") BuildMatchesTab();
+            else if (tabKey == "system") BuildSystemTab();
+            else if (tabKey == "about") BuildAboutTab();
+        }
+
+        // ==========================================
+        // KART OLUŞTURMA YARDIMCILARI
+        // ==========================================
+        private StackPanel CreateHeroHeader(string title, string description, string moreInfoText = null, Action onMoreInfo = null)
+        {
+            var sp = new StackPanel { Margin = new Thickness(0, 0, 0, 18) };
+
+            var titleTb = new TextBlock
+            {
+                Text = title,
+                FontSize = 26,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = _textPrimaryBrush,
+                Margin = new Thickness(0, 0, 0, 8),
+                FontFamily = new System.Windows.Media.FontFamily("Segoe UI Variable Display, Segoe UI, sans-serif")
+            };
+            sp.Children.Add(titleTb);
+
+            var descTb = new TextBlock
+            {
+                Text = description,
+                FontSize = 12.5,
+                Foreground = _textSecondaryBrush,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            sp.Children.Add(descTb);
+
+            if (!string.IsNullOrEmpty(moreInfoText))
+            {
+                var linkTb = new TextBlock
+                {
+                    Text = moreInfoText,
+                    FontSize = 12,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = _accentBrush,
+                    Cursor = Cursors.Hand
+                };
+                if (onMoreInfo != null)
+                {
+                    linkTb.MouseDown += delegate(object s, MouseButtonEventArgs e) { onMoreInfo(); };
+                }
+                sp.Children.Add(linkTb);
+            }
+
+            return sp;
+        }
+
+        private Border CreateMasterHeroCard(string title, string iconText, bool initialValue, Action<bool> onChanged)
+        {
+            var card = new Border
+            {
+                Background = _cardBgBrush,
+                BorderBrush = _cardBorderBrush,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(16, 12, 16, 12),
+                Margin = new Thickness(0, 0, 0, 16)
+            };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var iconBorder = new Border
+            {
+                Width = 32,
+                Height = 32,
+                CornerRadius = new CornerRadius(6),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 120, 212)),
+                Margin = new Thickness(0, 0, 14, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var iconLbl = new TextBlock
+            {
+                Text = iconText,
+                FontSize = 16,
+                Foreground = System.Windows.Media.Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            iconBorder.Child = iconLbl;
+            Grid.SetColumn(iconBorder, 0);
+            grid.Children.Add(iconBorder);
+
+            var titleLbl = new TextBlock
+            {
+                Text = title,
+                FontSize = 14,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = _textPrimaryBrush,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(titleLbl, 1);
+            grid.Children.Add(titleLbl);
+
+            var toggle = new PowerToggleSwitch(initialValue, onChanged, _isDark);
+            Grid.SetColumn(toggle, 2);
+            grid.Children.Add(toggle);
+
+            card.Child = grid;
+            return card;
+        }
+
+        private Border CreateSectionTitle(string title)
+        {
+            var b = new Border { Margin = new Thickness(0, 14, 0, 8) };
+            var tb = new TextBlock
+            {
+                Text = title,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = _textPrimaryBrush
+            };
+            b.Child = tb;
+            return b;
+        }
+
+        private Border CreateSettingCard(string title, string description, FrameworkElement rightControl)
+        {
+            var card = new Border
+            {
+                Background = _cardBgBrush,
+                BorderBrush = _cardBorderBrush,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(16, 12, 16, 12),
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            var titleTb = new TextBlock
+            {
+                Text = title,
+                FontSize = 13,
+                FontWeight = FontWeights.Medium,
+                Foreground = _textPrimaryBrush
+            };
+            stack.Children.Add(titleTb);
+
+            if (!string.IsNullOrEmpty(description))
+            {
+                var descTb = new TextBlock
+                {
+                    Text = description,
+                    FontSize = 11.5,
+                    Foreground = _textSecondaryBrush,
+                    Margin = new Thickness(0, 2, 0, 0),
+                    TextWrapping = TextWrapping.Wrap
+                };
+                stack.Children.Add(descTb);
+            }
+
+            Grid.SetColumn(stack, 0);
+            grid.Children.Add(stack);
+
+            if (rightControl != null)
+            {
+                rightControl.VerticalAlignment = VerticalAlignment.Center;
+                Grid.SetColumn(rightControl, 1);
+                grid.Children.Add(rightControl);
+            }
+
+            card.Child = grid;
+            return card;
+        }
+
+        private class TextColorPreset
+        {
+            public string Id;
+            public string Name;
+            public string Icon;
+            public System.Windows.Media.Color Color;
+        }
+
+        private Border CreateTextColorSettingCard()
+        {
+            var presets = new TextColorPreset[]
+            {
+                new TextColorPreset { Id = "beyaz", Name = "Beyaz (Klasik)", Icon = "⚪", Color = System.Windows.Media.Color.FromRgb(248, 250, 252) },
+                new TextColorPreset { Id = "siyah", Name = "Siyah (Klasik)", Icon = "⚫", Color = System.Windows.Media.Color.FromRgb(15, 23, 42) },
+                new TextColorPreset { Id = "mavi", Name = "Gök Mavisi", Icon = "🔵", Color = System.Windows.Media.Color.FromRgb(56, 189, 248) },
+                new TextColorPreset { Id = "yesil", Name = "Zümrüt Yeşili", Icon = "🟢", Color = System.Windows.Media.Color.FromRgb(52, 211, 153) },
+                new TextColorPreset { Id = "sari", Name = "Altın Sarısı", Icon = "🟡", Color = System.Windows.Media.Color.FromRgb(251, 191, 36) },
+                new TextColorPreset { Id = "turuncu", Name = "Canlı Turuncu", Icon = "🟠", Color = System.Windows.Media.Color.FromRgb(251, 146, 60) },
+                new TextColorPreset { Id = "kirmizi", Name = "Mercan Kırmızısı", Icon = "🔴", Color = System.Windows.Media.Color.FromRgb(248, 113, 113) },
+                new TextColorPreset { Id = "mor", Name = "Mor / Lavanta", Icon = "🟣", Color = System.Windows.Media.Color.FromRgb(167, 139, 250) },
+                new TextColorPreset { Id = "pembe", Name = "Gül Pembesi", Icon = "🌸", Color = System.Windows.Media.Color.FromRgb(244, 114, 182) },
+                new TextColorPreset { Id = "turkuaz", Name = "Deniz Turkuazı", Icon = "💎", Color = System.Windows.Media.Color.FromRgb(45, 212, 191) }
+            };
+
+            var rightPanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+
+            var swatchesPanel = new WrapPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 0, 8),
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+
+            string curId = (_cfg.TextColor ?? "").ToLowerInvariant();
+            if (string.IsNullOrEmpty(curId)) curId = (_cfg.Theme == "light") ? "siyah" : "beyaz";
+
+            int selectedIndex = 0;
+            for (int i = 0; i < presets.Length; i++)
+            {
+                if (presets[i].Id == curId)
+                {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+
+            var cmbColor = new System.Windows.Controls.ComboBox
+            {
+                Height = 28,
+                Width = 220,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+
+            foreach (var p in presets)
+            {
+                cmbColor.Items.Add(p.Icon + " " + p.Name);
+            }
+            cmbColor.SelectedIndex = selectedIndex;
+
+            var circles = new List<Border>();
+            Action updateHighlights = delegate
+            {
+                int cur = cmbColor.SelectedIndex;
+                for (int i = 0; i < circles.Count; i++)
+                {
+                    bool isSel = (i == cur);
+                    circles[i].BorderThickness = new Thickness(isSel ? 2.5 : 1);
+                    circles[i].BorderBrush = isSel
+                        ? _accentBrush
+                        : (_isDark ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(90, 255, 255, 255))
+                                   : new SolidColorBrush(System.Windows.Media.Color.FromArgb(90, 0, 0, 0)));
+                }
+            };
+
+            for (int i = 0; i < presets.Length; i++)
+            {
+                int idx = i;
+                var p = presets[i];
+                var circle = new Border
+                {
+                    Width = 20,
+                    Height = 20,
+                    CornerRadius = new CornerRadius(10),
+                    Background = new SolidColorBrush(p.Color),
+                    Margin = new Thickness(0, 0, 6, 2),
+                    Cursor = Cursors.Hand,
+                    ToolTip = p.Name,
+                    BorderThickness = new Thickness(idx == selectedIndex ? 2.5 : 1),
+                    BorderBrush = (idx == selectedIndex) ? _accentBrush : (_isDark ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(90, 255, 255, 255)) : new SolidColorBrush(System.Windows.Media.Color.FromArgb(90, 0, 0, 0)))
+                };
+                circle.MouseLeftButtonDown += delegate
+                {
+                    cmbColor.SelectedIndex = idx;
+                };
+                circles.Add(circle);
+                swatchesPanel.Children.Add(circle);
+            }
+
+            cmbColor.SelectionChanged += delegate(object s, SelectionChangedEventArgs e)
+            {
+                if (cmbColor.SelectedIndex >= 0 && cmbColor.SelectedIndex < presets.Length)
+                {
+                    _cfg.TextColor = presets[cmbColor.SelectedIndex].Id;
+                    SaveAndNotify();
+                    updateHighlights();
+                }
+            };
+
+            rightPanel.Children.Add(swatchesPanel);
+            rightPanel.Children.Add(cmbColor);
+
+            return CreateSettingCard("Widget Yazı Rengi ve Tonları",
+                "Saat, tarih, hava durumu ve tüm widget metinleri için ana renk tonu. Seçilen rengin birincil, ikincil ve yumuşak tonları widget genelinde otomatik uygulanır (Siyah ve Beyaz orijinal tonları korunur).",
+                rightPanel);
+        }
+
+        private Border CreateTeamSettingCard(string teamKey, string title, string description, FrameworkElement rightControl)
+        {
+            var card = new Border
+            {
+                Background = _cardBgBrush,
+                BorderBrush = _cardBorderBrush,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(16, 12, 16, 12),
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 0: Yuvarlak Renkli Amblem
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // 1: Başlık & Açıklama
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 2: Toggle Switch
+
+            var emblem = SoccerBallFactory.CreateTeamEmblem(teamKey, 34);
+            Grid.SetColumn(emblem, 0);
+            grid.Children.Add(emblem);
+
+            var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            var titleTb = new TextBlock
+            {
+                Text = title,
+                FontSize = 13.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = _textPrimaryBrush
+            };
+            stack.Children.Add(titleTb);
+
+            if (!string.IsNullOrEmpty(description))
+            {
+                var descTb = new TextBlock
+                {
+                    Text = description,
+                    FontSize = 11.5,
+                    Foreground = _textSecondaryBrush,
+                    Margin = new Thickness(0, 2, 0, 0),
+                    TextWrapping = TextWrapping.Wrap
+                };
+                stack.Children.Add(descTb);
+            }
+
+            Grid.SetColumn(stack, 1);
+            grid.Children.Add(stack);
+
+            if (rightControl != null)
+            {
+                rightControl.VerticalAlignment = VerticalAlignment.Center;
+                Grid.SetColumn(rightControl, 2);
+                grid.Children.Add(rightControl);
+            }
+
+            card.Child = grid;
+            return card;
+        }
+
+        // ==========================================
+        // SEKME 1: GİRİŞ & CANLI DURUM
+        // ==========================================
+        private void BuildHomeTab()
+        {
+            _mainContentPanel.Children.Add(CreateHeroHeader("Desktop Zen'e Hoş Geldiniz", "Masaüstünüzü tek tıkla sadeleştirin, canlı durumları denetleyin."));
+
+            // 1. Canlı Masaüstü İkon Durum Kartı
+            var statusCard = new Border
+            {
+                Background = _cardBgBrush,
+                BorderBrush = _cardBorderBrush,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(18),
+                Margin = new Thickness(0, 0, 0, 16)
+            };
+
+            var sGrid = new Grid();
+            sGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            sGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var statusStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            var l1 = new TextBlock { Text = "Masaüstü İkon Canlı Durumu", FontSize = 12, Foreground = _textSecondaryBrush };
+            _lblIconStatus = new TextBlock { Text = "Tespit Ediliyor...", FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = _textPrimaryBrush, Margin = new Thickness(0, 3, 0, 0) };
+            statusStack.Children.Add(l1);
+            statusStack.Children.Add(_lblIconStatus);
+            Grid.SetColumn(statusStack, 0);
+            sGrid.Children.Add(statusStack);
+
+            _btnToggleNow = new System.Windows.Controls.Button
+            {
+                Content = "İkonları Gizle / Göster",
+                Padding = new Thickness(16, 8, 16, 8),
+                Background = _accentBrush,
+                Foreground = System.Windows.Media.Brushes.White,
+                FontWeight = FontWeights.Medium,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand
+            };
+            _btnToggleNow.Click += delegate(object s, RoutedEventArgs e)
+            {
+                if (_onToggleIcons != null) _onToggleIcons();
+                UpdateLiveStatus();
+            };
+            Grid.SetColumn(_btnToggleNow, 1);
+            sGrid.Children.Add(_btnToggleNow);
+            statusCard.Child = sGrid;
+            _mainContentPanel.Children.Add(statusCard);
+            UpdateLiveStatus();
+
+            // 2. Modül Hızlı Erişim Kartları
+            _mainContentPanel.Children.Add(CreateSectionTitle("HIZLI GEZİNME VE MODÜLLER"));
+
+            var btnAutoHide = new System.Windows.Controls.Button { Content = "Mod\u00FCle Git", Height = 28, Padding = new Thickness(12, 0, 12, 0) };
+            btnAutoHide.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("autohide"); };
+            _mainContentPanel.Children.Add(CreateSettingCard("\uD83D\uDC41\uFE0F \u0130kon Gizleme", "Hareketsizlikte simgeleri otomatik gizleme ve fare/t\u0131klama tetikleyicileri.", btnAutoHide));
+
+            var btnWidget = new System.Windows.Controls.Button { Content = "Mod\u00FCle Git", Height = 28, Padding = new Thickness(12, 0, 12, 0) };
+            btnWidget.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("widget"); };
+            _mainContentPanel.Children.Add(CreateSettingCard("\uD83E\uDE9F Masa\u00FCst\u00FC Widget'\u0131", "Saat, tarih, \u015Fehir ve 3D renkli hava durumu kart\u0131.", btnWidget));
+
+            var btnTools = new System.Windows.Controls.Button { Content = "Mod\u00FCle Git", Height = 28, Padding = new Thickness(12, 0, 12, 0) };
+            btnTools.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("tools"); };
+            _mainContentPanel.Children.Add(CreateSettingCard("\uD83D\uDD4C Sistem Ara\u00E7lar\u0131", "Din\u00EE bildirimler (g\u00FCn\u00FCn \u00E2yet ve had\u00EEsi), Diyanet namaz vakitleri ve T\u00FCrkiye resm\u00EE tatilleri.", btnTools));
+
+            var btnFin = new System.Windows.Controls.Button { Content = "Mod\u00FCle Git", Height = 28, Padding = new Thickness(12, 0, 12, 0) };
+            btnFin.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("finance"); };
+            _mainContentPanel.Children.Add(CreateSettingCard("\uD83D\uDCC8 Finans & Pariteler", "D\u00F6viz, alt\u0131n, BIST 100 ve kripto paralar\u0131n canl\u0131 takibi.", btnFin));
+
+            var btnMatch = new System.Windows.Controls.Button { Content = "Mod\u00FCle Git", Height = 28, Padding = new Thickness(12, 0, 12, 0) };
+            btnMatch.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("matches"); };
+            _mainContentPanel.Children.Add(CreateSettingCard("\u26BD Futbol Ma\u00E7 Takip\u00E7isi", "Milli Tak\u0131m ve 4 B\u00FCy\u00FCklerin ma\u00E7 saatleri ve dinamik tak\u0131m renkleri.", btnMatch));
+
+            var btnSys = new System.Windows.Controls.Button { Content = "Mod\u00FCle Git", Height = 28, Padding = new Thickness(12, 0, 12, 0) };
+            btnSys.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("system"); };
+            _mainContentPanel.Children.Add(CreateSettingCard("\u26A1 Ak\u0131ll\u0131 \u00D6zellikler", "Canl\u0131 CPU & RAM donan\u0131m monit\u00F6r\u00FC ve oyun optimizasyonu.", btnSys));
+        }
+
+
+private void BuildGeneralTab()
+{
+_mainContentPanel.Children.Add(CreateHeroHeader("Genel Ayarlar", "Sistem başlangıcı, kısayollar ve renk teması tercihleri."));
+
+_mainContentPanel.Children.Add(CreateMasterHeroCard("Windows Açılışında Otomatik Başlat", "🚀", _cfg.StartWithWindows, delegate(bool val)
+{
+_cfg.StartWithWindows = val;
+App.SetStartup(val);
+SaveAndNotify();
+}));
+
+_mainContentPanel.Children.Add(CreateSectionTitle("SİSTEM VE KISAYOLLAR"));
+
+// Kısayol Kartı
+var hotkeyPill = new Border
+{
+Background = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 255, 255, 255))
+: new SolidColorBrush(System.Windows.Media.Color.FromRgb(230, 235, 245)),
+CornerRadius = new CornerRadius(4),
+Padding = new Thickness(10, 4, 10, 4)
+};
+hotkeyPill.Child = new TextBlock { Text = "Win + Ctrl + D", FontWeight = FontWeights.SemiBold, Foreground = _accentBrush, FontSize = 12 };
+_mainContentPanel.Children.Add(CreateSettingCard("Masaüstü İkon Kısayolu", "Masaüstü ikonlarını istediğiniz anda anında gizleyip geri getirmek için klavye tuş kombinasyonu.", hotkeyPill));
+
+// Tema Seçimi (Sadece Koyu ve Açık Tema)
+var cmbTheme = new System.Windows.Controls.ComboBox
+{
+ItemsSource = new string[] {
+"Koyu Tema (Dark)",
+"Açık Tema (Light)"
+},
+SelectedIndex = (_cfg.Theme == "light") ? 1 : 0,
+Height = 28,
+Width = 200
+};
+cmbTheme.SelectionChanged += delegate(object s, SelectionChangedEventArgs e)
+{
+bool toLight = (cmbTheme.SelectedIndex == 1);
+string prevTheme = _cfg.Theme;
+_cfg.Theme = toLight ? "light" : "dark";
+if (prevTheme != _cfg.Theme)
+{
+if (_cfg.TextColor == "beyaz" && toLight) _cfg.TextColor = "siyah";
+else if (_cfg.TextColor == "siyah" && !toLight) _cfg.TextColor = "beyaz";
+}
+SaveAndNotify();
+InitTheme();
+SwitchTab("general");
+};
+_mainContentPanel.Children.Add(CreateSettingCard("Uygulama Teması", "Masaüstü widget'ı ve ayarlar paneli için renk paleti (Koyu veya Açık).", cmbTheme));
+_mainContentPanel.Children.Add(CreateTextColorSettingCard());
+
+// Web Widget Başlat
+var btnLaunchWeb = new System.Windows.Controls.Button { Content = "🌐 Web Sürümünü Aç", Height = 28, Padding = new Thickness(12, 0, 12, 0) };
+btnLaunchWeb.Click += delegate(object s, RoutedEventArgs e)
+{
+string path = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "widget.html");
+if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+};
+_mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulamadan bağımsız çalışan HTML/JS tarayıcı widget'ını açar.", btnLaunchWeb));
+}
+
+
+        private void BuildAutoHideTab()
+        {
+            _mainContentPanel.Children.Add(CreateHeroHeader("İkon & Görev Çubuğu Gizleme", "Kullanıcı hareketsiz kaldığında masaüstü simgelerini ve görev çubuklarını otomatik gizleyerek temiz bir çalışma alanı sunar."));
+
+            _mainContentPanel.Children.Add(CreateMasterHeroCard("Otomatik İkon Gizlemeyi Etkinleştir", "👁️", _cfg.AutoHideEnabled, delegate(bool val)
+            {
+                _cfg.AutoHideEnabled = val;
+                SaveAndNotify();
+            }));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("ZAMANLAMA VE BEKLEME"));
+
+            // Bekleme Süresi Slider
+            var sliderPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var sliderTimeout = new Slider
+            {
+                Minimum = 2,
+                Maximum = 60,
+                Value = _cfg.TimeoutSeconds,
+                Width = 140,
+                IsSnapToTickEnabled = true,
+                TickFrequency = 1,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var lblTimeout = new TextBlock
+            {
+                Text = _cfg.TimeoutSeconds.ToString() + " sn",
+                Foreground = _accentBrush,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(10, 0, 0, 0),
+                Width = 45
+            };
+            sliderTimeout.ValueChanged += delegate(object s, RoutedPropertyChangedEventArgs<double> e)
+            {
+                int val = (int)sliderTimeout.Value;
+                lblTimeout.Text = val.ToString() + " sn";
+                _cfg.TimeoutSeconds = val;
+                SaveAndNotify();
+            };
+            sliderPanel.Children.Add(sliderTimeout);
+            sliderPanel.Children.Add(lblTimeout);
+            _mainContentPanel.Children.Add(CreateSettingCard("Hareketsizlik Bekleme Süresi", "Masaüstünde işlem yapılmadığında ikonların gizlenmesi için geçecek süre (2 - 60 saniye).", sliderPanel));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("GERİ GETİRME TETİKLEYİCİLERİ"));
+
+            var swMouseMove = new PowerToggleSwitch(_cfg.RestoreOnMouseMove, delegate(bool val) { _cfg.RestoreOnMouseMove = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Fare Hareketi ile Geri Getir", "Fare oynatıldığı anda masaüstü ikonları hemen görünür olur.", swMouseMove));
+
+            var swDesktopClick = new PowerToggleSwitch(_cfg.RestoreOnDesktopClick, delegate(bool val) { _cfg.RestoreOnDesktopClick = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Masaüstü Tıklaması ile Geri Getir", "Masaüstünün boş bir alanına sol tıklandığında ikonları ekrana getirir.", swDesktopClick));
+
+            var swDoubleClick = new PowerToggleSwitch(_cfg.DesktopDoubleClickToggle, delegate(bool val) { _cfg.DesktopDoubleClickToggle = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Masaüstüne Çift Tıklama ile Aç / Kapat", "Masaüstüne çift tıklayarak ikonları manuel olarak gizleyebilir veya geri açabilirsiniz.", swDoubleClick));
+
+            var swRightClick = new PowerToggleSwitch(_cfg.RestoreOnDesktopRightClick, delegate(bool val) { _cfg.RestoreOnDesktopRightClick = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Masaüstüne Sağ Tıklama ile Geri Getir", "Masaüstünün boş bir alanına veya duvar kâğıdına sağ tıklandığında gizlenmiş olan simgeleri anında ekrana getirir.", swRightClick));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("GÖREV VE BAŞLAT ÇUBUĞU (TASKBAR)"));
+
+            var swHideTaskbarOnHide = new PowerToggleSwitch(_cfg.HideTaskbarOnHide, delegate(bool val)
+            {
+                _cfg.HideTaskbarOnHide = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Simgeler Gizlendiğinde Başlat Çubuklarını Gizle (Çift Monitör)", "Masaüstü simgeleri gizlendiğinde birincil ekran ve tüm ikinci monitörlerdeki (çift / çoklu ekran) Başlat ve görev çubuklarını otomatik olarak gizler, simgeler geri geldiğinde çubukları tekrar gösterir.", swHideTaskbarOnHide));
+
+            var swHideTaskbarAlways = new PowerToggleSwitch(_cfg.HideTaskbarAlways, delegate(bool val)
+            {
+                _cfg.HideTaskbarAlways = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Başlat Çubuklarını Her Zaman Gizle", "Simgeler ekranda olsa dahi ana ve ikinci ekranlardaki görev çubuklarını sürekli gizli tutar (tam ekran odaklanma modu).", swHideTaskbarAlways));
+
+            var btnTestTaskbar = new System.Windows.Controls.Button
+            {
+                Content = "🖥️ Çubukları Gizle / Göster (Test)",
+                Height = 28,
+                Padding = new Thickness(12, 0, 12, 0),
+                Cursor = Cursors.Hand
+            };
+            btnTestTaskbar.Click += delegate
+            {
+                IntPtr tray = Win32.FindWindow("Shell_TrayWnd", null);
+                bool isCurrentlyVis = (tray != IntPtr.Zero && Win32.IsWindowVisible(tray));
+                Win32.SetTaskbarVisibility(!isCurrentlyVis);
+            };
+            _mainContentPanel.Children.Add(CreateSettingCard("Çift Monitör Görev Çubuklarını Test Et", "Ana ve ikinci monitördeki Başlat / görev çubuklarının gizlenme ve görünme davranışını anında test edin.", btnTestTaskbar));
+        }
+
+        // ==========================================
+        // SEKME 4: DUVAR KÂĞIDI & CANLI EFEKTLER
+        // ==========================================
+        private void BuildWallpaperTab()
+        {
+            _mainContentPanel.Children.Add(CreateHeroHeader("Duvar Kâğıdı & Canlı Efektler", "Simgeler gizlendiğinde tam kalite duvar kâğıtları ve hafif canlı atmosferik efektler."));
+
+            _mainContentPanel.Children.Add(CreateMasterHeroCard("Simgeler Gizlendiğinde Özel Duvar Kağıdı Göster", "🖼️", _cfg.ShowWallpaperOnHide, delegate(bool val)
+            {
+                _cfg.ShowWallpaperOnHide = val;
+                SaveAndNotify();
+            }));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("ÖZEL DUVAR KÂĞIDI"));
+
+            // Manuel Dosya Seçme ve Sıfırlama
+            var fileSelectPanel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 4, 0, 4) };
+            var btnRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+
+            var btnBrowse = new System.Windows.Controls.Button
+            {
+                Content = "📁 Duvar Kağıdı Seç...",
+                Height = 28,
+                Padding = new Thickness(12, 0, 12, 0),
+                Margin = new Thickness(0, 0, 8, 0),
+                Cursor = Cursors.Hand
+            };
+
+            var btnClear = new System.Windows.Controls.Button
+            {
+                Content = "🔄 Sıfırla (Varsayılana Dön)",
+                Height = 28,
+                Padding = new Thickness(10, 0, 10, 0),
+                Margin = new Thickness(0, 0, 8, 0),
+                Cursor = Cursors.Hand
+            };
+
+            var btnPreview = new System.Windows.Controls.Button
+            {
+                Content = "👁️ Önizleme Yap",
+                Height = 28,
+                Padding = new Thickness(10, 0, 10, 0),
+                Cursor = Cursors.Hand
+            };
+
+            var txtPath = new TextBlock
+            {
+                Text = string.IsNullOrEmpty(_cfg.CustomWallpaperPath)
+                    ? "Seçili: Seçilmedi (Varsayılan Windows Duvar Kağıdı Korunur)"
+                    : "Seçili: " + _cfg.CustomWallpaperPath,
+                Foreground = _textSecondaryBrush,
+                FontSize = 11,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 360
+            };
+
+            btnBrowse.Click += delegate(object s, RoutedEventArgs e)
+            {
+                var ofd = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "Duvar Kağıdı Görseli Seçin (Windows 'Doldur' / Orijinal Kalite)",
+                    Filter = "Resim Dosyaları (*.png;*.jpg;*.jpeg;*.bmp;*.webp)|*.png;*.jpg;*.jpeg;*.bmp;*.webp|Tüm Dosyalar (*.*)|*.*",
+                    CheckFileExists = true
+                };
+                if (ofd.ShowDialog() == true)
+                {
+                    _cfg.CustomWallpaperPath = ofd.FileName;
+                    txtPath.Text = "Seçili: " + _cfg.CustomWallpaperPath;
+                    SaveAndNotify();
+                }
+            };
+
+            btnClear.Click += delegate(object s, RoutedEventArgs e)
+            {
+                _cfg.CustomWallpaperPath = "";
+                txtPath.Text = "Seçili: Seçilmedi (Varsayılan Windows Duvar Kağıdı Korunur)";
+                SaveAndNotify();
+            };
+
+            btnPreview.Click += delegate(object s, RoutedEventArgs e)
+            {
+                if (_onToggleIcons != null) _onToggleIcons();
+            };
+
+            btnRow.Children.Add(btnBrowse);
+            btnRow.Children.Add(btnClear);
+            btnRow.Children.Add(btnPreview);
+            fileSelectPanel.Children.Add(btnRow);
+            fileSelectPanel.Children.Add(txtPath);
+
+            _mainContentPanel.Children.Add(CreateSettingCard("Özel Duvar Kağıdı Dosyası", "Windows 'Doldur' (Fill) moduyla her monitörün ekran boyutuna tam doldurulur (2 monitör ve çoklu ekran desteği). Özel görsel seçilmemişse varsayılan Windows duvar kağıdında hiçbir değişiklik yapılmaz.", fileSelectPanel));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("GÜNÜN SAATİNE GÖRE DİNAMİK DUVAR KÂĞIDI"));
+
+            // Günün Saatine Göre Dinamik Duvar Kâğıdı
+            var dynamicWpPanel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 4, 0, 4) };
+            var swDynamicWp = new PowerToggleSwitch(_cfg.DynamicWallpaperEnabled, delegate(bool val)
+            {
+                _cfg.DynamicWallpaperEnabled = val;
+                SaveAndNotify();
+            }, _isDark);
+            dynamicWpPanel.Children.Add(swDynamicWp);
+
+            Func<string, string, Action<string>, UIElement> createSlotRow = delegate(string label, string currentPath, Action<string> onSet)
+            {
+                var row = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 4, 0, 4) };
+                var btnSubRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
+                var lbl = new TextBlock { Text = label, Width = 150, FontWeight = FontWeights.SemiBold, Foreground = _accentBrush, VerticalAlignment = VerticalAlignment.Center };
+                var btnB = new System.Windows.Controls.Button { Content = "📁 Seç...", Height = 24, Padding = new Thickness(8, 0, 8, 0), Margin = new Thickness(0, 0, 6, 0), Cursor = Cursors.Hand };
+                var btnC = new System.Windows.Controls.Button { Content = "🔄 Sıfırla", Height = 24, Padding = new Thickness(8, 0, 8, 0), Margin = new Thickness(0, 0, 6, 0), Cursor = Cursors.Hand };
+                var txtP = new TextBlock
+                {
+                    Text = string.IsNullOrEmpty(currentPath) ? "(Seçilmedi)" : System.IO.Path.GetFileName(currentPath),
+                    ToolTip = currentPath,
+                    Foreground = _textSecondaryBrush,
+                    FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    MaxWidth = 180,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+
+                btnB.Click += delegate
+                {
+                    var ofd = new Microsoft.Win32.OpenFileDialog
+                    {
+                        Title = label + " İçin Duvar Kağıdı Seçin",
+                        Filter = "Resim Dosyaları (*.png;*.jpg;*.jpeg;*.bmp;*.webp)|*.png;*.jpg;*.jpeg;*.bmp;*.webp|Tüm Dosyalar (*.*)|*.*",
+                        CheckFileExists = true
+                    };
+                    if (ofd.ShowDialog() == true)
+                    {
+                        onSet(ofd.FileName);
+                        txtP.Text = System.IO.Path.GetFileName(ofd.FileName);
+                        txtP.ToolTip = ofd.FileName;
+                        SaveAndNotify();
+                    }
+                };
+
+                btnC.Click += delegate
+                {
+                    onSet("");
+                    txtP.Text = "(Seçilmedi)";
+                    txtP.ToolTip = "";
+                    SaveAndNotify();
+                };
+
+                btnSubRow.Children.Add(lbl);
+                btnSubRow.Children.Add(btnB);
+                btnSubRow.Children.Add(btnC);
+                btnSubRow.Children.Add(txtP);
+                row.Children.Add(btnSubRow);
+                return row;
+            };
+
+            dynamicWpPanel.Children.Add(createSlotRow("🌅 Sabah (06:00 - 11:00):", _cfg.WallpaperMorning, val => _cfg.WallpaperMorning = val));
+            dynamicWpPanel.Children.Add(createSlotRow("☀️ Öğle (11:00 - 17:00):", _cfg.WallpaperNoon, val => _cfg.WallpaperNoon = val));
+            dynamicWpPanel.Children.Add(createSlotRow("🌆 Akşam (17:00 - 21:00):", _cfg.WallpaperEvening, val => _cfg.WallpaperEvening = val));
+            dynamicWpPanel.Children.Add(createSlotRow("🌙 Gece (21:00 - 06:00):", _cfg.WallpaperNight, val => _cfg.WallpaperNight = val));
+
+            _mainContentPanel.Children.Add(CreateSettingCard("Günün Saatine Göre Dinamik Duvar Kâğıdı", "Günün vaktine (Sabah, Öğle, Akşam, Gece) göre özel duvar kâğıtları otomatik olarak devreye girer. Yuva seçilmemişse genel özel duvar kağıdı veya Windows varsayılanı korunur.", dynamicWpPanel));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("EKRANDAKİ CANLI ATMOSFERİK PARÇACIKLAR"));
+
+            var weatherFxPanel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 4, 0, 4) };
+            var swWeatherFx = new PowerToggleSwitch(_cfg.ShowWeatherWallpaperEffects, delegate(bool val)
+            {
+                _cfg.ShowWeatherWallpaperEffects = val;
+                SaveAndNotify();
+            }, _isDark);
+
+            var fxBtnRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
+            var btnTestRain = new System.Windows.Controls.Button
+            {
+                Content = "🌧️ Yağmur",
+                Height = 28,
+                Padding = new Thickness(10, 0, 10, 0),
+                Margin = new Thickness(0, 0, 6, 0),
+                Cursor = Cursors.Hand
+            };
+            btnTestRain.Click += delegate
+            {
+                if (_onTestWeather != null) _onTestWeather("rain");
+            };
+
+            var btnTestSnow = new System.Windows.Controls.Button
+            {
+                Content = "❄️ Kar",
+                Height = 28,
+                Padding = new Thickness(10, 0, 10, 0),
+                Margin = new Thickness(0, 0, 6, 0),
+                Cursor = Cursors.Hand
+            };
+            btnTestSnow.Click += delegate
+            {
+                if (_onTestWeather != null) _onTestWeather("snow");
+            };
+
+            var btnTestFireflies = new System.Windows.Controls.Button
+            {
+                Content = "✨ Ateş Böcekleri",
+                Height = 28,
+                Padding = new Thickness(10, 0, 10, 0),
+                Margin = new Thickness(0, 0, 6, 0),
+                Cursor = Cursors.Hand
+            };
+            btnTestFireflies.Click += delegate
+            {
+                if (_onTestWeather != null) _onTestWeather("fireflies");
+            };
+
+            var btnTestAutumn = new System.Windows.Controls.Button
+            {
+                Content = "🍂 Sonbahar",
+                Height = 28,
+                Padding = new Thickness(10, 0, 10, 0),
+                Margin = new Thickness(0, 0, 6, 0),
+                Cursor = Cursors.Hand
+            };
+            btnTestAutumn.Click += delegate
+            {
+                if (_onTestWeather != null) _onTestWeather("autumn");
+            };
+
+            var btnStopFx = new System.Windows.Controls.Button
+            {
+                Content = "⏹️ Kapat",
+                Height = 28,
+                Padding = new Thickness(10, 0, 10, 0),
+                Cursor = Cursors.Hand
+            };
+            btnStopFx.Click += delegate
+            {
+                if (_onTestWeather != null) _onTestWeather("clear");
+            };
+
+            fxBtnRow.Children.Add(btnTestRain);
+            fxBtnRow.Children.Add(btnTestSnow);
+            fxBtnRow.Children.Add(btnTestFireflies);
+            fxBtnRow.Children.Add(btnTestAutumn);
+            fxBtnRow.Children.Add(btnStopFx);
+
+            weatherFxPanel.Children.Add(swWeatherFx);
+            weatherFxPanel.Children.Add(fxBtnRow);
+
+            _mainContentPanel.Children.Add(CreateSettingCard("Ekrandaki Canlı Atmosferik Efektler (Yağmur, Kar, Ateş Böcekleri, Yapraklar)", "Ekranda GPU'yu hiç yormayan çok hafif, zarif yağmur damlaları, kar taneleri, parıldayan ateş böcekleri veya süzülen sonbahar yaprakları akar. Dilediğinizde tek tıkla test edebilir veya kapatabilirsiniz.", weatherFxPanel));
+        }
+
+        // ==========================================
+        // SEKME 5: SAAT & HAVA DURUMU WİDGET'I
+        // ==========================================
+        private void BuildWidgetTab()
+        {
+            _mainContentPanel.Children.Add(CreateHeroHeader("Saat & Hava Durumu Widget'ı", "Dijital saat, tarih, Türkçe gün ismi ve 3D hava durumu kartı."));
+
+            _mainContentPanel.Children.Add(CreateMasterHeroCard("Masaüstü Widget'ını Göster", "⏰", _cfg.ShowWidget, delegate(bool val)
+            {
+                _cfg.ShowWidget = val;
+                SaveAndNotify();
+            }));
+
+            var swClockOnlyHidden = new PowerToggleSwitch(_cfg.ClockOnlyWhenIconsHidden, delegate(bool val)
+            {
+                _cfg.ClockOnlyWhenIconsHidden = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Sadece Simgeler Gizlendiğinde Göster (Kapalı = Her Zaman Göster)", "Açıkken: Saat widget'ı masaüstü simgeleri gizlendiğinde otomatik görünür. Kapalıyken: Masaüstünde simgeler olsa dahi sürekli görünür kalır.", swClockOnlyHidden));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("KONUM VE SABİTLEME"));
+
+            var swLockPos = new PowerToggleSwitch(_cfg.LockWidgetPosition, delegate(bool val)
+            {
+                _cfg.LockWidgetPosition = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("🔒 Widget Konumunu Kilitle", "Widget'ın fare ile sürüklenmesini ve yanlışlıkla kaydırılmasını engeller, masaüstünde sabit tutar.", swLockPos));
+
+            var posStack = new StackPanel { Orientation = Orientation.Horizontal };
+            var btnTopCenter = new System.Windows.Controls.Button { Content = "⬆️ Üst Orta (Varsayılan)", Height = 28, Padding = new Thickness(10, 0, 10, 0), Margin = new Thickness(0, 0, 8, 0), Cursor = Cursors.Hand };
+            btnTopCenter.Click += delegate(object s, RoutedEventArgs e)
+            {
+                _cfg.WidgetPosition = "top_center";
+                _cfg.WidgetX = -1;
+                _cfg.WidgetY = -1;
+                SaveAndNotify();
+            };
+            var btnCenter = new System.Windows.Controls.Button { Content = "🎯 Ekran Ortası", Height = 28, Padding = new Thickness(10, 0, 10, 0), Cursor = Cursors.Hand };
+            btnCenter.Click += delegate(object s, RoutedEventArgs e)
+            {
+                _cfg.WidgetPosition = "center";
+                _cfg.WidgetX = -1;
+                _cfg.WidgetY = -1;
+                SaveAndNotify();
+            };
+            var btnResetAll = new System.Windows.Controls.Button { Content = "🔄 Tüm Konumları Sıfırla", Height = 28, Padding = new Thickness(10, 0, 10, 0), Margin = new Thickness(8, 0, 0, 0), Cursor = Cursors.Hand };
+            btnResetAll.Click += delegate(object s, RoutedEventArgs e)
+            {
+                _cfg.WidgetPosition = "top_center";
+                _cfg.WidgetX = -1;
+                _cfg.WidgetY = -1;
+                _cfg.ShiftWidgetX = -1;
+                _cfg.ShiftWidgetY = -1;
+                _cfg.QuoteX = -1;
+                _cfg.QuoteY = -1;
+                _cfg.VerseX = -1;
+                _cfg.VerseY = -1;
+                _cfg.HadithX = -1;
+                _cfg.HadithY = -1;
+                _cfg.HolidayX = -1;
+                _cfg.HolidayY = -1;
+                _cfg.MediaX = -1;
+                _cfg.MediaY = -1;
+                _cfg.ZenNotesX = -1;
+                _cfg.ZenNotesY = -1;
+                _cfg.DockX = -1;
+                _cfg.DockY = -1;
+                SaveAndNotify();
+            };
+            posStack.Children.Add(btnTopCenter);
+            posStack.Children.Add(btnCenter);
+            posStack.Children.Add(btnResetAll);
+            _mainContentPanel.Children.Add(CreateSettingCard("Ekran Konumu", "Widget'ı ekranın üst orta alanına (varsayılan) veya tam ortasına hizalayın veya tüm masaüstü widget konumlarını varsayılana sıfırlayın.", posStack));
+
+            var cmbLayer = new System.Windows.Controls.ComboBox
+            {
+                ItemsSource = new string[] { "Masaüstü Arka Planına Sabitle (Varsayılan / Arka Planda)", "Her Zaman Üstte Tut", "Normal Pencere" },
+                SelectedIndex = _cfg.WidgetPinnedToDesktop ? 0 : (_cfg.WidgetAlwaysOnTop ? 1 : 2),
+                Height = 28,
+                Width = 265
+            };
+            cmbLayer.SelectionChanged += delegate(object s, SelectionChangedEventArgs e)
+            {
+                _cfg.WidgetPinnedToDesktop = (cmbLayer.SelectedIndex == 0);
+                _cfg.WidgetAlwaysOnTop = (cmbLayer.SelectedIndex == 1);
+                SaveAndNotify();
+            };
+            _mainContentPanel.Children.Add(CreateSettingCard("Katman Seviyesi", "Widget'ın pencerelerin arkasında masaüstüne sabitlenmesi veya en üstte durması (Varsayılan: Masaüstü Arka Planına Sabitle).", cmbLayer));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("GÖRÜNÜM VE BOYUT"));
+
+            // Opaklık Slider (0 - 100)
+            var opStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var sliderOp = new Slider
+            {
+                Minimum = 0,
+                Maximum = 100,
+                Value = (int)(_cfg.WidgetOpacity * 100),
+                Width = 140,
+                IsSnapToTickEnabled = true,
+                TickFrequency = 5,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            int curOpVal = (int)(_cfg.WidgetOpacity * 100);
+            var lblOp = new TextBlock
+            {
+                Text = (curOpVal == 0) ? "%0 (Görünmez)" : ("%" + curOpVal.ToString()),
+                Foreground = _accentBrush,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(10, 0, 0, 0),
+                Width = 85
+            };
+            sliderOp.ValueChanged += delegate(object s, RoutedPropertyChangedEventArgs<double> e)
+            {
+                int val = (int)sliderOp.Value;
+                lblOp.Text = (val == 0) ? "%0 (Görünmez)" : ("%" + val.ToString());
+                _cfg.WidgetOpacity = val / 100.0;
+                SaveAndNotify();
+            };
+            opStack.Children.Add(sliderOp);
+            opStack.Children.Add(lblOp);
+            _mainContentPanel.Children.Add(CreateSettingCard("Kart Yüzey Saydamlığı (Opaklık)", "Kart yüzeyinin şeffaflık seviyesi (%0 - %100). En sola (%0) çekildiğinde kart yüzeyi ve çerçevesi tamamen gizlenir.", opStack));
+
+            // Widget Boyutu / Ölçek Slider (%50 - %150)
+            var scaleStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var sliderScale = new Slider
+            {
+                Minimum = 50,
+                Maximum = 150,
+                Value = (int)Math.Round((_cfg.WidgetScale <= 0 ? 1.0 : _cfg.WidgetScale) * 100),
+                Width = 140,
+                IsSnapToTickEnabled = true,
+                TickFrequency = 5,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var lblScale = new TextBlock
+            {
+                Text = "%" + ((int)sliderScale.Value).ToString(),
+                Foreground = _accentBrush,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(10, 0, 0, 0),
+                Width = 45
+            };
+            sliderScale.ValueChanged += delegate(object s, RoutedPropertyChangedEventArgs<double> e)
+            {
+                int val = (int)sliderScale.Value;
+                lblScale.Text = "%" + val.ToString();
+                _cfg.WidgetScale = val / 100.0;
+                SaveAndNotify();
+            };
+            scaleStack.Children.Add(sliderScale);
+            scaleStack.Children.Add(lblScale);
+            _mainContentPanel.Children.Add(CreateSettingCard("Widget Boyutu (Yüzdelik Ölçek)", "Masaüstü widget'ının boyutunu oranını bozmadan büyütün veya küçültün (%50 - %150).", scaleStack));
+
+            // Widget Yazı Boyutu / Font Ölçek Slider (%80 - %135)
+            var fontScaleStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var sliderFontScale = new Slider
+            {
+                Minimum = 80,
+                Maximum = 135,
+                Value = (int)Math.Round((_cfg.WidgetFontScale <= 0 ? 1.0 : _cfg.WidgetFontScale) * 100),
+                Width = 140,
+                IsSnapToTickEnabled = true,
+                TickFrequency = 5,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var lblFontScale = new TextBlock
+            {
+                Text = "%" + ((int)sliderFontScale.Value).ToString(),
+                Foreground = _accentBrush,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(10, 0, 0, 0),
+                Width = 45
+            };
+            sliderFontScale.ValueChanged += delegate(object s, RoutedPropertyChangedEventArgs<double> e)
+            {
+                int val = (int)sliderFontScale.Value;
+                lblFontScale.Text = "%" + val.ToString();
+                _cfg.WidgetFontScale = val / 100.0;
+                SaveAndNotify();
+            };
+            fontScaleStack.Children.Add(sliderFontScale);
+            fontScaleStack.Children.Add(lblFontScale);
+            _mainContentPanel.Children.Add(CreateSettingCard("🔤 Widget Yazı Boyutu (Arka Plan Sabit)", "Arka plan kartı sabit kalır, saat, tarih, hava durumu ve panellerdeki yazıların boyutunu ayarlar (%80 - %135).", fontScaleStack));
+
+            var swSec = new PowerToggleSwitch(_cfg.ShowSeconds, delegate(bool val) { _cfg.ShowSeconds = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Küçük Saniye Sayacı", "Saatin sağında küçük ve zarif saniye göstergesi.", swSec));
+
+            var swCompact = new PowerToggleSwitch(_cfg.CompactMode, delegate(bool val) { _cfg.CompactMode = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Kompakt Mod", "Yalnızca sade saat ve tarih gösterir, alt panelleri daraltır.", swCompact));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("HAVA DURUMU VE ŞEHİR"));
+
+            var cities = new string[] { "İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Adana", "Trabzon", "Eskişehir", "Konya", "Gaziantep", "Kayseri", "Samsun" };
+            int cityIdx = Array.IndexOf(cities, _cfg.City);
+            if (cityIdx < 0) cityIdx = 0;
+            var cmbCity = new System.Windows.Controls.ComboBox
+            {
+                ItemsSource = cities,
+                SelectedIndex = cityIdx,
+                IsEditable = true,
+                Height = 28,
+                Width = 180
+            };
+            cmbCity.SelectionChanged += delegate(object s, SelectionChangedEventArgs e)
+            {
+                if (cmbCity.SelectedItem != null)
+                {
+                    _cfg.City = cmbCity.SelectedItem.ToString();
+                    SaveAndNotify();
+                }
+            };
+            cmbCity.LostFocus += delegate(object s, RoutedEventArgs e)
+            {
+                if (!string.IsNullOrEmpty(cmbCity.Text))
+                {
+                    _cfg.City = cmbCity.Text.Trim();
+                    SaveAndNotify();
+                }
+            };
+            _mainContentPanel.Children.Add(CreateSettingCard("Hava Durumu Şehri", "Otomatik sıcaklık ve renkli 3D minimal hava durumu ikon verisi alınacak şehir.", cmbCity));
+        }
+
+        // ==========================================
+        // SEKME 6: MASAÜSTÜ KARTLARI & DOCK
+        // ==========================================
+        private void BuildDesktopCardsTab()
+        {
+            _mainContentPanel.Children.Add(CreateHeroHeader("Masaüstü Kartları & Dock", "Vardiya & Çizelge Kartı, Zen Hızlı Not Kartı, Zen Dock ve Spotify Medya Mini Oynatıcı."));
+
+            // 1. Vardiya & Nöbetçi Çizelgesi Widget'ı
+            _mainContentPanel.Children.Add(CreateSectionTitle("📋 VARDİYA & NÖBETÇİ ÇİZELGESİ"));
+
+            var swShift = new PowerToggleSwitch(_cfg.ShowShiftWidget, delegate(bool val)
+            {
+                _cfg.ShowShiftWidget = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Vardiya & Nöbetçi Çizelgesi Widget'ı", "Masaüstünde anlık ve devralacak çalışma vardiyalarını (Sabah, Akşam, Gece ve Fazla Mesai) dinamik olarak Excel'den okuyan ve gösteren bağımsız widget.", swShift));
+
+            var swShiftOnlyHidden = new PowerToggleSwitch(_cfg.ShiftOnlyWhenIconsHidden, delegate(bool val)
+            {
+                _cfg.ShiftOnlyWhenIconsHidden = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Sadece Simgeler Gizlendiğinde Göster (Kapalı = Her Zaman Göster)", "Açıkken: Vardiya çizelgesi yalnızca masaüstü simgeleri gizlendiğinde görünür. Kapalıyken: Masaüstünde simgeler olsa dahi sürekli görünür kalır.", swShiftOnlyHidden));
+
+            var swLockShift = new PowerToggleSwitch(_cfg.LockShiftWidgetPosition, delegate(bool val)
+            {
+                _cfg.LockShiftWidgetPosition = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("🔒 Vardiya Widget Konumunu Kilitle", "Vardiya widget'ının fare ile sürüklenmesini ve yanlışlıkla kaydırılmasını engeller, masaüstünde sabit tutar. Kilit açıkken widget ekran üzerinde serbestçe taşınabilir.", swLockShift));
+
+            var swCountdown = new PowerToggleSwitch(_cfg.ShiftHandoverCountdown, delegate(bool val)
+            {
+                _cfg.ShiftHandoverCountdown = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("⏰ Vardiya Devir Geri Sayımı (07:00, 15:00, 23:00)", "Vardiya devir saatlerine kalan süreyi saniye saniye sayar ve devir saatine 15 dakika kala dikkat çekici amber sarı uyarı moduna geçer.", swCountdown));
+
+            // Vardiya Widget Boyut Olcegi Slider (%50 - %100, en buyuk boyutu suanki %100)
+            var shiftScaleStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var sliderShiftScale = new System.Windows.Controls.Slider
+            {
+                Minimum = 50,
+                Maximum = 100,
+                Value = (int)Math.Round((_cfg.ShiftWidgetScale <= 0 ? 1.0 : Math.Min(1.0, _cfg.ShiftWidgetScale)) * 100),
+                Width = 140,
+                IsSnapToTickEnabled = true,
+                TickFrequency = 5,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var lblShiftScale = new TextBlock
+            {
+                Text = "%" + ((int)sliderShiftScale.Value).ToString(),
+                FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                Foreground = _textPrimaryBrush,
+                Width = 45,
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            sliderShiftScale.ValueChanged += delegate(object s, RoutedPropertyChangedEventArgs<double> e)
+            {
+                int val = (int)sliderShiftScale.Value;
+                lblShiftScale.Text = "%" + val.ToString();
+                _cfg.ShiftWidgetScale = val / 100.0;
+                SaveAndNotify();
+            };
+            shiftScaleStack.Children.Add(sliderShiftScale);
+            shiftScaleStack.Children.Add(lblShiftScale);
+            _mainContentPanel.Children.Add(CreateSettingCard("Vardiya Widget Boyutu (K\u00FC\u00E7\u00FCltme \u00D6l\u00E7e\u011Fi)", "Vardiya widget'\u0131n\u0131n ekran kaplama boyutunu oran\u0131n\u0131 bozmadan k\u00FC\u00E7\u00FClt\u00FCn (%50 - %100, en b\u00FCy\u00FCk boyutu %100'd\u00FCr).", shiftScaleStack));
+
+            // 1. Çizelge Klasörü Yolu
+            var shiftFolderRow = new StackPanel { Orientation = Orientation.Horizontal };
+            var txtShiftFolder = new TextBox
+            {
+                Text = string.IsNullOrEmpty(_cfg.ShiftFolderPath) ? "(Hedef belirtilmedi - Çizelge okuma pasif)" : _cfg.ShiftFolderPath,
+                IsReadOnly = true,
+                Width = 220,
+                Height = 28,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(6, 0, 6, 0),
+                Background = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(35, 39, 46)) : new SolidColorBrush(System.Windows.Media.Color.FromRgb(240, 243, 246)),
+                Foreground = _isDark ? System.Windows.Media.Brushes.LightGray : System.Windows.Media.Brushes.DarkSlateGray,
+                BorderBrush = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(60, 65, 75)) : new SolidColorBrush(System.Windows.Media.Color.FromRgb(200, 205, 215)),
+                BorderThickness = new Thickness(1),
+                ToolTip = "Seçilen Çizelge Hedefi:\n" + (_cfg.ShiftFolderPath ?? "") +
+                          (!string.IsNullOrEmpty(_cfg.ShiftFolderPath) && _cfg.ShiftFolderPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)
+                           ? "\n(Hedef Yolu: " + ShellLinkHelper.ResolveShortcut(_cfg.ShiftFolderPath) + ")" : "")
+            };
+            var btnBrowseLnk = new System.Windows.Controls.Button
+            {
+                Content = "🔗 Kısayol / Excel",
+                Height = 28,
+                Padding = new Thickness(8, 0, 8, 0),
+                Margin = new Thickness(6, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Çizelge masaüstü kısayolunu (.lnk) veya doğrudan Excel dosyasını (.xlsx) seçin"
+            };
+            var btnBrowseFolder = new System.Windows.Controls.Button
+            {
+                Content = "📁 Klasör Seç",
+                Height = 28,
+                Padding = new Thickness(8, 0, 8, 0),
+                Margin = new Thickness(6, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Çizelge çalışma çizelgelerinin yer aldığı klasörü seçin"
+            };
+            var btnClearFolder = new System.Windows.Controls.Button
+            {
+                Content = "❌ Sıfırla",
+                Height = 28,
+                Padding = new Thickness(8, 0, 8, 0),
+                Margin = new Thickness(6, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Hedefi kaldırır ve Çizelge okumasını pasife alır"
+            };
+
+            btnBrowseLnk.Click += delegate
+            {
+                string chosen = ShellLinkHelper.PromptPickShortcutOrFile(_cfg.ShiftFolderPath, "Çizelge Masaüstü Kısayolunu (.lnk) veya Excel Çizelgesini Seçin");
+                if (!string.IsNullOrEmpty(chosen))
+                {
+                    _cfg.ShiftFolderPath = chosen;
+                    txtShiftFolder.Text = _cfg.ShiftFolderPath;
+                    txtShiftFolder.ToolTip = "Seçilen Çizelge Hedefi:\n" + _cfg.ShiftFolderPath +
+                                             (_cfg.ShiftFolderPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)
+                                              ? "\n(Hedef Yolu: " + ShellLinkHelper.ResolveShortcut(_cfg.ShiftFolderPath) + ")" : "");
+                    SaveAndNotify();
+                }
+            };
+
+            btnBrowseFolder.Click += delegate
+            {
+                string chosen = ShellLinkHelper.PromptPickFolder(_cfg.ShiftFolderPath, "Çizelge çalışma çizelgelerinin yer aldığı ana klasörü seçin:");
+                if (!string.IsNullOrEmpty(chosen))
+                {
+                    _cfg.ShiftFolderPath = chosen;
+                    txtShiftFolder.Text = _cfg.ShiftFolderPath;
+                    txtShiftFolder.ToolTip = "Seçilen Çizelge Hedefi:\n" + _cfg.ShiftFolderPath;
+                    SaveAndNotify();
+                }
+            };
+
+            btnClearFolder.Click += delegate
+            {
+                _cfg.ShiftFolderPath = "";
+                txtShiftFolder.Text = "(Hedef belirtilmedi - Çizelge okuma pasif)";
+                txtShiftFolder.ToolTip = "Hedef belirtilmedi";
+                SaveAndNotify();
+            };
+
+            shiftFolderRow.Children.Add(txtShiftFolder);
+            shiftFolderRow.Children.Add(btnBrowseLnk);
+            shiftFolderRow.Children.Add(btnBrowseFolder);
+            shiftFolderRow.Children.Add(btnClearFolder);
+
+            _mainContentPanel.Children.Add(CreateSettingCard("📁 Çizelge Klasörü / Kısayolu", "Masaüstündeki kısayolu (.lnk), doğrudan Excel dosyasını (.xlsx) veya ana klasörü seçebilirsiniz. Hedef belirtilmediğinde Excel işlemi ve arka plan çizelge okuması kesinlikle çalıştırılmaz.", shiftFolderRow));
+
+            // 2. Vardiya Amiri Çizelgesi Klasörü Yolu
+            var supFolderRow = new StackPanel { Orientation = Orientation.Horizontal };
+            var txtSupFolder = new TextBox
+            {
+                Text = string.IsNullOrEmpty(_cfg.SupervisorFolderPath) ? "(Hedef belirtilmedi - Vardiya amiri okuma pasif)" : _cfg.SupervisorFolderPath,
+                IsReadOnly = true,
+                Width = 220,
+                Height = 28,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(6, 0, 6, 0),
+                Background = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(35, 39, 46)) : new SolidColorBrush(System.Windows.Media.Color.FromRgb(240, 243, 246)),
+                Foreground = _isDark ? System.Windows.Media.Brushes.LightGray : System.Windows.Media.Brushes.DarkSlateGray,
+                BorderBrush = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(60, 65, 75)) : new SolidColorBrush(System.Windows.Media.Color.FromRgb(200, 205, 215)),
+                BorderThickness = new Thickness(1),
+                ToolTip = "Seçilen Vardiya Amiri Hedefi:\n" + (_cfg.SupervisorFolderPath ?? "") +
+                          (!string.IsNullOrEmpty(_cfg.SupervisorFolderPath) && _cfg.SupervisorFolderPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)
+                           ? "\n(Hedef Yolu: " + ShellLinkHelper.ResolveShortcut(_cfg.SupervisorFolderPath) + ")" : "")
+            };
+            var btnBrowseSupLnk = new System.Windows.Controls.Button
+            {
+                Content = "🔗 Kısayol / Excel",
+                Height = 28,
+                Padding = new Thickness(8, 0, 8, 0),
+                Margin = new Thickness(6, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Vardiya amiri masaüstü kısayolunu (.lnk) veya doğrudan Excel dosyasını (.xlsx) seçin"
+            };
+            var btnBrowseSupFolder = new System.Windows.Controls.Button
+            {
+                Content = "📁 Klasör Seç",
+                Height = 28,
+                Padding = new Thickness(8, 0, 8, 0),
+                Margin = new Thickness(6, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Vardiya amirliği çizelgesinin yer aldığı klasörü seçin"
+            };
+            var btnClearSupFolder = new System.Windows.Controls.Button
+            {
+                Content = "❌ Sıfırla",
+                Height = 28,
+                Padding = new Thickness(8, 0, 8, 0),
+                Margin = new Thickness(6, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Hedefi kaldırır ve Vardiya Amiri okumasını pasife alır"
+            };
+
+            btnBrowseSupLnk.Click += delegate
+            {
+                string chosen = ShellLinkHelper.PromptPickShortcutOrFile(_cfg.SupervisorFolderPath, "Vardiya Amiri Masaüstü Kısayolunu (.lnk) veya Excel Çizelgesini Seçin");
+                if (!string.IsNullOrEmpty(chosen))
+                {
+                    _cfg.SupervisorFolderPath = chosen;
+                    txtSupFolder.Text = _cfg.SupervisorFolderPath;
+                    txtSupFolder.ToolTip = "Seçilen Vardiya Amiri Hedefi:\n" + _cfg.SupervisorFolderPath +
+                                           (_cfg.SupervisorFolderPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)
+                                            ? "\n(Hedef Yolu: " + ShellLinkHelper.ResolveShortcut(_cfg.SupervisorFolderPath) + ")" : "");
+                    SaveAndNotify();
+                }
+            };
+
+            btnBrowseSupFolder.Click += delegate
+            {
+                string chosen = ShellLinkHelper.PromptPickFolder(_cfg.SupervisorFolderPath, "Vardiya Amiri çizelgesinin yer aldığı ana klasörü seçin:");
+                if (!string.IsNullOrEmpty(chosen))
+                {
+                    _cfg.SupervisorFolderPath = chosen;
+                    txtSupFolder.Text = _cfg.SupervisorFolderPath;
+                    txtSupFolder.ToolTip = "Seçilen Vardiya Amiri Hedefi:\n" + _cfg.SupervisorFolderPath;
+                    SaveAndNotify();
+                }
+            };
+
+            btnClearSupFolder.Click += delegate
+            {
+                _cfg.SupervisorFolderPath = "";
+                txtSupFolder.Text = "(Hedef belirtilmedi - Vardiya amiri okuma pasif)";
+                txtSupFolder.ToolTip = "Hedef belirtilmedi";
+                SaveAndNotify();
+            };
+
+            supFolderRow.Children.Add(txtSupFolder);
+            supFolderRow.Children.Add(btnBrowseSupLnk);
+            supFolderRow.Children.Add(btnBrowseSupFolder);
+            supFolderRow.Children.Add(btnClearSupFolder);
+
+            _mainContentPanel.Children.Add(CreateSettingCard("👮 Vardiya Amiri Çizelgesi Klasörü / Kısayolu", "Vardiya Amiri çizelgesinin bulunduğu klasörü, masaüstü kısayolunu (.lnk) veya doğrudan Excel dosyasını (.xlsx) seçebilirsiniz. İleride çizelgenin yeri veya dosya adı değiştiğinde buradan hızlıca güncelleyebilirsiniz.", supFolderRow));
+            // 2. Zen Şeffaf Hızlı Not Kartı (Sticky Pad)
+            _mainContentPanel.Children.Add(CreateSectionTitle("📝 ZEN ŞEFFAF HIZLI NOT KARTI (STICKY PAD)"));
+
+            var swNotes = new PowerToggleSwitch(_cfg.ShowZenNotes, delegate(bool val)
+            {
+                _cfg.ShowZenNotes = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Zen Şeffaf Hızlı Not Kartını Göster", "Masaüstünde aklınızdakileri, devir notlarını veya telefon numaralarını anında yazabileceğiniz şeffaf akrilik not kartı. Notlar otomatik olarak 'notes.txt' dosyasına kaydedilir.", swNotes));
+
+            var swNotesOnlyHidden = new PowerToggleSwitch(_cfg.ZenNotesOnlyWhenIconsHidden, delegate(bool val)
+            {
+                _cfg.ZenNotesOnlyWhenIconsHidden = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("👁️ Not Kartı: Sadece Simgeler Gizlendiğinde Göster (Kapalı = Her Zaman Göster)", "Açıkken (varsayılan): Not kartı yalnızca masaüstü simgeleri gizlendiğinde ekrana gelir. Kapalıyken: Masaüstünde simgeler açık olsa dahi kart her zaman görünür ve yazılabilir kalır.", swNotesOnlyHidden));
+
+            var swLockNotes = new PowerToggleSwitch(_cfg.LockZenNotesPosition, delegate(bool val)
+            {
+                _cfg.LockZenNotesPosition = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("🔒 Not Kartı Konumunu Kilitle", "Not kartının fare ile taşınmasını ve yanlışlıkla sürüklenmesini önler.", swLockNotes));
+
+            // 3. Zen Uygulama Çekmecesi (Minimal Dock / Launchpad)
+            _mainContentPanel.Children.Add(CreateSectionTitle("🚀 ZEN UYGULAMA ÇEKMECESİ (MINIMAL DOCK / LAUNCHPAD)"));
+
+            var swDock = new PowerToggleSwitch(_cfg.ShowZenDock, delegate(bool val)
+            {
+                _cfg.ShowZenDock = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Zen Uygulama Çekmecesini (Dock) Göster", "Ekranın alt kısmında Dosya Gezgini, Web Tarayıcısı, Vardiya Çizelgesi/Excel, Not Defteri, Hesap Makinesi, Komut İstemi ve Ayarlar'a tek tıkla ulaşabileceğiniz modern yüzen kapsül dock.", swDock));
+
+            var swDockOnlyHidden = new PowerToggleSwitch(_cfg.DockOnlyWhenIconsHidden, delegate(bool val)
+            {
+                _cfg.DockOnlyWhenIconsHidden = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Dock'u Sadece Simgeler Gizlendiğinde Göster (Kapalı = Her Zaman Göster)", "Açıkken: Uygulama çekmecesi sadece masaüstü simgeleri gizlendiğinde görünür. Kapalıyken: Simgeler açık olsa da sürekli ekranda kalır.", swDockOnlyHidden));
+
+            var swLockDock = new PowerToggleSwitch(_cfg.LockDockPosition, delegate(bool val)
+            {
+                _cfg.LockDockPosition = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("🔒 Dock Konumunu Kilitle", "Dock kapsülünün fare ile taşınmasını kilitler veya serbest bırakır.", swLockDock));
+
+            // 4. Canlı Medya ve Müzik Çalar
+            _mainContentPanel.Children.Add(CreateSectionTitle("🎵 CANLI MEDYA & SPOTIFY / MÜZİK MİNİ OYNATICI"));
+
+            var swMedia = new PowerToggleSwitch(_cfg.ShowMediaPlayer, delegate(bool val)
+            {
+                _cfg.ShowMediaPlayer = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Canlı Medya & Spotify / Müzik Mini Oynatıcı", "Spotify veya tarayıcıda (YouTube vb.) aktif bir müzik veya video çaldığında parça ve sanatçı adını, animasyonlu ekolayzeri ve ⏮ ⏯ ⏭ kontrol butonlarını gösterir. Medya duraklatıldığında veya kapatıldığında otomatik olarak gizlenir.", swMedia));
+
+            var swLockMedia = new PowerToggleSwitch(_cfg.LockMediaPosition, delegate(bool val)
+            {
+                _cfg.LockMediaPosition = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("🔒 Medya Mini Oynatıcı Konumunu Kilitle", "Medya çubuğunun ekrandaki konumunu sabitler veya fareyle serbestçe taşınmasını sağlar.", swLockMedia));
+        }
+
+        // ==========================================
+        // SEKME 7: MANEVÎ REHBER & RESMÎ TATİLLER
+        // ==========================================
+
+        private void BuildGuidanceTab()
+        {
+            _mainContentPanel.Children.Add(CreateHeroHeader("Manevî Rehber & Resmî Tatiller", "Günün Âyet-i Kerîmesi, Hadîs-i Şerîfi, Günün Sözü, Diyanet 81 il namaz vakitleri ve Türkiye resmî tatilleri."));
+
+            // 1. Dinî Bildirimler & İlham Kartları
+            _mainContentPanel.Children.Add(CreateSectionTitle("📖 İLHAM VE MANEVÎ REHBER KARTLARI"));
+
+            var swVerse = new PowerToggleSwitch(_cfg.ShowDailyVerse, delegate(bool val)
+            {
+                _cfg.ShowDailyVerse = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Günün Âyet-i Kerîmesi (Ekranın Sol Altında)", "Masaüstü simgeleri gizlendiğinde ekranın sol en alt köşesinde, her gün değişen Kur'ân-ı Kerîm âyeti ve sûre numarası paylaşılır.", swVerse));
+
+            var swHadith = new PowerToggleSwitch(_cfg.ShowDailyHadith, delegate(bool val)
+            {
+                _cfg.ShowDailyHadith = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Günün Hadîs-i Şerîfi (Ekranın Sağ Altında)", "Masaüstü simgeleri gizlendiğinde ekranın sağ en alt köşesinde, her gün değişen Hadîs-i Şerîf ve sahih hadis kaynağı paylaşılır.", swHadith));
+
+            var swQuote = new PowerToggleSwitch(_cfg.ShowDailyQuote, delegate(bool val)
+            {
+                _cfg.ShowDailyQuote = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("💡 Günün Sözü & Özdeyiş (Ekranın Sol Üstünde)", "Masaüstü simgeleri gizlendiğinde ekranın sol üst köşesinde, her gün değişen ilham verici özlü söz veya vecize paylaşılır.", swQuote));
+
+            var swLockInspirations = new PowerToggleSwitch(_cfg.LockInspirationPosition, delegate(bool val)
+            {
+                _cfg.LockInspirationPosition = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("🔒 Âyet, Hadîs & Söz Kartları Konumunu Kilitle", "Manevî rehber kartlarının (Âyet, Hadîs, Günün Sözü) masaüstünde sabit durmasını sağlar. Kilit açıkken fare ile kartları dilediğiniz konuma taşıyabilirsiniz.", swLockInspirations));
+
+            // 2. Diyanet Namaz Vakitleri & Ezan Saatleri
+            _mainContentPanel.Children.Add(CreateSectionTitle("🕋 DİYANET NAMAZ VAKİTLERİ & EZAN SAATLERİ"));
+
+            var swPrayer = new PowerToggleSwitch(_cfg.ShowPrayerTimes, delegate(bool val)
+            {
+                _cfg.ShowPrayerTimes = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Diyanet Namaz Vakitleri Paneli", "Masaüstü widget'ının en altında resmi Diyanet İşleri Başkanlığı 6 vakit tablosunu ve sıradaki vakit geri sayımını gösterir.", swPrayer));
+
+            var prayerCities = new string[]
+            {
+                "Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Aksaray", "Amasya", "Ankara", "Antalya", "Ardahan", "Artvin",
+                "Aydın", "Balıkesir", "Bartın", "Batman", "Bayburt", "Bilecik", "Bingöl", "Bitlis", "Bolu", "Burdur",
+                "Bursa", "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır", "Düzce", "Edirne", "Elazığ", "Erzincan",
+                "Erzurum", "Eskişehir", "Gaziantep", "Giresun", "Gümüşhane", "Hakkari", "Hatay", "Iğdır", "Isparta", "İstanbul",
+                "İzmir", "Kahramanmaraş", "Karabük", "Karaman", "Kars", "Kastamonu", "Kayseri", "Kilis", "Kırıkkale", "Kırklareli",
+                "Kırşehir", "Kocaeli", "Konya", "Kütahya", "Malatya", "Manisa", "Mardin", "Mersin", "Muğla", "Muş",
+                "Nevşehir", "Niğde", "Ordu", "Osmaniye", "Rize", "Sakarya", "Samsun", "Şanlıurfa", "Siirt", "Sinop",
+                "Sivas", "Şırnak", "Tekirdağ", "Tokat", "Trabzon", "Tunceli", "Uşak", "Van", "Yalova", "Yozgat", "Zonguldak"
+            };
+
+            int prayerCityIdx = -1;
+            for (int i = 0; i < prayerCities.Length; i++)
+            {
+                if (string.Equals(prayerCities[i], _cfg.PrayerCity, StringComparison.OrdinalIgnoreCase))
+                {
+                    prayerCityIdx = i;
+                    break;
+                }
+            }
+            if (prayerCityIdx < 0) prayerCityIdx = Array.IndexOf(prayerCities, "İstanbul");
+            if (prayerCityIdx < 0) prayerCityIdx = 0;
+
+            var prayerCityRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+
+            var cmbPrayerCity = new System.Windows.Controls.ComboBox
+            {
+                ItemsSource = prayerCities,
+                SelectedIndex = prayerCityIdx,
+                IsEditable = true,
+                Height = 28,
+                Width = 180
+            };
+            cmbPrayerCity.SelectionChanged += delegate(object s, SelectionChangedEventArgs e)
+            {
+                if (cmbPrayerCity.SelectedItem != null)
+                {
+                    _cfg.PrayerCity = cmbPrayerCity.SelectedItem.ToString();
+                    SaveAndNotify();
+                }
+            };
+            cmbPrayerCity.LostFocus += delegate(object s, RoutedEventArgs e)
+            {
+                if (!string.IsNullOrEmpty(cmbPrayerCity.Text))
+                {
+                    _cfg.PrayerCity = cmbPrayerCity.Text.Trim();
+                    SaveAndNotify();
+                }
+            };
+
+            var btnRefreshPrayer = new System.Windows.Controls.Button
+            {
+                Content = "🔄 Vakitleri Yenile",
+                Height = 28,
+                Padding = new Thickness(10, 0, 10, 0),
+                Margin = new Thickness(8, 0, 0, 0),
+                Cursor = Cursors.Hand
+            };
+            btnRefreshPrayer.Click += delegate
+            {
+                SaveAndNotify();
+            };
+
+            prayerCityRow.Children.Add(cmbPrayerCity);
+            prayerCityRow.Children.Add(btnRefreshPrayer);
+
+            _mainContentPanel.Children.Add(CreateSettingCard("Namaz Vakti Bölgesi / Şehri (81 İl)", "Resmi Diyanet İşleri Başkanlığı'ndan ezan ve namaz vakitlerinin otomatik çekileceği il. Varsayılan bölge İstanbul'dur.", prayerCityRow));
+
+            // 3. Türkiye Resmî & Dinî Tatilleri
+            _mainContentPanel.Children.Add(CreateSectionTitle("🇹🇷 TÜRKİYE RESMÎ & DİNÎ TATİLLERİ"));
+
+            var swHoliday = new PowerToggleSwitch(_cfg.ShowNationalHolidays, delegate(bool val)
+            {
+                _cfg.ShowNationalHolidays = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Türkiye Resmî & Dinî Tatilleri (Ekranın Alt Ortasında)", "Masaüstü simgeleri gizlendiğinde ekranın en alt ortasında ayrı tek satır şık bir widget olarak sıradaki resmî tatili ve kalan gün sayısını gösterir. Tıklandığında sonraki tatilleri sırayla listeler.", swHoliday));
+
+            var swLockHolidays = new PowerToggleSwitch(_cfg.LockHolidayPosition, delegate(bool val)
+            {
+                _cfg.LockHolidayPosition = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("🔒 Resmî Tatil Barı Konumunu Kilitle", "Resmî tatil ve geri sayım çubuğunun fare ile taşınmasını kilitler veya serbest bırakır.", swLockHolidays));
+        }
+
+        private void BuildToolsTab()
+        {
+            BuildGuidanceTab();
+        }
+
+        // ==========================================
+        // SEKME 5: FİNANS & PARİTELER
+        // ==========================================
+        private void BuildFinanceTab()
+        {
+            _mainContentPanel.Children.Add(CreateHeroHeader("Finans & Piyasa Paneli", "Döviz, altın, borsa endeksi ve kripto paralar 5 dakikada bir otomatik yenilenir."));
+
+            _mainContentPanel.Children.Add(CreateMasterHeroCard("Finans Panelini Göster", "📈", _cfg.ShowFinance, delegate(bool val)
+            {
+                _cfg.ShowFinance = val;
+                SaveAndNotify();
+            }));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("GÖSTERİLECEK PARİTELER (İSTEĞE BAĞLI SEÇİM)"));
+
+            var swUsd = new PowerToggleSwitch(_cfg.ShowUsd, delegate(bool val) { _cfg.ShowUsd = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("💵 Dolar (USD / TRY)", "Amerikan Doları anlık kur fiyatı ve günlük değişim yüzdesi.", swUsd));
+
+            var swEur = new PowerToggleSwitch(_cfg.ShowEur, delegate(bool val) { _cfg.ShowEur = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("💶 Euro (EUR / TRY)", "Euro anlık kur fiyatı ve günlük değişim yüzdesi.", swEur));
+
+            var swGram = new PowerToggleSwitch(_cfg.ShowGramGold, delegate(bool val) { _cfg.ShowGramGold = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("🪙 Gram Altın (TRY)", "Kapalıçarşı anlık gram altın fiyatı.", swGram));
+
+            var swOns = new PowerToggleSwitch(_cfg.ShowOunceGold, delegate(bool val) { _cfg.ShowOunceGold = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("🥇 Ons Altın (USD)", "Uluslararası ons altın piyasa değeri.", swOns));
+
+            var swBist = new PowerToggleSwitch(_cfg.ShowBist, delegate(bool val) { _cfg.ShowBist = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("📈 BIST 100 Endeksi", "Borsa İstanbul BIST 100 puanı ve seans durumu (Açık/Kapalı).", swBist));
+
+            var swBtc = new PowerToggleSwitch(_cfg.ShowBtc, delegate(bool val) { _cfg.ShowBtc = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("₿ Bitcoin (BTC / USDT)", "Bitcoin anlık dolar fiyatı ve 24 saatlik değişim oranı.", swBtc));
+
+            var swEth = new PowerToggleSwitch(_cfg.ShowEth, delegate(bool val) { _cfg.ShowEth = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("🔷 Ethereum (ETH / USDT)", "Ethereum anlık dolar fiyatı ve 24 saatlik değişim oranı.", swEth));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("ÖZEL PARİTE EKLEME"));
+
+            var customGrid = new Grid();
+            customGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
+            customGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var txtCustom = new System.Windows.Controls.TextBox
+            {
+                Text = _cfg.CustomParities,
+                Height = 28,
+                Background = _cardBgBrush,
+                BorderBrush = _cardBorderBrush,
+                Foreground = _textPrimaryBrush,
+                Padding = new Thickness(8, 4, 8, 4),
+                FontSize = 12
+            };
+            Grid.SetColumn(txtCustom, 0);
+            customGrid.Children.Add(txtCustom);
+
+            var btnCustom = new System.Windows.Controls.Button
+            {
+                Content = "Uygula",
+                Height = 28,
+                Padding = new Thickness(12, 0, 12, 0),
+                Margin = new Thickness(6, 0, 0, 0),
+                Background = _accentBrush,
+                Foreground = System.Windows.Media.Brushes.White,
+                FontWeight = FontWeights.Medium,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand
+            };
+            btnCustom.Click += delegate(object s, RoutedEventArgs e)
+            {
+                _cfg.CustomParities = txtCustom.Text.Trim();
+                SaveAndNotify();
+            };
+            Grid.SetColumn(btnCustom, 1);
+            customGrid.Children.Add(btnCustom);
+
+            _mainContentPanel.Children.Add(CreateSettingCard("Kısa Kod ile Özel Kripto / Döviz", "Virgülle ayırarak istediğiniz sembolleri ekleyin. (Örn: SOL, AVAX, XRP, DOGE, GBP, CHF)", customGrid));
+        }
+
+        // ==========================================
+        // SEKME 6: MAÇ TAKİPÇİSİ
+        // ==========================================
+        private void BuildMatchesTab()
+        {
+            _mainContentPanel.Children.Add(CreateHeroHeader("Futbol Maç Takipçisi", "Milli Takım ve 4 Büyüklerin maç saatleri, dinamik takım renkleri ve özel Ay-Yıldız ayraç teması."));
+
+            _mainContentPanel.Children.Add(CreateMasterHeroCard("Maç Takipçisini Göster", "⚽", _cfg.ShowMatchTracker, delegate(bool val)
+            {
+                _cfg.ShowMatchTracker = val;
+                SaveAndNotify();
+            }));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("MAÇ GÜNÜ DİNAMİK SAAT TEMASI"));
+
+            var swMatchClock = new PowerToggleSwitch(_cfg.MatchClockThemeEnabled, delegate(bool val) { _cfg.MatchClockThemeEnabled = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Maç Günü Takım Saati Renkleri", "Maç gününde saat ve dakika kulüp renklerine bürünür (GS: Sarı-Kırmızı, FB: Sarı-Lacivert, BJK: Siyah-Beyaz, TS: Bordo-Mavi, Türkiye: Kırmızı-Beyaz + Ay-Yıldız ayraç). Oynanan maç bittikten 1 saat sonra saat rengi otomatik olarak normale döner.", swMatchClock));
+
+            var swUpcoming = new PowerToggleSwitch(_cfg.ShowUpcomingMatch, delegate(bool val) { _cfg.ShowUpcomingMatch = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("En Yakın Maç Tarihi ve Geri Sayım", "Bugün maç yoksa seçili takımların en yakın maç tarihini ve kalan gün sayısını göster.", swUpcoming));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("CANLI MAÇ BAŞLANGIÇ ANİMASYONU & DÜDÜK"));
+
+            var btnTestWhistle = new System.Windows.Controls.Button
+            {
+                Content = "🔊 Seken Topu ve Düdüğü Test Et",
+                Height = 30,
+                Padding = new Thickness(14, 0, 14, 0),
+                Cursor = Cursors.Hand
+            };
+            btnTestWhistle.Click += delegate(object s, RoutedEventArgs e)
+            {
+                if (_onTestWhistleAlert != null) _onTestWhistleAlert();
+            };
+            _mainContentPanel.Children.Add(CreateSettingCard("Canlı Maç Öncesi Seken Top & Hakem Düdüğü", "Seçili takımın maç saatinden 5 dakika önce widget üzerinde takım renklerinde seken futbol topu ve geri sayım başlar (6 dakika sürer). Maç saati geldiğinde hakem başlama düdüğü çalar.", btnTestWhistle));
+
+            var btnTestFinalWhistle = new System.Windows.Controls.Button
+            {
+                Content = "🏁 Bitiş Düdüğünü Test Et (3 Düdük)",
+                Height = 30,
+                Padding = new Thickness(14, 0, 14, 0),
+                Cursor = Cursors.Hand
+            };
+            btnTestFinalWhistle.Click += delegate(object s, RoutedEventArgs e)
+            {
+                if (_onTestFinalWhistle != null) _onTestFinalWhistle();
+            };
+            _mainContentPanel.Children.Add(CreateSettingCard("Canlı Maç Bitiş Düdüğü (Son Düdük)", "Takip edilen takımın maçı bittiğinde (ESPN canlı skorundan algılandığında veya 90+ dakika tamamlandığında) hakemin klasik 3 üflemeli bitiş düdüğü (Piiip! Piiip! Piiiiip!) çalar ve maç sonucu bildirimi gösterilir.", btnTestFinalWhistle));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("CANLI SKOR & ANLIK GOL BİLDİRİMİ"));
+
+            var swLiveScore = new PowerToggleSwitch(_cfg.ShowMatchLiveScores, delegate(bool val)
+            {
+                _cfg.ShowMatchLiveScores = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Canlı Skor & Gol Bildirimleri", "Maç esnasında canlı skorları ve oynanan maç dakikasını takip eder (örn: 🔴 CANLI 74' · GS 2 - 1 FB).", swLiveScore));
+
+            var cmbGoalEffect = new System.Windows.Controls.ComboBox
+            {
+                ItemsSource = new string[] {
+                    "🥅 Ağları Havalandırma (Kaptan Tsubasa - Yeni)",
+                    "⚽ Seken Futbol Topu (Klasik)"
+                },
+                SelectedIndex = (_cfg.GoalEffectStyle == "bouncing_ball") ? 1 : 0,
+                Height = 28,
+                Width = 265
+            };
+            cmbGoalEffect.SelectionChanged += delegate(object s, SelectionChangedEventArgs e)
+            {
+                _cfg.GoalEffectStyle = (cmbGoalEffect.SelectedIndex == 1) ? "bouncing_ball" : "tsubasa_net";
+                SaveAndNotify();
+            };
+            _mainContentPanel.Children.Add(CreateSettingCard("Gol & Maç Başlangıç Animasyonu", 
+                "Gol olduğunda ve maç öncesinde bildirim kartındaki canlı animasyon stili. Kaptan Tsubasa ağları havalandırma (monitörden dışarı fırlayan 3D şok dalgalı ağ efekti) veya klasik seken top.", 
+                cmbGoalEffect));
+
+            var btnTestGoal = new System.Windows.Controls.Button
+            {
+                Content = "🔊 Stadyum GOOOL Efektini Test Et",
+                Height = 30,
+                Padding = new Thickness(14, 0, 14, 0),
+                Cursor = Cursors.Hand
+            };
+            btnTestGoal.Click += delegate
+            {
+                if (_onTestGoalAlert != null) _onTestGoalAlert();
+            };
+            _mainContentPanel.Children.Add(CreateSettingCard("Canlı Stadyum GOOOL Efekti & Kutlama", "Seçili takımınız gol attığında çalan stadyum spikeri, ağları havalandırma / seken top animasyonu ve canlı gol kutlamasını önizleyin.", btnTestGoal));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("TAKİP EDİLECEK TAKIMLAR (İSTEĞE BAĞLI SEÇİM)"));
+
+            var swTR = new PowerToggleSwitch(_cfg.TrackTurkey, delegate(bool val) { _cfg.TrackTurkey = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateTeamSettingCard("turkiye", "Türkiye (Milli Takım)", "Milli maçlar ve turnuvalar (Varsayılan olarak açıktır).", swTR));
+
+            var swGS = new PowerToggleSwitch(_cfg.TrackGalatasaray, delegate(bool val) { _cfg.TrackGalatasaray = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateTeamSettingCard("galatasaray", "Galatasaray", "Galatasaray Süper Lig ve Avrupa kupası maçları.", swGS));
+
+            var swFB = new PowerToggleSwitch(_cfg.TrackFenerbahce, delegate(bool val) { _cfg.TrackFenerbahce = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateTeamSettingCard("fenerbahce", "Fenerbahçe", "Fenerbahçe Süper Lig ve Avrupa kupası maçları.", swFB));
+
+            var swBJK = new PowerToggleSwitch(_cfg.TrackBesiktas, delegate(bool val) { _cfg.TrackBesiktas = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateTeamSettingCard("besiktas", "Beşiktaş", "Beşiktaş Süper Lig ve kupa maçları.", swBJK));
+
+            var swTS = new PowerToggleSwitch(_cfg.TrackTrabzonspor, delegate(bool val) { _cfg.TrackTrabzonspor = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateTeamSettingCard("trabzonspor", "Trabzonspor", "Trabzonspor Süper Lig ve kupa maçları.", swTS));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("ZEN DİNLENME MODU - ZAFER BAYRAĞI (BALKON KONSEPTİ)"));
+
+            var swFlag = new PowerToggleSwitch(_cfg.ZenVictoryFlagEnabled, delegate(bool val)
+            {
+                _cfg.ZenVictoryFlagEnabled = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Zafer Bayrağı Modu", 
+                "Takımınız maç kazandığında ve bilgisayarınız Zen Dinlenme Modu'na geçtiğinde yukarıdan aşağıya ipek kumaş zafer bayrağının zarifçe inerek rüzgârda dalgalanmasını sağlar.", 
+                swFlag));
+
+            var cmbFlagTeam = new System.Windows.Controls.ComboBox
+            {
+                ItemsSource = new string[] {
+                    "⚡ Otomatik (Takip edilen takımlara göre)",
+                    "⭐ Galatasaray",
+                    "⭐ Fenerbahçe",
+                    "⭐ Beşiktaş",
+                    "⭐ Trabzonspor",
+                    "⭐ Türkiye (Milli Takım)"
+                },
+                SelectedIndex = GetFlagTeamIndex(_cfg.ZenVictoryTeam),
+                Height = 28,
+                Width = 265
+            };
+            cmbFlagTeam.SelectionChanged += delegate
+            {
+                switch (cmbFlagTeam.SelectedIndex)
+                {
+                    case 1: _cfg.ZenVictoryTeam = "galatasaray"; break;
+                    case 2: _cfg.ZenVictoryTeam = "fenerbahce"; break;
+                    case 3: _cfg.ZenVictoryTeam = "besiktas"; break;
+                    case 4: _cfg.ZenVictoryTeam = "trabzonspor"; break;
+                    case 5: _cfg.ZenVictoryTeam = "turkiye"; break;
+                    default: _cfg.ZenVictoryTeam = "auto"; break;
+                }
+                SaveAndNotify();
+            };
+            _mainContentPanel.Children.Add(CreateSettingCard("Bayrak Takımı", "Zen Dinlenme Modunda gösterilecek takım bayrağı.", cmbFlagTeam));
+
+            var cmbFlagSide = new System.Windows.Controls.ComboBox
+            {
+                ItemsSource = new string[] {
+                    "📌 Sağ Üstten Aşağı İnen Flama (Önerilen)",
+                    "📌 Sol Üstten Aşağı İnen Flama"
+                },
+                SelectedIndex = string.Equals(_cfg.FlagSide, "left", StringComparison.OrdinalIgnoreCase) ? 1 : 0,
+                Height = 28,
+                Width = 265
+            };
+            cmbFlagSide.SelectionChanged += delegate
+            {
+                _cfg.FlagSide = cmbFlagSide.SelectedIndex == 1 ? "left" : "right";
+                _cfg.FlagX = -1;
+                _cfg.FlagY = -1;
+                SaveAndNotify();
+            };
+            _mainContentPanel.Children.Add(CreateSettingCard("Bayrak Asılma Yeri", "Büyük dikey saten bayrağın ekranın sağ üstünden mi yoksa sol üstünden mi aşağıya ineceğini belirleyin.", cmbFlagSide));
+
+            var btnTestFlag = new System.Windows.Controls.Button
+            {
+                Content = "🚩 Zafer Bayrağını Canlı Test Et (Demo)",
+                Height = 32,
+                Padding = new Thickness(14, 0, 14, 0),
+                Cursor = Cursors.Hand,
+                FontWeight = FontWeights.SemiBold
+            };
+            btnTestFlag.Click += delegate
+            {
+                if (_onTestVictoryFlag != null) _onTestVictoryFlag(_cfg.ZenVictoryTeam);
+            };
+            _mainContentPanel.Children.Add(CreateSettingCard("Canlı Zafer Bayrağı Demosu", 
+                "Zen Dinlenme Modu'nu anında devreye sokarak seçili takımınızın dikey bayrağının yukarıdan aşağıya salınımını ve dalgalanmasını canlı olarak deneyimleyin. (Çıkmak için fareyi hareket ettirmeniz yeterlidir).", 
+                btnTestFlag));
+        }
+
+        private int GetFlagTeamIndex(string team)
+        {
+            switch ((team ?? "").ToLowerInvariant())
+            {
+                case "galatasaray": return 1;
+                case "fenerbahce": return 2;
+                case "besiktas": return 3;
+                case "trabzonspor": return 4;
+                case "turkiye": return 5;
+                default: return 0; // auto
+            }
+        }
+
+        // ==========================================
+        // SEKME 7: AKILLI ÖZELLİKLER
+        // ==========================================
+        private void BuildSystemTab()
+        {
+            _mainContentPanel.Children.Add(CreateHeroHeader("Akıllı Özellikler ve Donanım", "Canlı CPU/RAM izleme ve akıllı oyun modu."));
+
+            _mainContentPanel.Children.Add(CreateMasterHeroCard("Canlı Donanım Monitörü (CPU & RAM)", "⚡", _cfg.ShowSystemMonitor, delegate(bool val)
+            {
+                _cfg.ShowSystemMonitor = val;
+                SaveAndNotify();
+            }));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("GELİŞMİŞ AKILLI MODLAR"));
+
+            var swGame = new PowerToggleSwitch(_cfg.GameModeEnabled, delegate(bool val) { _cfg.GameModeEnabled = val; SaveAndNotify(); }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Oyun Modu (Otomatik Askıya Alma)", "Tam ekran oyun veya uygulama açıkken CPU ve arka plan sorgulamalarını otomatik duraklatır.", swGame));
+
+            // Akıllı RAM ve Bellek Optimizasyonu
+            var ramStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var btnTrimRam = new System.Windows.Controls.Button
+            {
+                Content = "⚡ RAM'i Şimdi Optimize Et",
+                Height = 30,
+                Padding = new Thickness(14, 0, 14, 0),
+                Background = _accentBrush,
+                Foreground = System.Windows.Media.Brushes.White,
+                FontWeight = FontWeights.SemiBold,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand
+            };
+            var lblRamStatus = new TextBlock
+            {
+                Text = "",
+                Foreground = _accentBrush,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 0, 0)
+            };
+            btnTrimRam.Click += delegate
+            {
+                MemoryOptimizer.TrimWorkingSet(true);
+                long ramMb = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
+                lblRamStatus.Text = string.Format("✓ Optimize edildi! ({0} MB)", ramMb);
+            };
+            ramStack.Children.Add(btnTrimRam);
+            ramStack.Children.Add(lblRamStatus);
+            _mainContentPanel.Children.Add(CreateSettingCard("Akıllı RAM Optimizasyonu", "5K/8K duvar kağıtlarını ekran çözünürlüğüne optimize eder ve boşta kalan belleği otomatik olarak Windows'a iade eder.", ramStack));
+        }
+
+        // ==========================================
+        // SEKME 8: HAKKINDA & GELİŞTİRİCİ (SERKAN ŞENTÜRK)
+        // ==========================================
+        private void BuildAboutTab()
+        {
+            _mainContentPanel.Children.Add(CreateHeroHeader("Hakkında & Geliştirici", "Modern Desktop Zen uygulama künyesi, mimari ve lisans detayları."));
+
+            // 1. ÖZEL GELİŞTİRİCİ HERO KARTI
+            var devCard = new Border
+            {
+                Background = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(30, 36, 48))
+                                     : new SolidColorBrush(System.Windows.Media.Color.FromRgb(240, 246, 255)),
+                BorderBrush = _accentBrush,
+                BorderThickness = new Thickness(1.5),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(22),
+                Margin = new Thickness(0, 0, 0, 16)
+            };
+            var devStack = new StackPanel();
+
+            var badgeRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+            var badgeBorder = new Border
+            {
+                Background = _accentBrush,
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(8, 3, 8, 3)
+            };
+            badgeBorder.Child = new TextBlock
+            {
+                Text = "DEVELOPER",
+                FontSize = 10,
+                FontWeight = FontWeights.Bold,
+                Foreground = System.Windows.Media.Brushes.White
+            };
+            badgeRow.Children.Add(badgeBorder);
+            devStack.Children.Add(badgeRow);
+
+            var nameTxt = new TextBlock
+            {
+                Text = "Serkan ŞENTÜRK",
+                FontSize = 24,
+                FontWeight = FontWeights.Bold,
+                Foreground = _textPrimaryBrush,
+                Margin = new Thickness(0, 0, 0, 14)
+            };
+            devStack.Children.Add(nameTxt);
+
+            var specBorder = new Border
+            {
+                Background = _isDark ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 255, 255, 255))
+                                     : new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255)),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(14, 10, 14, 10)
+            };
+            var specGrid = new Grid();
+            specGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+            specGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            specGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            specGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            specGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            specGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            // Satır 0: Developer
+            var l1 = new TextBlock { Text = "Developer:", FontWeight = FontWeights.SemiBold, Foreground = _textSecondaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
+            var v1 = new TextBlock { Text = "Serkan ŞENTÜRK", FontWeight = FontWeights.Bold, Foreground = _accentBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
+            Grid.SetRow(l1, 0); Grid.SetColumn(l1, 0);
+            Grid.SetRow(v1, 0); Grid.SetColumn(v1, 1);
+            specGrid.Children.Add(l1); specGrid.Children.Add(v1);
+
+            // Satır 1: Sürüm
+            var l2 = new TextBlock { Text = "Uygulama Sürümü:", FontWeight = FontWeights.SemiBold, Foreground = _textSecondaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
+            var v2 = new TextBlock { Text = "v2.5 (Modern Zen Edition)", Foreground = _textPrimaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
+            Grid.SetRow(l2, 1); Grid.SetColumn(l2, 0);
+            Grid.SetRow(v2, 1); Grid.SetColumn(v2, 1);
+            specGrid.Children.Add(l2); specGrid.Children.Add(v2);
+
+            // Satır 2: Teknoloji
+            var l3 = new TextBlock { Text = "Teknoloji Altyapısı:", FontWeight = FontWeights.SemiBold, Foreground = _textSecondaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
+            var v3 = new TextBlock { Text = "C# WPF, Win32 Native Core, DirectX Rendering", Foreground = _textPrimaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
+            Grid.SetRow(l3, 2); Grid.SetColumn(l3, 0);
+            Grid.SetRow(v3, 2); Grid.SetColumn(v3, 1);
+            specGrid.Children.Add(l3); specGrid.Children.Add(v3);
+
+            // Satır 3: Telif Hakkı
+            var l4 = new TextBlock { Text = "Telif Hakkı:", FontWeight = FontWeights.SemiBold, Foreground = _textSecondaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
+            var v4 = new TextBlock { Text = "© 2026 Serkan ŞENTÜRK. Tüm Hakları Saklıdır.", Foreground = _textPrimaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
+            Grid.SetRow(l4, 3); Grid.SetColumn(l4, 0);
+            Grid.SetRow(v4, 3); Grid.SetColumn(v4, 1);
+            specGrid.Children.Add(l4); specGrid.Children.Add(v4);
+
+            specBorder.Child = specGrid;
+            devStack.Children.Add(specBorder);
+            devCard.Child = devStack;
+            _mainContentPanel.Children.Add(devCard);
+
+            // 2. Kısayollar ve İpuçları
+            _mainContentPanel.Children.Add(CreateSectionTitle("KISAYOLLAR VE KULLANIM İPUÇLARI"));
+            _mainContentPanel.Children.Add(CreateSettingCard("Win + Ctrl + D", "Masaüstü ikonlarını anında gizler veya geri getirir.", null));
+            _mainContentPanel.Children.Add(CreateSettingCard("Masaüstüne Çift Tık", "Masaüstü ikonlarını manuel olarak açıp kapatır.", null));
+            _mainContentPanel.Children.Add(CreateSettingCard("Donanım Çubuğuna Tık", "Windows Görev Yöneticisi'ni doğrudan açar.", null));
+            _mainContentPanel.Children.Add(CreateSettingCard("Finans Değerlerine Tık", "Piyasa ve kripto verilerini beklemeden anında yeniler.", null));
+        }
+
+        // ==========================================
+        // DİNAMİK ARAMA MANTIĞI
+        // ==========================================
+        private void OnSearchChanged()
+        {
+            string q = (_txtSearch != null) ? _txtSearch.Text.Trim().ToLowerInvariant() : "";
+            if (string.IsNullOrEmpty(q))
+            {
+                SwitchTab(_activeTabKey);
+                return;
+            }
+
+            _mainContentPanel.Children.Clear();
+
+            var searchHeader = new TextBlock
+            {
+                Text = "Arama Sonuçları: \"" + _txtSearch.Text.Trim() + "\"",
+                FontSize = 22,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = _textPrimaryBrush,
+                Margin = new Thickness(0, 0, 0, 16)
+            };
+            _mainContentPanel.Children.Add(searchHeader);
+
+            int matchCount = 0;
+
+            // Serkan Şentürk & Hakkında eşleşmesi
+            if (q.Contains("serkan") || q.Contains("şentürk") || q.Contains("senturk") || q.Contains("geliştirici") || q.Contains("developer") || q.Contains("mimar") || q.Contains("hakkında"))
+            {
+                var devBtn = new System.Windows.Controls.Button { Content = "Bölüme Git", Height = 28, Padding = new Thickness(12, 0, 12, 0), Cursor = Cursors.Hand };
+                devBtn.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("about"); };
+                _mainContentPanel.Children.Add(CreateSettingCard("ℹ️ Hakkında & Geliştirici (Serkan ŞENTÜRK)", "Desktop Zen künyesi, yazılım mimarisi ve lisans detayları.", devBtn));
+                matchCount++;
+            }
+
+            // İkon Otomatik Gizleme eşleşmeleri
+            if (q.Contains("ikon") || q.Contains("gizle") || q.Contains("otomatik") || q.Contains("zaman") || q.Contains("fare") || q.Contains("tık"))
+            {
+                var btn = new System.Windows.Controls.Button { Content = "Bölüme Git", Height = 28, Padding = new Thickness(12, 0, 12, 0), Cursor = Cursors.Hand };
+                btn.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("autohide"); };
+                _mainContentPanel.Children.Add(CreateSettingCard("👁️ İkon Otomatik Gizleme", "Hareketsizlik süresi ve fare/tıklama tetikleyicileri.", btn));
+                matchCount++;
+            }
+
+            // Duvar Kağıdı ve Canlı Atmosferik Efektler eşleşmeleri
+            if (q.Contains("duvar") || q.Contains("wallpaper") || q.Contains("arka plan") || q.Contains("resim") || q.Contains("görsel") || q.Contains("yağmur") || q.Contains("kar") || q.Contains("ateş böceği") || q.Contains("sonbahar") || q.Contains("parçacık") || q.Contains("efekt"))
+            {
+                var btn = new System.Windows.Controls.Button { Content = "Bölüme Git", Height = 28, Padding = new Thickness(12, 0, 12, 0), Cursor = Cursors.Hand };
+                btn.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("wallpaper"); };
+                _mainContentPanel.Children.Add(CreateSettingCard("🖼️ Duvar Kâğıdı & Canlı Efektler", "Özel duvar kağıdı, günün saatine göre dinamik görseller ve canlı yağmur/kar parçacıkları.", btn));
+                matchCount++;
+            }
+
+            // Saat & Hava durumu widget eşleşmeleri
+            if (q.Contains("widget") || q.Contains("saat") || q.Contains("tarih") || q.Contains("hava") || q.Contains("şehir") || q.Contains("saydam") || q.Contains("opak") || q.Contains("şeffaf") || q.Contains("boyut") || q.Contains("ölçek") || q.Contains("scale") || q.Contains("yüzde") || q.Contains("yazı") || q.Contains("font") || q.Contains("saniye") || q.Contains("kompakt"))
+            {
+                var btn = new System.Windows.Controls.Button { Content = "Bölüme Git", Height = 28, Padding = new Thickness(12, 0, 12, 0), Cursor = Cursors.Hand };
+                btn.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("widget"); };
+                _mainContentPanel.Children.Add(CreateSettingCard("⏰ Saat & Hava Durumu Widget'ı", "Saat konumu, şehir seçimi, saydamlık (%0-%100), boyut ve arka plan sabit yazı ölçekleme.", btn));
+                matchCount++;
+            }
+
+            // Masaüstü Kartları & Dock (Vardiya, Not Kartı, Dock, Medya Çalar) eşleşmeleri
+            if (q.Contains("kart") || q.Contains("dock") || q.Contains("çekmece") || q.Contains("not") || q.Contains("sticky") || q.Contains("vardiya") || q.Contains("nöbet") || q.Contains("çizelge") || q.Contains("excel") || q.Contains("devir") || q.Contains("medya") || q.Contains("spotify") || q.Contains("müzik") || q.Contains("şarkı"))
+            {
+                var btn = new System.Windows.Controls.Button { Content = "Bölüme Git", Height = 28, Padding = new Thickness(12, 0, 12, 0), Cursor = Cursors.Hand };
+                btn.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("desktop_cards"); };
+                _mainContentPanel.Children.Add(CreateSettingCard("🗂️ Masaüstü Kartları & Dock", "Vardiya & Nöbetçi Çizelgesi, Zen Hızlı Not Kartı, Zen Dock ve Spotify Medya Mini Çalar.", btn));
+                matchCount++;
+            }
+
+            // Manevî Rehber & Tatiller (Ayet, Hadis, Söz, Namaz, Tatiller) eşleşmeleri
+            if (q.Contains("rehber") || q.Contains("dini") || q.Contains("dinî") || q.Contains("namaz") || q.Contains("vakit") || q.Contains("ezan") || q.Contains("diyanet") || q.Contains("ayet") || q.Contains("âyet") || q.Contains("hadis") || q.Contains("hadîs") || q.Contains("kuran") || q.Contains("söz") || q.Contains("özdeyiş") || q.Contains("tatil") || q.Contains("bayram"))
+            {
+                var btn = new System.Windows.Controls.Button { Content = "Bölüme Git", Height = 28, Padding = new Thickness(12, 0, 12, 0), Cursor = Cursors.Hand };
+                btn.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("guidance"); };
+                _mainContentPanel.Children.Add(CreateSettingCard("🕌 Manevî Rehber & Resmî Tatiller", "Günün Âyet-i Kerîmesi, Hadîs-i Şerîfi, Günün Sözü, Diyanet 81 il namaz vakitleri ve Türkiye resmî tatilleri.", btn));
+                matchCount++;
+            }
+
+            // Finans eşleşmeleri
+            if (q.Contains("finans") || q.Contains("dolar") || q.Contains("euro") || q.Contains("altın") || q.Contains("ons") || q.Contains("bist") || q.Contains("btc") || q.Contains("kripto") || q.Contains("parite"))
+            {
+                var btn = new System.Windows.Controls.Button { Content = "Bölüme Git", Height = 28, Padding = new Thickness(12, 0, 12, 0), Cursor = Cursors.Hand };
+                btn.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("finance"); };
+                _mainContentPanel.Children.Add(CreateSettingCard("📈 Finans ve Kripto Pariteleri", "USD, EUR, Gram/Ons Altın, BIST 100 ve özel sembol ayarları.", btn));
+                matchCount++;
+            }
+
+            // Maç eşleşmeleri
+            if (q.Contains("maç") || q.Contains("futbol") || q.Contains("takım") || q.Contains("türkiye") || q.Contains("galatasaray") || q.Contains("fenerbahçe") || q.Contains("beşiktaş") || q.Contains("trabzon") || q.Contains("gol") || q.Contains("düdük") || q.Contains("tsubasa"))
+            {
+                var btn = new System.Windows.Controls.Button { Content = "Bölüme Git", Height = 28, Padding = new Thickness(12, 0, 12, 0), Cursor = Cursors.Hand };
+                btn.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("matches"); };
+                _mainContentPanel.Children.Add(CreateSettingCard("⚽ Futbol Maç Takipçisi ve Takım Temaları", "Milli Takım ve 4 Büyüklerin maç saatleri, kulüp saati renkleri ve Ay-Yıldız ayraç.", btn));
+                matchCount++;
+            }
+
+            // Donanım eşleşmeleri
+            if (q.Contains("donanım") || q.Contains("cpu") || q.Contains("ram") || q.Contains("işlemci") || q.Contains("bellek") || q.Contains("oyun") || q.Contains("performans") || q.Contains("optimize"))
+            {
+                var btn = new System.Windows.Controls.Button { Content = "Bölüme Git", Height = 28, Padding = new Thickness(12, 0, 12, 0), Cursor = Cursors.Hand };
+                btn.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("system"); };
+                _mainContentPanel.Children.Add(CreateSettingCard("⚡ Performans & Donanım", "Canlı CPU/RAM monitörü, akıllı oyun modu ve RAM bellek optimizasyonu.", btn));
+                matchCount++;
+            }
+
+            if (matchCount == 0)
+            {
+                var noResult = new TextBlock
+                {
+                    Text = "Aradığınız kriterle eşleşen bir ayar veya modül bulunamadı. Lütfen farklı bir kelime deneyin.",
+                    FontSize = 13,
+                    Foreground = _textSecondaryBrush,
+                    Margin = new Thickness(0, 16, 0, 0)
+                };
+                _mainContentPanel.Children.Add(noResult);
+            }
+        }
+
+        private void UpdateLiveStatus()
+        {
+            if (_lblIconStatus == null) return;
+            bool visible = Win32.AreIconsVisible();
+            if (visible)
+            {
+                _lblIconStatus.Text = "👁️ İkonlar Görünür";
+                _lblIconStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(74, 222, 128));
+                if (_btnToggleNow != null) _btnToggleNow.Content = "İkonları Gizle";
+            }
+            else
+            {
+                _lblIconStatus.Text = "🙈 İkonlar Gizli";
+                _lblIconStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(251, 146, 60));
+                if (_btnToggleNow != null) _btnToggleNow.Content = "İkonları Göster";
+            }
+        }
+
+        private void SaveAndNotify()
+        {
+            _cfg.Save();
+            if (_onConfigChanged != null) _onConfigChanged();
+        }
+
+        private static ImageSource _cachedDogAvatar = null;
+        private ImageSource GetDogAvatarSource()
+        {
+            if (_cachedDogAvatar != null) return _cachedDogAvatar;
+            try
+            {
+                string dir = AppDomain.CurrentDomain.BaseDirectory;
+                string[] candidates = new string[]
+                {
+                    System.IO.Path.Combine(dir, "zen_avatar.jpg"),
+                    System.IO.Path.Combine(dir, "dog_logo.jpg"),
+                    @"C:\Users\oturu\.gemini\antigravity\brain\eb5c7dfc-6fbc-475c-bee0-05bdf03a9a85\.user_uploaded\media_1792181141341_25780a3b.jpg"
+                };
+                foreach (var p in candidates)
+                {
+                    if (File.Exists(p))
+                    {
+                        var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                        bmp.BeginInit();
+                        bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                        bmp.UriSource = new Uri(p, UriKind.Absolute);
+                        bmp.EndInit();
+                        bmp.Freeze();
+                        _cachedDogAvatar = bmp;
+                        return bmp;
+                    }
+                }
+
+                byte[] bytes = Convert.FromBase64String(DogLogoBase64);
+                using (var ms = new MemoryStream(bytes))
+                {
+                    var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                    bmp.BeginInit();
+                    bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                    bmp.StreamSource = ms;
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    _cachedDogAvatar = bmp;
+                    return bmp;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private const string DogLogoBase64 = "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAgMDAwMDBAcFBAQEBAkGBwUHCgkLCwoJCgoMDREODAwQDAoKDhQPEBESExMTCw4UFhQSFhESExL/2wBDAQMDAwQEBAgFBQgSDAoMEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhL/wAARCACgAKADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD4iaQsfmXr0461YgJVyFGBnOPT/OKxzcOTywyeeaabh1OQ9ea43R7EZWZ0+oOTocuME+fGT2/v1W8O3bWup2rRfZ87wStwF8tx/dbPGD9RWKk0kkbCWVzGeeW4yO/6/rV+3QxwJL5C3HlEKyk5BBPB4OR3FTy2TRrztyTPf/h94ZeFru6063H2EQvIjQrlAGADoVySrqM45IYc+ta3j5k8J+EoY7ISxXevXYZkePBit0HRT2yxHPXjrWV+z7qmreF/EJs9Z0//AIpy9QBjOpKqrkoSsgII5xkHI+hr6a1T4I+FviDpFnFqGoy6bcWZMccZZmjP8O3a5z2GCp9Oua4KlXlmk2d1PD88ZSitT5d+D+g6T8U9ZHh7VrmLS7x7dDbXdxJy7KGXywepOeQDu4z0roNc/Zj+IOjXmow2WkyatbWpDRXdo6ulwmM5QDksO64zXsvhb9jjS/Dt9b32vazLKmmThrOTTbZIZZVHRpHJbBAJGAD+HFesSyNoEsK6ZcXE1oyhH8xizYA4OazliWpXjsbUsuUo8s9/I+DPE3wr8U+E47c+LdJvNLS8jLQSSxZRx1PPrjt1r1hPiBH4e0jTbfWfEXhnTGS1ijEE8TPPwoGCob7x9BX0/wCKdCt/H3hy40PXQtxaXyfK0q7jHIBlJB/tA4NYXhD4N+FfAs8N1Bomn3GqxDA1K+T7Vdk4wT5jZ2Dvhenqa5sW44iKUuh3YGk8HKThrc4Hwz4N8Q+MtMF5YX6rbycBn08Qn8mORkevNesaT4bPh/RtLtLu7jB022ZWIQYZz2z/AFrpDdQKMZi9FABCg/QVk6n4fi1djJfatcxDHyxxlUUf8BxXmSwUY7anrLGyl8WiMCeOztRCEvVk+yQOB+7++7dhx0HrWUsFtAsRW9hc2ts6jEf+skfPA9h61o6j8PJ50zpetybQD+7lhBDe2c8fWue0nwN4p+0FtfW3t7VGwBay+Y83oBxwD3OOOe+KyVCafwmyr02vjHNZwW5tz9st5Psdswwqf6x2zwPYetRQ2cUBtsXls/2OB87V++7Z+VeO2etcH428R67oWtS21tawtbxNgugyVX/a64Pbk5rkbj4sarbSuBZwyhGwSr//AFqztJuyRrzJK7Z7bZaesLWe66tSLSNpHI5BY5wo45PSvLP2ndWPhz4QpZLJC0+sXgiIQ5Krnew/JRn61l2/xn1JW+fToiPaT/61eM/tEfEu48Y3uk2c0Atk02F3MYbOXkI5/JRXbg6LlWirbHFjq6hQk0zyNfNvp1igBea4lWKJQOrsQq/qRXun7RcEfhvVvA3gO0ZPI8M6RF5qIR/rZOWJ9yFz+NeYfBqNP+Fm6JdXdubq10qf7bLHgYPl/dzn/a2n8KueM/Fsnj/4s6prk6kC8upGiTOdiKNqj8gK9rESc6qSWiV/m9jwsKlGk295NL7jzBbkkgbgvHc4xXaWfws1rWfCx1/w5PZ65aW7BL2GxmD3Fnk4BeL7wUnjcAR055p3gbT4NR1uxiu9Ik1lZZVUWMTFHmG0dCBkdMmvtT4bfBDTg2na54f0nXPhfr0LFZbG4vPt1rexE4ZSGJKhlyOex5BrqxGL9notzgwmB9rrLY+PPBvw91bXtRitJtGkKs/ls0swUhgM4K7s5x3wQO45r3vwh+xfqt9c217YRPFGVMdxHqD+UIweflIBVx6EZHtX2BpdvpOjMraXpmn21yECyOsKvzjH3iMn61tL4tu8iIujJjqVxj8On5Zrgniqkt9D1KeCpQWiv6nE+A/hTL8P9A+x6q2nXPQqLeBFVgOOgAGceg5966y3g0eRlMkZhJHzbBgNxjDKePTkHqBWhfC5ubckmGSGQZHIU/lXGX9zfacjNJAGtx/HuB4/CsbXOhPzOlMcOj2iCwvGnjOQYZXzkVzFzqMfm3ESZVR0Dc4zzWHNrrLOB/AR8u48ZrOk1tJL98Y3NFyPcUnFlRktzul1KFbRJZXwiAZJOAtWbbxNp+pXc0Vn5MzIo2byVJPftXluoa4JWCkkoo4G7AFGla9aJOsdy7W8Z/5aRdQff1pSjZaDVmz03UNa+xTsyNYWcZ6GVtz578c1lXfjUfKrta3a9pEjwR/UVzWpeE9O1hQ2n6tdxyyAmNnVZEf+RFcNqNhqXh+88i8kWRW5WRAcMPoazTfUppW0PVV8SiVC8A6fejzkgVLZeJZBMstuwVSeVL8H6Z6V5fYa89vMhZiCTxzwfrVpdVNtrHkq2IrhRJGD2z2/PNaOSsZrc9nvtSi1TTGtkSCMyJgsqKxP4Y5rwPxx8LZ1kLW/kvGxPlxwDYxPchehOOwOfaun07xPNDK6QuHiLfKrc7T/AIVvWfiW016B7e5UM+P3lvIMk+49f51hOPNqdEHy6HzHfaPJprfvnwpJA3KQ2R2IxkH2r508c6r/AGn4j1CeMsVE5UH2Xgfyr9I9U8C+FvEtrM2pWh3GMh5VlbecDhs55I9+a+IfjX8JtK8CyGbTX1KeGVWeFbo/O3PUoFXA+vJyPrXXgHFT13OPMITlT02Mb4ZRvpXg7xN4g+VXWH7PC7euO34sPyrk/CLebqsjtztiJGe5NfQPxt+HujfCP9mvwbZD7SviXxC0U16rSjZnZ5kmFxxgso/CvAfBKAz3TjJbYoHsOa3nJTp1KkeuhzRhKFWnTfTX7z2L4U+O/wDhVOqx6tYWFneXO0RvPNEvnCLuqH7oYk8sRk4Ar7C8DfHHw78TtJn/ALAaa2vYQFuBLa7Yy53fKrg7S3yngV+ZvhXxFqfiDXRY26XF5JeEJBbQrk7iQAB9c9a/QH4S/CiP4UeGo01Qwy67qAWa8CNvS0OMCNT0yABkjqc84rOdGrCTVXVk4Supr3dkeixtc3EqMEKxjALJjcR9K2U1waaMWFjJOx43Syj+WMCuSGqiO63Kzqp+9tPB/Cs/WPFmFZbVeAOueT9ahU0dzmbGr+JrmWYvMkCAHlYjj9R3rnNV8XmWJo4HZWHVWbO4exri9Y8UysxDyZPpmufuNcEnO4An1NaRirmUnZHbrq4uH+/jHY1R1G9MMgdWzu9PWuXiv2YZBIB9DTbq+ZUJZiQPU1WhmpO5sTaqSCcnntms1tWKzDBwfTPasC+16OKNizgY9TxXB6l8TbHSWla/uVQBjyPmOB2A/rWbpylojo9rGKuz37w34m2y/ZmYKjndH833XHp6ZFddqCjWrSaCY5cgSQyf3T/ng18oeHvj/wCGby/SBrtrR2YBXl+Vc/72MfrX0Fofi+2vDC9tOkilPmIOccVFWjKGrQ6VeFS/K7megY3NxaXamO4iOGUHnHZhVi5ma11HTppWLOkDqB24zg/yNbWrW0WpKjQkLcqN9tN390J7giuY1W4DNprkgbt6H2rkavob26keg6lhP3rMCXKOc/dIJ5/P+dVLjXpbLX/LjchZQJIscbWPbPoSP5VUupY7F5ipCnHmH6n/APVWBql6NVg861BW7sJsjHV4+/5H+VbpmMm0z3Dwt40j1KMyNJsuYCFmB43eh+vPWuL+In7PCePvEtrrmkaxOVmvYn1O0vpWlUQ7wX8rnjIB4ORzXK6XrAi1aVkfCXURDAHjnp/M16H4I8cySW0bXD5eEhWJPUcg/qM0rOPvRKjJT0keL/t1Xer6v400O10rTNRutL0jTsLLBau6GRzlhkAjgBRXhHg2zurazuJb23mtWmk+RZlKHAGOh5HNfo1D4rhvJZLaYxpOoyrEcOtfM37Qtmlz4ye5YeSj2qRxSKAFdl+9n6Z/UURxadNUrFPB/vvbXPGv2cvCQ034hWGq6rAhudLlEtm9zK0MMb7W2yscYYLxxnn9K+6INY/tCyhlS6N6HXH2jaV80jgtz2JzXB+F/gn4f8MCOSe71K/kiAOHuTHGT/uLx+ddddXihzsAVEUKgHQAdhXXTxDxEuY4vqqw0eUs3F6LWNmzzj8q43xDrOwHDFS4zgAZq5qWo75CpOAo7GuF8V6h5fmMDyRgfStJQSJU2c54q8Vf2fC8jNwvpya5/AMeKZPEccrxgjyG+dOp2+o9R/KuE+KOq6ktvDLpszxeTcoZNozuBzgfnivYPhNbQ6pb2Oo3WnfZbu4twLh0QKHJyGVlxyff3rWjSUo8xyzrPn5TodItZfsgWUEsHIyfTtTptOu7szLFE/l52g9M8V29lpEUYAXkRc/hWqkcYiCoozWsqUOrBSl0PmzxfpeoxXRgihkkYfeA4Cj39vevLPEngCa7mlXUbqNZShaKEtgluw29cfXH0r7L1bw0mooWwqOOFOM4Pr9a8w8U/AnSNXmF1e3MsTICMhunqQOpJ9TUxnCGpdWjOpG1j4yvoxb3LwTIsKqdrZGCvrwa9m+D/ji9sPLWcyCzVdkIfOQo4GT74zitLxD8GdKtrlGsGvLhlbG+6kDmU9sDtitSz8ES6bZF5E8rYPlzjJ/CqrV4ThZI5sLhalKd2z6H8Oa3HqGjxy7s7VDDmsbVLhZN+w5MMzOm3oOa4jwFrTQE2Eu5Qq5X3HTP5muhadlu50f+Mhh+WDXk1Kavc9uFR8ph63qLt9u5xiNQD9awbK7lhzk4EhJU/XtUfirUWhLhR96X5iP4gD0/Km2N1HPaBSOG+6euDVKOhnK9yc6m9vexMuFHIJ9M9K6DQ9XNpGygnDZLY75P/16466uBGwMgAZDgn/P51Ys9QMcuc8cfkaTT6Exdmel/wDCXN5sTlz5iIDjPtgis7x1o1z8RtExoaRvqduRtjkl2CSMZzz03Kf0NcdfXjRyJIjHYR8vNdp8MNQefX40QM4b59uO2MN+lclWmovmR6NGo5LkZ7hqUfmW4ZAUDMoJ24OO/wDI1zk53xs3TPSvSfGPhq40nw7PNPGsLxj5lJzgbfWvJ5J8W7gnkniu7BQtCxxY2S5tDGu5ibhuec4zXE+Lmfc23rjAB6ZrrrqUNITnDeh71XtVgm1KNnhWVgw+9/AfX3rskr6I4UzK8BeC7u7s3Oow20tncgkBkDAv23Ht7V6RY+HYbG2SKJBCFIK8dD6E/pRba9HYQljHFFGAAxx19BjvWB4y+MGkeE7NjqcsX2mZf3NvG3zHPQn0FbQtGNkZy3ua+q6xbaNfQ20j4aYEj/dGcn9MVN4f1L+1ImmIKRLnBIxn3+lfMuqfGyCWdbm4ia6eBnVUlcgRBjnHHX610ug/HSXVUVLKLTI1XA2ENk/TJGfzrCrCduZm9KvSXu3Poh5kmysUkbk9g4rnb2QyTNHNEoA4Icc1wieNJWAlAt5Qy7vKTIYfTPStZfGttqTbbh9u9cKXOGibHQnupNcVSpodtNJs2pvD1veDzYYo45wuFkAzge3pXnfifSdWs7lxeWX+iAcOhyD7muoTWLi1ckNtVfvAtjFaR1lb6Hy7pQwPQntWMazT1NXSjJHk9i7Wd6j4GxjhW7g+ldhNNv8AKlweRtJxVXxLoCRs80SK0LnkKMbTTdIuBLbeRO2QpwCeuK251JGHs+V2OX8YWhfzHUH7pI/HnNc3pN20S+WT8ucr7V6RrGkG5gkjKnLIVRsd+1ecWts8chWUYZTyDWbk7WK5S7eIbhMMWB/vVDaOy/LMRuAwTWpHZl4vmB56GpI9GF0QE+Vh0zxWqaSM+R3Ksd18pSTlG6j+6exr1P4FaUL3XbieQHybW3cE9ssCBXnVl4Vvr+5kitoizxqWwD1A9PWvpT4V+Dn8LeHY/MYfar1RLNgcj5fu/hmuOvNPQ7sPTafMz034j6rdaj4evY5lYAKpwwxgAjivDZyfIVscEsDXr/iLWv7S068WUqfMhIAxz0/KvISDJE4YcLyDXqUU0edXaaOevhskVl70tg3lSzyKMEk/N6gVPfW+9UXpls5+lQTSqFMMOFVRlsd881pUUjmp76lTVdX8qCV8NJ5SFlA9QM18T6140ufEmt3t5qUxe4mck7j2zwB7DpX2FqU3lg42gH1r5L+K/guXQvEd1qNlAzWF/IZEMa48lm6qQOnPQ1vgnHmae5yY+M+VNbHLNrjGVo2yFJ7mtXwvdSSa5E0O7PVwvcfhXNxW7TuFjTfIT0x1ruPC2mGxj87C+Yy/PuXr7ewr0KvIonnUOaUz2TR73zoUktnSR4h8yxEFvp161vQ6os0W63G1zwdy/Mp9x6V55o8408pcWYCBx8yMA2fx7j37/WuugvrfUlWa1YxSdCjdz+P/AOuvnq8EnofR0JNo3BeSXKxvcFjJbfcIPBH+I/lWjHq8krL5zkrxkE5Fc/a3LocHt1BqWSfCkxk8dVPUfQ965bJnWnodxZal54EbsGQ8f41SvbCSymDpgK33SvQiuY0jVXjnVd2cn5SeM+1dxp2oRXsDW9yDtPTPY0pNp2SNE1JamloW3UYPKmwXQdPVa5fxT4PktLxp4R8knO7GR/8AWrc0yY6bqypz1yp6ZFdJqy/abQtCDvQZUH+IelRflY1Zo8oeGaNVRY2UKuAeufxq9aMgZWmDAqOQvrVye8sTOY5onhcnIYLw1W9O0Y6pKRb4RMHDucD86vmXLcag3I7D4f2sF7dZmtYpzgFVJAP8uTXqtrIqKPLWRGVTwpx2714lpVveaBeAuSNjgh0ORgV7hAHe0illVCJIwRuHQ4zXLJpyudkU1GxRld8fvg/AHX6VxskivLOEXAAIUZ6DNbt9q+5NiMmNo+VTk9K5yYiNGbu+Tz6V71J2PCqq6Kk6o0QyPm7fTvXONnDzyHCs2W+h6f0romIeZQOgUVzuoMLWznRusRPP95ex/wA+lFVvcxijn9Tm3kMxwuSAO4rzLxCgvGuIJOQkgVtwyAa7ueYu7KMhU4INchrsW672252vJgOQM5HbNczm09DpsnGzPFPEljHpWpC8iVUMErZUcFgMZ/SrMXim2eBZYd8O75fNiwHQ9sqeDXrl/wCDtN1i1EN/AjjBwcYI/GsGP4WaZEWKrujYY2kdMHg13xxkHD3tzzJYOpGbcNjmtH8UtYuPNCTwPwzwr8re5Q/dP5V1dlrsdwoDtHtY/LKqlcf7w7H3FXbPwlaWakW0YXA7jNEujxjooBrhryjJ+6duHhOK1Zes9RIlMV6AoIAV/ftV+ZijqV7CufkRgiJtJ2cc/pW1LKPL2ry8QG4fWua3c67kLMYLkeUSoJyBnOPauo0nUudrnBPQn1rnGQSKrAc1p2ceIgQecUWYuY7RLn7QsUhYloWGD3xXVW1wzx4J6A4Nef6bdEoA/VT09a6SLWI44ZJJWCgIcAnHOOlJ09blxmzG12NJNRkWEK23nA6+ppdJnMEy7JGUZ+ZQetYct7JNdSSv98nOK3/DNlcajdgWiCeXcNsXG5h7ZrGq+VWOqg25Hd6TbQXcELqxUo482Jh95c165pq2/kRi3xM2zO0ElQMfpXIeF9PjtrbytTt54lYgsksP+rP16/lXS+RBZIpgZ0Rydm87S3HpmuVa7HdLsedWibnZnc4I4UDrTL3iGV2bA24X61FNeTGUAgqMfe/D1qOdjNFtznFfSQWh83J2K0MxSI+Z1QYHvWD4gfzrf93gMp6f3l6kVrXLbM+h/Sue1YFkG0tkHrU11ojOm9bHMak5R3K8LvZj2znvWJeRCW6SQAZ6t710d9EssD+aSpA+8Bn8xWHfQNDbpNC4kUHBKj+lcEldnUnZAcmNdpPGePWp7WMSAqxxnofSodvmwCSAgj7w/qKmtySNynHrVK6E2mJJalS3r/Osq7xG+HFdAHymc5UVn3pkZhhflbrgUmrsadloZRgy6lunWpI4ipuHfn5NxzUZl8ycbTwGAx61qS2rLYvtDbnGNtTy6g5mdYMXgD8kyP19K6K2titum7uKo2OnsGhhPAjXLH3rbO2ONyP4BjmtkmQplZT5WCvU1m3d6818iIzCGI4x2J7mpGvTKWRR0OPaqt2DFIg6bxnNZylqbw2JZpWMyFeAeK7fwVLJa6pbTW/yvBIsmeuMHmuMtbR5ZVYH5R3Nd54a8u1w0nAmwu4dAOK5q7SidlBPmPdrvVFtsvKUUN93a3U+gB6VyF38R9OsLwx30fkAK3zzsq7R/s9cn2yDV6WO31zSpLaR9yTLt3xnB/z+FeB/EP4Xa21/JNZ6re27xL8m9UkSQdslhknHHboK5Kai377sjsqc6XuK7PRhqce35y2OOtXFP+jeYQBu5ANcqb3y5lUAMOOTWi9408QQP8o644r6hJqR8tKSY3UbgY9Oefas1sb+RkH8auyxIEPf61UkQCMNnHP5UTimtSIyaZmX1mFikdAWA5xjqK5S6Qy6dqNopJaHbNH7gHn8OlehqiyQbhySOa5LWLlLWdvMt4/MTgMFxlT646jmuKpT5WdEZ8yMPwxumiaOQ52NlcnnFaV3ZPZvvVd2OVA7iq+kxW9ves9owVJMZQ8EfnXWTwJcQKQM7OVrNRKclYxUtBNJ5SA4IDA+uai1vT2h09uMEcE+lXdP/wBGcRylgYj8hPcVoa3LFeWrLICdwGSDg1q6atczU3exwuj6UbmQSSD92vX3PpXRSxhIxlenSnaPG0szfKEihGFAHA+ppup3kRcgP8kQyVXq319BUpJIpu7K5vItItZJpsM8n3F7uxpZT9m0uLzMmVwXk/3jzisbTUk1vU2u7pR9ntD8oHTPYCrut3yjBlbvkDPU0FRV2MtVCspPXv8AWq2syqt0kRGCijI96NLvUmZ5mP7uIZye9UX33Eu6Tl2JORWXLeR0p2Rr6XKwxuckDsa9B8NzQ3VsYpwPlGM+hrzqzX7OoZycg9D3rr/D94u0nIXPG2sKsHsjrozSPUNHtmMEb2sp3kfMM8fhW5qPhvVPE+khLG5gAVyHjkUELjvjvn1rgNH1GWG42Byp6r6H8K77w74jihm8q+DeW/8ArNrYHTqDXC0tmd8JvdHjkSQM6xo5kkbAzkHmryqlrNtkfaB0BNZOiMYbrm2MUaIWDtICTx3rRd4Li486UoxbgAHPSvrOh8e2WmuI5FPl8/SqMt8qoYyOGPpW2NPUW2XAUEZxkcD/ABrDuYgRIxBCp/ESOaTTBMNPvNrbJOjnjPaotY0tbtMqAGx+lU7tiLRjbqGcgbcketT2N3cLZqbna5HDEGs5xui4ySZxd/ZzWE3IOM8NjrV/TfFL2o2agqCNR8r7uT+FaOqzmRCyhVHviuJkQzaj8yDy05JJ61zWszS51V34lsJ5FQF0cnhyvyn8auHWNOt0jS8nBM3CgEDP41zF5YIiwzxkFWXpkVzd9qMd7d7RIGjt/wCHrn6egppO25LlY9F1HUc2rx2ZW2j6E5AOPXNclr2t29jYJBYOZpZX/esPm4/ziqltELxPlQqG+6pbsO59q56W/aC5lWzRNwJBV+Q9Rbuac9kbo8bPYxC3ht0VF689/wCtUp9QuNaJklb5kB2gDgVStLNb3JvQUmkbIwcBj7GtGK1uEXyLC2wMfNI7jNT1KTZBaeI5LNBFMgZG4O3jNbtlq8UoXaAp9zWUmgxuwEzAtngK3GfrWrbaLHEvMiIO25xSuaK6NmDULNx/pELlgOCrVs6Zdwowa1LAZ+647VyiwweYqpcQOD2DjNallZPE2YmUjPP7ysnBo6IzPQbE+c6yRuVYHhTXUWxklQbfmcAkY+lefWGoPZEC4TcvqG613OgXVvfgMJ3j4PPB7V59SNm7no0Z3P/Z";
+
+        private static ImageSource _cachedZenIcon = null;
+        public static ImageSource GetZenAppIconSource()
+        {
+            if (_cachedZenIcon != null) return _cachedZenIcon;
+            try
+            {
+                string dir = AppDomain.CurrentDomain.BaseDirectory;
+                string[] candidates = new string[]
+                {
+                    System.IO.Path.Combine(dir, "zen_icon_transparent.png"),
+                    System.IO.Path.Combine(dir, "zen_icon.png")
+                };
+                foreach (var p in candidates)
+                {
+                    if (File.Exists(p))
+                    {
+                        var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                        bmp.BeginInit();
+                        bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                        bmp.UriSource = new Uri(p, UriKind.Absolute);
+                        bmp.EndInit();
+                        bmp.Freeze();
+                        _cachedZenIcon = bmp;
+                        return bmp;
+                    }
+                }
+
+                byte[] bytes = Convert.FromBase64String(ZenIconBase64);
+                using (var ms = new MemoryStream(bytes))
+                {
+                    var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                    bmp.BeginInit();
+                    bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                    bmp.StreamSource = ms;
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    _cachedZenIcon = bmp;
+                    return bmp;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private const string ZenIconBase64 = "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAApoSURBVGhD7Zh7bFv1FcfbTUJstIWGPOy8HDePOknzcstD2tA2QEz7Yy8qMYGmbRUgTdrQ2MY2GIUN1k1Mm4QGQzA2hLaVJnbi9ztJkzR90a5QaAOIlm6UlT6S+Po+fW0n9nc6Pyet/fNN2pAC0ravdNT+k3s/5/jc81qx4v/6L9LG0ZStZyi1uXso+VDXYPKZzoi6vTOk9ndEtb91xJJPtUeTD7QPp77cGdOt/N9+bOoayXymZ1j/Q8+wPtE1qM/a9wAb9wP2vUDPHqB73vYCXXuBznGgPaql2mP6obaYvq0tpnbzz/xIZN+ZvsM+kt5r35XDppeBnjGgezCFrqiKzkjeOuZsQ1hh1s5MRXtUx4YRoGMP0BrVYYvq4dawfgv/jg9F9ph2g30kveu6/cBGiuygjq6oxsAvDq+gLaSgNSQzswVl2MIa2nYBrSOALaYP2NyTLfw7L5vsw6lH7aMz2U37gO5YEt0xAl8a/LwDDH7O1jNTmCMtsZTcHJDv5d+9LF0fnl5jH9ZD1x8E7DszDPwCfN6BZcEHJGYtfhHrY2nYdgFNIfVPK1asWMmzLFmdMaXSPpI+SPA9c1FfLPKU400BBRa/jFqfjBpv3up8Mtb5CbQUvqXAmv0SmgMKbLuBpoDqaXNOXMEzXbLykU8duu4A0BPNgy8E3xhUUetTYAspuHVUw5YDSfzksI4HX9Pxo1d1fHO/hpuGFFj9MirdEiy+fNQLHWDwfglNfgmNPgkt46B/3TzXJasnpkVZ5Evg5xyIqGgOUrQVfGV3Es8eT2NCnEUqC0OpMzm8Iszid2+l8LlhBZUuERZvKXyTL+/AOp+M5nGgwZP4I892UXVH5Uev/8fCaUPpUudTcNuYBt+pGWRzPO7i0mZzePFEGvaIjIoBsSjyefg58yto3AlYPPG7eMYFZY9pGzeOZmDfmTaEpzyv9yl4+EgK6gyPtjSd1bPYsl/D2n6RARfCW70irN4ErJE0LAFVrHdNmnlWA2Fld0Tdz0plVC1JG4K3+hX85USGZ1mWfnlEZ05Yi+BFNJB5Elg3Alhc8b/ztCXqicqbN+03rvOUNhT5F/55eeHn9cjrOq525sHPw3tFWDwiLD4FDcEkGlxCF898QcDK7qjyCuuwHDx9sJTzW4+k+PeW6LicxY53M9g2kcLDr+v4zYSOgfcy+Le2wNddoDv3qFjrTJx3gMEzE2AdBurcQi+PfV72Qe1G+3iuYDzIO0Blsimo4LZRDfos/8oLekPM4u6Xk2gO5EslM5eIijmzBSXcfyiJ9xZx5Ewyi/UBEdXuQvgE6t0J1PtV1Hkkvc47Vc2zM3XHkk/TYGZU5+v9CiJnFv5iHSczaArIqHJTIzJuUpTflOftQQnDizzrmbdTWOVIFMO7E6hzJ2AZBmpdwvd4dkqfT3RFlGM9Y7kS+Maggq/uTi5YKp0nMwx8nf8iHXbOzG6JRXjsnLETUiaHrpAEk6sYnqw+lkPNwHSEx1/RM5hq7R7Us0YjcQ19uCfS/HuY3pKyaPLTmGAw2xh0WGpSZFUuER0hGed046g8dFjDqj6hCL7WJaDWr5EDU03h6TVFDnRGk9+gJYSHp7LZGlJwTDbO27sPaCz6F4s836ToX0qTra8l+Ucy7TyTwVqHUAzvElDjFlHrU2H2iBuLHYioj9AmxU+VNJh9cVTFjEGg3lGyLN8XyvmF4OfrPKXRhqCERLr04ZOpLFp8IkwDBfBzVhvNobo/fgfngPI8/QL8SFzvk3HPQeMovfRuhlWaS0kbHn6+TF7bn8DI2dJvgVz6wpCMa53xIvjqAQG1MaDaOfXjIgc6Qmov7bD8PF/jk/Gz13T++UyPH9XzDiwx8oVNarUjgeePG/eW28dkXN0XL4JnDgwCZsfUY8UORFQPLd/8MlLtlbH1dWMHyDGq8x8UnsrkaoeAJ98yfv4d4zJWzzkwD189EEdNDDA5hSeKHNgQVl8iB/hNihygud5I2yZ01qCM4BdLm8IOu8oh4IV3jH+Br43JWNMXL4I39887MP2LIgc6QtJz8w4UroF1Xhnfflnjn83UdzJ93oGlRp6s3pNglWbcoB9Qz/lsTMRax7wDeXiy6ihgdk3fX+TAhrD8IN1t+B2W1sDPDyuGSwrNNgRPHXap8NRhK/sFdIdEKAYl7v1kFlZ3ApVOcuACvKlfgDk0C1P/9O1FDrSH5M3s6MQt4LTDUpOiTctI9x3Kz/LMgSXAW9wJXLkjjt++YZye4fczuGpHHOYi+DjrziaXhIo+biptD+uNbWF1ho5ORXebYH4we+pt4zw9qWVhC+RHA3LgUuGvcQi4LiyxscFI9x1U8akd08XwZF4VlX1Tp81+fLrIARql24LS0Q0juZLTR71Pws07FWQM0og0eHoGJpcIk1tkv8ClwFP+HxaMf9WpVBaNHgHljmL4Kuc0TOEsKpzTnmL4ObWGlCfo3Gd0t6GPtfek8TxEGjozg7agxOo6tXsenoAp5yltNoUlvBI3hidtO6Lhiu356BfCMwciIAe+w7MzNQeErrZYip37+MGs3itiU1SGYND253VKy+KnrybRGpBQ1p9gzlCdX90nsGrTFRSx7WgS4gJpQzom0QcaR4WjFL7KrdBHLa1xiGU8+3nZ/OIonfj42Yb+Xz4g4t4DxiW1UJOpHGKnM3juWAq/f1PHn4+nMHo2A3kRcFI6C9wyKOKqudwvhK90TqEqxqL/LM9cpBZ/4pbWUXJAKZltqExSxfn1hHHlWK7u2acUpc4F+GlUUuVxiZmK3nONPHOJmn2JcCsdWv2lTcrqpfQQ8djRy+cERX4enk8bBu+Yi37vuSd5VkM1+sSm9dFkan00ZdhhG7wSux58a5/KGs5yRP3l1iERV2yfMoZ3TqHSn0KFU3h/rfPE1Tzrgmryxr9rGwc7tC4021zjTLD9lnZYo5l+MZ1OZvH4EY3m+gVy/kLqVPp0lPWdvZVnvKia/OKLdCVeaDwgM7vzI3FPWMLPD2tskzqnl/4qs7l8lQqcyuD7B1U0eQWWMoW1noev6BdQGQXKXzr7MM92aXI6P9nol0N0Jebh+TpvGhDYDlvmFGDzi7h5SMbmXTLu2q3g62MybopJsHoSWNUbZx3WqEnx8FWDQHnf5NIPu4WyvPivK9cFVR9diek0bgRfePqodSfYGljmjLNlhOZ5GolpqqTBrGS2KYGfQgWlDUXeEX+a5/lgAlZaA8pzjSOANZxmt0oj+JIFnNukiqdKY3j6YCnny53TW3mMZcvil7ZYwymBHVp9Mjv3XR74KfaxslLpVt4t7538Ev/uyyZL75kGS1Db3hDS0TBMjijLgq9yyzBFGXiqYkB+cvVf37yWf+eHIotPu7E+oPbV+zSNzn310Rzq/Cob5BaFp3neq8IczsIUyaHSLQsVLuXZst7pVv4dH4ksHr2hLqD9oMarRGo84iRdzuhuQ5cDMtpfyapjgDk8C5NbQtVA4lSVS/RUuuR7KpznTPwzPzbVRsWyGq90g7lfvLPalXjA3B//VbVbfMLsjD9uciV+aBpIbC7vT/RUOLGK/9v/Wf0HkQU1TB2Aj7kAAAAASUVORK5CYII=";
+    }
+
+    // ==========================================
+    // ANA UYGULAMA MOTORU & SİSTEM TEPSİSİ
+    // ==========================================
+    public class App : Application
+    {
+        private Config _cfg;
+        private WidgetWindow _widgetWindow;
+        private SettingsWindow _settingsWindow;
+        private WallpaperWindow _wallpaperWindow;
+        private Forms.NotifyIcon _trayIcon;
+        private Forms.MenuItem _trayMiLock;
+        private Forms.MenuItem _trayMiWeatherFx;
+        private Forms.MenuItem _trayMiPrayer;
+        private ShiftWidgetWindow _shiftWidgetWindow;
+        private Forms.MenuItem _trayMiShiftWidget;
+        private Forms.MenuItem _trayMiLockShift;
+        private Forms.MenuItem _trayMiMasterLock;
+        private Forms.MenuItem _trayMiLockInspiration;
+        private Forms.MenuItem _trayMiLockHoliday;
+        private Forms.MenuItem _trayMiLockMedia;
+        private Forms.MenuItem _trayMiLockZenNotes;
+        private Forms.MenuItem _trayMiLockZenDock;
+        private ZenNotesWindow _zenNotesWindow;
+        private Forms.MenuItem _trayMiZenNotes;
+        private Forms.MenuItem _trayMiZenNotesAlways;
+        private ZenDockWindow _zenDockWindow;
+        private Forms.MenuItem _trayMiZenDock;
+        private Forms.MenuItem _trayMiAmbientMode;
+        private DailyInspirationManager _inspirationManager;
+        private ZenVictoryFlagWindow _victoryFlagWindow;
+        private bool _isFlagDemoActive = false;
+        private string _flagDemoTeam = null;
+
+        private DispatcherTimer _inactivityTimer;
+        private DispatcherTimer _desktopClickTimer;
+        private bool _wasLButtonPressed = false;
+        private bool _wasRButtonPressed = false;
+        private int _lastLeftClickTime = 0;
+        private Win32.POINT _lastLeftClickPt;
+        private DispatcherTimer _singleClickTimer;
+        private bool _wasIconsHiddenByAuto = false;
+        private bool _isAmbientActive = false;
+        private int _taskbarCheckCounter = 0;
+        private int _flagCheckCounter = 0;
+        private bool _userDismissedFlag = false;
+
+        private const int HOTKEY_ID = 9001;
+        private HwndSource _hotkeySource;
+        private static EventWaitHandle _showSettingsEvent;
+        private static EventWaitHandle _showFlagDemoEvent;
+        private static uint s_showSettingsMsg = 0;
+        private static uint s_showFlagDemoMsg = 0;
+
+        [STAThread]
+        public static void Main(string[] args)
+        {
+            try
+            {
+                Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory;
+
+                s_showSettingsMsg = Win32.RegisterWindowMessage("DesktopZen_ShowSettingsMessage");
+                s_showFlagDemoMsg = Win32.RegisterWindowMessage("DesktopZen_ShowFlagDemoMessage");
+
+                bool isFlagDemoRequested = (args != null && args.Length > 0 &&
+                    (args[0] == "--demo-flag" || args[0] == "-demo-flag" || args[0] == "--flag" || args[0] == "/flag"));
+
+                bool createdNew;
+                using (var mutex = new Mutex(true, "DesktopZen_SingleInstanceMutex", out createdNew))
+                {
+                    if (!createdNew)
+                    {
+                        // Uygulama zaten çalışıyor
+                        try
+                        {
+                            if (isFlagDemoRequested)
+                            {
+                                if (s_showFlagDemoMsg != 0)
+                                {
+                                    Win32.PostMessage((IntPtr)Win32.HWND_BROADCAST, s_showFlagDemoMsg, IntPtr.Zero, IntPtr.Zero);
+                                }
+                                var flagEvt = EventWaitHandle.OpenExisting("DesktopZen_ShowFlagDemoEvent");
+                                flagEvt.Set();
+                            }
+                            else
+                            {
+                                if (s_showSettingsMsg != 0)
+                                {
+                                    Win32.PostMessage((IntPtr)Win32.HWND_BROADCAST, s_showSettingsMsg, IntPtr.Zero, IntPtr.Zero);
+                                }
+                                var openEvt = EventWaitHandle.OpenExisting("DesktopZen_ShowSettingsEvent");
+                                openEvt.Set();
+                            }
+                        }
+                        catch { }
+                        return;
+                    }
+
+                    _showSettingsEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "DesktopZen_ShowSettingsEvent");
+                    _showFlagDemoEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "DesktopZen_ShowFlagDemoEvent");
+
+                    var app = new App();
+                    app.DispatcherUnhandledException += delegate(object s, DispatcherUnhandledExceptionEventArgs a)
+                    {
+                        try { File.WriteAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "error.log"), a.Exception.ToString()); } catch { }
+                        a.Handled = true;
+                    };
+                    AppDomain.CurrentDomain.UnhandledException += delegate(object s, UnhandledExceptionEventArgs a)
+                    {
+                        try { File.WriteAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "error.log"), a.ExceptionObject.ToString()); } catch { }
+                    };
+                    app.Run();
+                }
+            }
+            catch (Exception ex)
+            {
+                try { File.WriteAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "error.log"), ex.ToString()); } catch { }
+            }
+        }
+
+        public static void SetStartup(bool enable)
+        {
+            try
+            {
+                using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
+                {
+                    if (key != null)
+                    {
+                        // Eski kalıntı anahtarları temizle
+                        try { key.DeleteValue("ModernAutoHideDesktopIcons", false); } catch { }
+
+                        string exePath = "";
+                        try { exePath = Process.GetCurrentProcess().MainModule.FileName; } catch { }
+                        if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath))
+                        {
+                            exePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Desktop Zen.exe");
+                        }
+                        if (!File.Exists(exePath))
+                        {
+                            exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                        }
+
+                        if (enable && File.Exists(exePath))
+                        {
+                            key.SetValue("DesktopZen", "\"" + exePath + "\" --autostart");
+                        }
+                        else
+                        {
+                            try { key.DeleteValue("DesktopZen", false); } catch { }
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        protected override void OnStartup(StartupEventArgs e)
+        {
+            base.OnStartup(e);
+
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _cfg = Config.Load();
+
+            // Windows başlangıç ayarını kontrol et ve doğrula
+            if (_cfg != null)
+            {
+                SetStartup(_cfg.StartWithWindows);
+            }
+
+            SetupTrayIcon();
+
+            _wallpaperWindow = new WallpaperWindow(_cfg, delegate
+            {
+                SetIconsAndWallpaperVisibility(true, false);
+            }, ToggleIcons);
+
+            _widgetWindow = new WidgetWindow(_cfg, delegate { OpenSettings(); }, ToggleIcons);
+            _widgetWindow.OnOpenSettingsTab = (tab) => OpenSettings(tab);
+            _widgetWindow.IsWallpaperActiveFunc = () => _wallpaperWindow != null && _wallpaperWindow.IsShowing;
+            _widgetWindow.OnWeatherUpdated = (cond) =>
+            {
+                if (_wallpaperWindow != null) _wallpaperWindow.UpdateWeatherCondition(cond);
+            };
+            _widgetWindow.OnVictoryMatchFinished = delegate(string team, string score)
+            {
+                _userDismissedFlag = false;
+                // KULLANICI KURALI: "maç bittiginde seçili takım kazandıgında yukarıdan aşağıya bayrak insin"
+                if (_victoryFlagWindow != null)
+                {
+                    _victoryFlagWindow.ShowFlag(team, score);
+                }
+            };
+            _wallpaperWindow.GetWidgetHwndFunc = () =>
+            {
+                if (_widgetWindow != null && _widgetWindow.IsVisible)
+                {
+                    return new WindowInteropHelper(_widgetWindow).Handle;
+                }
+                return IntPtr.Zero;
+            };
+
+            _inspirationManager = new DailyInspirationManager(_cfg);
+            _widgetWindow.GetInspirationHandlesFunc = () =>
+            {
+                return _inspirationManager != null ? _inspirationManager.GetWindowHandles() : new List<IntPtr>();
+            };
+            _wallpaperWindow.GetInspirationHandlesFunc = () =>
+            {
+                return _inspirationManager != null ? _inspirationManager.GetWindowHandles() : new List<IntPtr>();
+            };
+            _widgetWindow.OnPositionChanged = delegate
+            {
+                if (_inspirationManager != null)
+                {
+                    _inspirationManager.UpdatePosition(_widgetWindow);
+                }
+            };
+
+            _shiftWidgetWindow = new ShiftWidgetWindow(_cfg);
+            _shiftWidgetWindow.OnLockChanged = delegate { OnConfigChanged(); };
+            _zenNotesWindow = new ZenNotesWindow(_cfg);
+            _zenNotesWindow.OnVisibilityModeChanged = delegate { OnConfigChanged(); };
+            _zenNotesWindow.OnOpenSettings = delegate { OpenSettings("widgets"); };
+            _zenDockWindow = new ZenDockWindow(_cfg, delegate { OpenSettings(); });
+            bool iconsVisible = Win32.AreIconsVisible();
+            UpdateWidgetsVisibility(iconsVisible);
+            UpdateTaskbarVisibility(iconsVisible);
+            try { AppDomain.CurrentDomain.ProcessExit += delegate { Win32.SetTaskbarVisibility(true); }; } catch { }
+
+            if (!Win32.AreIconsVisible())
+            {
+                if (_cfg.ShowWallpaperOnHide && _wallpaperWindow != null)
+                {
+                    _wallpaperWindow.ShowWallpaper();
+                }
+                if (_widgetWindow != null && _widgetWindow.IsVisible)
+                {
+                    _widgetWindow.ApplyZOrder();
+                }
+                if (_shiftWidgetWindow != null && _shiftWidgetWindow.IsVisible)
+                {
+                    _shiftWidgetWindow.ApplyZOrder();
+                }
+                if (_zenNotesWindow != null && _zenNotesWindow.IsVisible)
+                {
+                    _zenNotesWindow.ApplyZOrder();
+                }
+                if (_zenDockWindow != null && _zenDockWindow.IsVisible)
+                {
+                    _zenDockWindow.ApplyZOrder();
+                }
+                if (_inspirationManager != null)
+                {
+                    _inspirationManager.ShowInspirations(_widgetWindow);
+                }
+            }
+
+            _victoryFlagWindow = new ZenVictoryFlagWindow(_cfg);
+            _victoryFlagWindow.OnCloseRequested = delegate
+            {
+                _userDismissedFlag = true;
+                if (_isAmbientActive) ExitAmbientMode();
+            };
+
+            _settingsWindow = new SettingsWindow(_cfg, OnConfigChanged, ToggleIcons,
+                delegate { if (_widgetWindow != null) _widgetWindow.TriggerTestAlert(); },
+                delegate { if (_widgetWindow != null) _widgetWindow.TriggerTestGoal(); },
+                delegate(string effect) { if (_wallpaperWindow != null) _wallpaperWindow.TestWeatherEffect(effect); },
+                delegate { EnterAmbientMode(); },
+                delegate(string team) { TriggerVictoryFlagDemo(team); },
+                delegate { if (_widgetWindow != null) _widgetWindow.TriggerTestFinalWhistle(); });
+
+            // İkinci bir çalıştırma sinyali (veya RegisterWindowMessage) gelirse ayarlar penceresini öne getir
+            if (s_showSettingsMsg != 0)
+            {
+                ComponentDispatcher.ThreadFilterMessage += delegate(ref System.Windows.Interop.MSG m, ref bool handled)
+                {
+                    if (m.message == (int)s_showSettingsMsg)
+                    {
+                        OpenSettings();
+                        handled = true;
+                    }
+                };
+            }
+
+            if (s_showFlagDemoMsg != 0)
+            {
+                ComponentDispatcher.ThreadFilterMessage += delegate(ref System.Windows.Interop.MSG m, ref bool handled)
+                {
+                    if (m.message == (int)s_showFlagDemoMsg)
+                    {
+                        TriggerVictoryFlagDemo();
+                        handled = true;
+                    }
+                };
+            }
+
+            // Windows başlangıcında otomatik başlatılmışsa sessiz başla;
+            // Kullanıcı programı kendi elle doğrudan çift tıklayarak açmışsa ayarlar penceresini göster
+            bool isAutoStart = (e.Args != null && e.Args.Length > 0 && 
+                (e.Args[0] == "--autostart" || e.Args[0] == "-autostart" || e.Args[0] == "/autostart" || e.Args[0] == "--silent"));
+
+            bool isFlagDemoDirect = (e.Args != null && e.Args.Length > 0 &&
+                (e.Args[0] == "--demo-flag" || e.Args[0] == "-demo-flag" || e.Args[0] == "--flag" || e.Args[0] == "/flag"));
+
+            if (!isAutoStart && !isFlagDemoDirect)
+            {
+                OpenSettings();
+            }
+
+            if (isFlagDemoDirect)
+            {
+                string targetTeam = (e.Args.Length > 1) ? e.Args[1] : null;
+                var dtDemo = new DispatcherTimer();
+                dtDemo.Interval = TimeSpan.FromMilliseconds(400);
+                dtDemo.Tick += delegate
+                {
+                    dtDemo.Stop();
+                    TriggerVictoryFlagDemo(targetTeam);
+                };
+                dtDemo.Start();
+            }
+
+            // Arka planda ikinci bir çalıştırma sinyali gelirse ayarlar penceresini veya bayrak demosunu tetikle
+            var signalTimer = new DispatcherTimer();
+            signalTimer.Interval = TimeSpan.FromMilliseconds(200);
+            signalTimer.Tick += delegate(object s, EventArgs ev)
+            {
+                try
+                {
+                    if (_showSettingsEvent != null && _showSettingsEvent.WaitOne(0))
+                    {
+                        OpenSettings();
+                    }
+                    if (_showFlagDemoEvent != null && _showFlagDemoEvent.WaitOne(0))
+                    {
+                        TriggerVictoryFlagDemo();
+                    }
+                }
+                catch { }
+            };
+            signalTimer.Start();
+
+            _inactivityTimer = new DispatcherTimer();
+            _inactivityTimer.Interval = TimeSpan.FromMilliseconds(250);
+            _inactivityTimer.Tick += InactivityCheck;
+            _inactivityTimer.Start();
+
+            // Başlangıç yüklemeleri (XAML, fontlar, başlangıç HTTP verileri vb.) tamamlandıktan sonra
+            // boşta kalan bellek sayfalarını Windows'a iade eden akıllı temizleyici
+            var startTrimTimer = new DispatcherTimer();
+            startTrimTimer.Interval = TimeSpan.FromSeconds(5);
+            startTrimTimer.Tick += delegate(object s, EventArgs ev)
+            {
+                startTrimTimer.Stop();
+                MemoryOptimizer.TrimWorkingSet(true);
+            };
+            startTrimTimer.Start();
+
+            _desktopClickTimer = new DispatcherTimer();
+            _desktopClickTimer.Interval = TimeSpan.FromMilliseconds(40);
+            _desktopClickTimer.Tick += DesktopClickCheck;
+            _desktopClickTimer.Start();
+
+            RegisterGlobalHotkey();
+
+            try
+            {
+                Microsoft.Win32.SystemEvents.DisplaySettingsChanged += delegate
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (_wallpaperWindow != null && _wallpaperWindow.IsShowing)
+                        {
+                            _wallpaperWindow.ShowWallpaper();
+                        }
+                        Win32.EnsureTaskbarVisible();
+                    }));
+                };
+            }
+            catch { }
+        }
+
+        private void SetupTrayIcon()
+        {
+            _trayIcon = new Forms.NotifyIcon();
+            _trayIcon.Text = "Desktop Zen (Serkan ŞENTÜRK)";
+
+            try
+            {
+                string icoPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "zen_icon.ico");
+                if (File.Exists(icoPath))
+                {
+                    _trayIcon.Icon = new System.Drawing.Icon(icoPath, 32, 32);
+                }
+            }
+            catch { }
+
+            if (_trayIcon.Icon == null)
+            {
+                var bmp = new Bitmap(32, 32);
+                using (var g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                    g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                    g.Clear(System.Drawing.Color.Transparent);
+                    using (var brush = new System.Drawing.Drawing2D.LinearGradientBrush(new System.Drawing.PointF(1, 1), new System.Drawing.PointF(30, 30), System.Drawing.Color.FromArgb(56, 189, 248), System.Drawing.Color.FromArgb(14, 165, 233)))
+                    {
+                        g.FillEllipse(brush, 1, 1, 30, 30);
+                    }
+                    using (var pen = new System.Drawing.Pen(System.Drawing.Color.White, 3.8f))
+                    {
+                        g.DrawEllipse(pen, 7.5f, 7.5f, 17f, 17f);
+                    }
+                }
+                _trayIcon.Icon = System.Drawing.Icon.FromHandle(bmp.GetHicon());
+            }
+            _trayIcon.Text = "Desktop Zen\n(Ayarları açmak için tıklayın)";
+            _trayIcon.Visible = true;
+
+            var menu = new Forms.ContextMenu();
+
+            var miSettings = new Forms.MenuItem("⚙️ Ayarlar Paneli", delegate(object s, EventArgs e) { OpenSettings(); });
+            miSettings.DefaultItem = true;
+            menu.MenuItems.Add(miSettings);
+
+            var miToggle = new Forms.MenuItem("👁️ İkonları Göster / Gizle", delegate(object s, EventArgs e) { ToggleIcons(); });
+            menu.MenuItems.Add(miToggle);
+
+            var miAuto = new Forms.MenuItem("⏱️ Otomatik Gizleme", delegate(object s, EventArgs e)
+            {
+                _cfg.AutoHideEnabled = !_cfg.AutoHideEnabled;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miAuto.Checked = _cfg.AutoHideEnabled;
+            menu.MenuItems.Add(miAuto);
+
+            var miWidget = new Forms.MenuItem("🪟 Masaüstü Widget'ı", delegate(object s, EventArgs e)
+            {
+                _cfg.ShowWidget = !_cfg.ShowWidget;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miWidget.Checked = _cfg.ShowWidget;
+            menu.MenuItems.Add(miWidget);
+
+            var miWeatherFx = new Forms.MenuItem("🌧️ Ekrandaki Hava Durumu Efekti", delegate(object s, EventArgs e)
+            {
+                _cfg.ShowWeatherWallpaperEffects = !_cfg.ShowWeatherWallpaperEffects;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miWeatherFx.Checked = _cfg.ShowWeatherWallpaperEffects;
+            _trayMiWeatherFx = miWeatherFx;
+            menu.MenuItems.Add(miWeatherFx);
+
+            var miPrayer = new Forms.MenuItem("🕌 Namaz Vakitleri Paneli", delegate(object s, EventArgs e)
+            {
+                _cfg.ShowPrayerTimes = !_cfg.ShowPrayerTimes;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miPrayer.Checked = _cfg.ShowPrayerTimes;
+            _trayMiPrayer = miPrayer;
+            menu.MenuItems.Add(miPrayer);
+
+            var miAmbient = new Forms.MenuItem("🌙 Zen Dinlenme Modunu Başlat (Ambient)", delegate(object s, EventArgs e)
+            {
+                EnterAmbientMode();
+            });
+            menu.MenuItems.Add(miAmbient);
+
+            var miAutoAmb = new Forms.MenuItem("⏱️ Otomatik Dinlenme Modu (Ambient)", delegate(object s, EventArgs e)
+            {
+                _cfg.ZenAmbientModeEnabled = !_cfg.ZenAmbientModeEnabled;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miAutoAmb.Checked = _cfg.ZenAmbientModeEnabled;
+            _trayMiAmbientMode = miAutoAmb;
+            menu.MenuItems.Add(miAutoAmb);
+
+            var miFlagDemo = new Forms.MenuItem("🚩 Zafer Bayrağı Demosu (Canlı Dalgalanma)", delegate(object s, EventArgs e)
+            {
+                TriggerVictoryFlagDemo();
+            });
+            menu.MenuItems.Add(miFlagDemo);
+
+            menu.MenuItems.Add(new Forms.MenuItem("-"));
+
+            // MASTER KİLİT & KONUM YÖNETİMİ
+            var miLocksMenu = new Forms.MenuItem("📍 Widget Konum & Kilit Yönetimi");
+
+            var miMasterLock = new Forms.MenuItem("🔓 / 🔒 Tüm Widget'ları Kilitle / Serbest Bırak", delegate(object s, EventArgs e)
+            {
+                bool anyUnlocked = !_cfg.LockWidgetPosition || !_cfg.LockShiftWidgetPosition || !_cfg.LockInspirationPosition || !_cfg.LockHolidayPosition || !_cfg.LockMediaPosition || !_cfg.LockZenNotesPosition || !_cfg.LockDockPosition;
+                bool targetLock = anyUnlocked; // Eğer herhangi biri açıksa hepsini kilitle, hepsi kilitliyse hepsini serbest bırak
+                _cfg.LockWidgetPosition = targetLock;
+                _cfg.LockShiftWidgetPosition = targetLock;
+                _cfg.LockInspirationPosition = targetLock;
+                _cfg.LockHolidayPosition = targetLock;
+                _cfg.LockMediaPosition = targetLock;
+                _cfg.LockZenNotesPosition = targetLock;
+                _cfg.LockDockPosition = targetLock;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            _trayMiMasterLock = miMasterLock;
+            miLocksMenu.MenuItems.Add(miMasterLock);
+            miLocksMenu.MenuItems.Add(new Forms.MenuItem("-"));
+
+            var miLock = new Forms.MenuItem("🔒 Ana Widget Konumu", delegate(object s, EventArgs e)
+            {
+                _cfg.LockWidgetPosition = !_cfg.LockWidgetPosition;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miLock.Checked = _cfg.LockWidgetPosition;
+            _trayMiLock = miLock;
+            miLocksMenu.MenuItems.Add(miLock);
+
+            var miLockShift = new Forms.MenuItem("🔒 Vardiya Widget Konumu", delegate(object s, EventArgs e)
+            {
+                _cfg.LockShiftWidgetPosition = !_cfg.LockShiftWidgetPosition;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miLockShift.Checked = _cfg.LockShiftWidgetPosition;
+            _trayMiLockShift = miLockShift;
+            miLocksMenu.MenuItems.Add(miLockShift);
+
+            var miLockInspirations = new Forms.MenuItem("🔒 Âyet, Hadîs & Günün Sözü Kartları", delegate(object s, EventArgs e)
+            {
+                _cfg.LockInspirationPosition = !_cfg.LockInspirationPosition;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miLockInspirations.Checked = _cfg.LockInspirationPosition;
+            _trayMiLockInspiration = miLockInspirations;
+            miLocksMenu.MenuItems.Add(miLockInspirations);
+
+            var miLockHoliday = new Forms.MenuItem("🔒 Resmî Tatil & Takvim Barı", delegate(object s, EventArgs e)
+            {
+                _cfg.LockHolidayPosition = !_cfg.LockHolidayPosition;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miLockHoliday.Checked = _cfg.LockHolidayPosition;
+            _trayMiLockHoliday = miLockHoliday;
+            miLocksMenu.MenuItems.Add(miLockHoliday);
+
+            var miLockMedia = new Forms.MenuItem("🔒 Medya / Spotify Mini Barı", delegate(object s, EventArgs e)
+            {
+                _cfg.LockMediaPosition = !_cfg.LockMediaPosition;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miLockMedia.Checked = _cfg.LockMediaPosition;
+            _trayMiLockMedia = miLockMedia;
+            miLocksMenu.MenuItems.Add(miLockMedia);
+
+            var miLockNotes = new Forms.MenuItem("🔒 Zen Hızlı Not Kartı", delegate(object s, EventArgs e)
+            {
+                _cfg.LockZenNotesPosition = !_cfg.LockZenNotesPosition;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miLockNotes.Checked = _cfg.LockZenNotesPosition;
+            _trayMiLockZenNotes = miLockNotes;
+            miLocksMenu.MenuItems.Add(miLockNotes);
+
+            var miLockDock = new Forms.MenuItem("🔒 Zen Uygulama Çekmecesi (Dock)", delegate(object s, EventArgs e)
+            {
+                _cfg.LockDockPosition = !_cfg.LockDockPosition;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miLockDock.Checked = _cfg.LockDockPosition;
+            _trayMiLockZenDock = miLockDock;
+            miLocksMenu.MenuItems.Add(miLockDock);
+
+            miLocksMenu.MenuItems.Add(new Forms.MenuItem("-"));
+
+            var miTopCenter = new Forms.MenuItem("⬆️ Ana Widget'ı Üst Ortaya Hizala", delegate(object s, EventArgs e)
+            {
+                _widgetWindow.TopCenterWidget();
+            });
+            miLocksMenu.MenuItems.Add(miTopCenter);
+
+            var miCenter = new Forms.MenuItem("🎯 Ana Widget'ı Merkeze Hizala", delegate(object s, EventArgs e)
+            {
+                _widgetWindow.CenterWidget();
+            });
+            miLocksMenu.MenuItems.Add(miCenter);
+
+            var miResetAll = new Forms.MenuItem("🔄 Tüm Widget Konumlarını Sıfırla (Varsayılana Dön)", delegate(object s, EventArgs e)
+            {
+                _cfg.WidgetPosition = "top_center";
+                _cfg.WidgetX = -1;
+                _cfg.WidgetY = -1;
+                _cfg.ShiftWidgetX = -1;
+                _cfg.ShiftWidgetY = -1;
+                _cfg.QuoteX = -1;
+                _cfg.QuoteY = -1;
+                _cfg.VerseX = -1;
+                _cfg.VerseY = -1;
+                _cfg.HadithX = -1;
+                _cfg.HadithY = -1;
+                _cfg.HolidayX = -1;
+                _cfg.HolidayY = -1;
+                _cfg.MediaX = -1;
+                _cfg.MediaY = -1;
+                _cfg.ZenNotesX = -1;
+                _cfg.ZenNotesY = -1;
+                _cfg.DockX = -1;
+                _cfg.DockY = -1;
+                _cfg.Save();
+
+                if (_widgetWindow != null) _widgetWindow.ResetPosition();
+                if (_shiftWidgetWindow != null) _shiftWidgetWindow.ResetPosition();
+                if (_zenNotesWindow != null) _zenNotesWindow.ResetPosition();
+                if (_zenDockWindow != null) _zenDockWindow.ResetPosition();
+                if (_inspirationManager != null) _inspirationManager.ResetPositions(_widgetWindow);
+
+                OnConfigChanged();
+            });
+            miLocksMenu.MenuItems.Add(miResetAll);
+
+            menu.MenuItems.Add(miLocksMenu);
+
+            var miShift = new Forms.MenuItem("📋 Vardiya Çizelgesi Widget'ı", delegate(object s, EventArgs e)
+            {
+                _cfg.ShowShiftWidget = !_cfg.ShowShiftWidget;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miShift.Checked = _cfg.ShowShiftWidget;
+            _trayMiShiftWidget = miShift;
+            menu.MenuItems.Add(miShift);
+
+            var miNotes = new Forms.MenuItem("📝 Zen Hızlı Not Kartı", delegate(object s, EventArgs e)
+            {
+                _cfg.ShowZenNotes = !_cfg.ShowZenNotes;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miNotes.Checked = _cfg.ShowZenNotes;
+            _trayMiZenNotes = miNotes;
+            menu.MenuItems.Add(miNotes);
+
+            var miNotesAlways = new Forms.MenuItem("📌 Not Kartını Her Zaman Göster", delegate(object s, EventArgs e)
+            {
+                _cfg.ZenNotesOnlyWhenIconsHidden = !_cfg.ZenNotesOnlyWhenIconsHidden;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miNotesAlways.Checked = !_cfg.ZenNotesOnlyWhenIconsHidden;
+            _trayMiZenNotesAlways = miNotesAlways;
+            menu.MenuItems.Add(miNotesAlways);
+
+            var miDock = new Forms.MenuItem("🚀 Zen Uygulama Çekmecesi (Dock)", delegate(object s, EventArgs e)
+            {
+                _cfg.ShowZenDock = !_cfg.ShowZenDock;
+                _cfg.Save();
+                OnConfigChanged();
+            });
+            miDock.Checked = _cfg.ShowZenDock;
+            _trayMiZenDock = miDock;
+            menu.MenuItems.Add(miDock);
+
+            var miWeb = new Forms.MenuItem("🌐 Web Widget'ını Aç", delegate(object s, EventArgs e)
+            {
+                string path = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "widget.html");
+                if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            });
+            menu.MenuItems.Add(miWeb);
+
+            menu.MenuItems.Add(new Forms.MenuItem("-"));
+
+            var miExit = new Forms.MenuItem("❌ Çıkış", delegate(object s, EventArgs e)
+            {
+                Win32.SetTaskbarVisibility(true);
+                SetIconsAndWallpaperVisibility(true, false);
+                if (_shiftWidgetWindow != null) { try { _shiftWidgetWindow.Close(); } catch { } }
+                if (_zenNotesWindow != null) { try { _zenNotesWindow.SaveNotesToFile(); _zenNotesWindow.Close(); } catch { } }
+                if (_zenDockWindow != null) { try { _zenDockWindow.Close(); } catch { } }
+                if (_inspirationManager != null) { try { _inspirationManager.Close(); } catch { } }
+                if (_wallpaperWindow != null) { try { _wallpaperWindow.Close(); } catch { } }
+                if (_victoryFlagWindow != null) { try { _victoryFlagWindow.Close(); } catch { } }
+                _trayIcon.Visible = false;
+                _trayIcon.Dispose();
+                Shutdown();
+            });
+            menu.MenuItems.Add(miExit);
+
+            _trayIcon.ContextMenu = menu;
+            _trayIcon.MouseClick += delegate(object s, Forms.MouseEventArgs e)
+            {
+                if (e.Button == Forms.MouseButtons.Left) OpenSettings();
+            };
+            _trayIcon.DoubleClick += delegate(object s, EventArgs e) { OpenSettings(); };
+        }
+
+        private void UpdateWidgetsVisibility(bool iconsVisible)
+        {
+            if (_widgetWindow != null)
+            {
+                bool shouldShowClock = _cfg.ShowWidget && (!_cfg.ClockOnlyWhenIconsHidden || !iconsVisible);
+                if (shouldShowClock)
+                {
+                    if (!_widgetWindow.IsVisible) _widgetWindow.Show();
+                    _widgetWindow.ApplyZOrder();
+                }
+                else
+                {
+                    if (_widgetWindow.IsVisible) _widgetWindow.Hide();
+                }
+            }
+
+            if (_shiftWidgetWindow != null)
+            {
+                bool shouldShowShift = _cfg.ShowShiftWidget && (!_cfg.ShiftOnlyWhenIconsHidden || !iconsVisible);
+                if (shouldShowShift)
+                {
+                    if (!_shiftWidgetWindow.IsVisible) _shiftWidgetWindow.Show();
+                    _shiftWidgetWindow.ApplyZOrder();
+                }
+                else
+                {
+                    if (_shiftWidgetWindow.IsVisible) _shiftWidgetWindow.Hide();
+                }
+            }
+
+            if (_zenNotesWindow != null)
+            {
+                bool shouldShowNotes = _cfg.ShowZenNotes && (!_cfg.ZenNotesOnlyWhenIconsHidden || !iconsVisible);
+                if (shouldShowNotes)
+                {
+                    if (!_zenNotesWindow.IsVisible) _zenNotesWindow.Show();
+                    _zenNotesWindow.ApplyZOrder();
+                }
+                else
+                {
+                    if (_zenNotesWindow.IsVisible) _zenNotesWindow.Hide();
+                }
+            }
+
+            if (_zenDockWindow != null)
+            {
+                bool shouldShowDock = _cfg.ShowZenDock && (!_cfg.DockOnlyWhenIconsHidden || !iconsVisible);
+                if (shouldShowDock)
+                {
+                    if (!_zenDockWindow.IsVisible) _zenDockWindow.Show();
+                    _zenDockWindow.ApplyZOrder();
+                }
+                else
+                {
+                    if (_zenDockWindow.IsVisible) _zenDockWindow.Hide();
+                }
+            }
+
+            if (_inspirationManager != null)
+            {
+                if (!iconsVisible)
+                {
+                    _inspirationManager.ShowInspirations(_widgetWindow);
+                }
+                else
+                {
+                    _inspirationManager.HideInspirations();
+                }
+            }
+        }
+
+        private void UpdateTaskbarVisibility(bool iconsVisible)
+        {
+            // Başlat ve görev çubuğu hiçbir zaman gizlenmez - daima görünür tutulur
+            Win32.EnsureTaskbarVisible();
+        }
+
+        public void SetIconsAndWallpaperVisibility(bool iconsVisible, bool isAuto = false)
+        {
+            Win32.SetIconsVisibility(iconsVisible);
+            _wasIconsHiddenByAuto = isAuto && !iconsVisible;
+
+            if (_wallpaperWindow != null)
+            {
+                if (!iconsVisible)
+                {
+                    _wallpaperWindow.ShowWallpaper();
+                }
+                else
+                {
+                    _wallpaperWindow.HideWallpaper();
+                }
+            }
+
+            UpdateWidgetsVisibility(iconsVisible);
+            UpdateTaskbarVisibility(iconsVisible);
+
+            if (_inspirationManager != null)
+            {
+                if (!iconsVisible)
+                {
+                    _inspirationManager.ShowInspirations(_widgetWindow);
+                }
+                else
+                {
+                    _inspirationManager.HideInspirations();
+                }
+            }
+        }
+
+        public void EnterAmbientMode()
+        {
+            if (_isAmbientActive) return;
+            _isAmbientActive = true;
+
+            try
+            {
+                // 1. Canlı / statik duvar kağıtlarını açık pencerelerin üst katmanına (HWND_TOPMOST) taşı
+                if (_wallpaperWindow != null)
+                {
+                    _wallpaperWindow.ShowWallpaperAmbient();
+                }
+
+                // 2. Ana Widget'ı ve diğer tüm aktif widget'ları duvar kağıdının da üstüne (HWND_TOPMOST) taşı
+                if (_widgetWindow != null)
+                {
+                    _widgetWindow.IsAmbientMode = true;
+                    if (_cfg.ShowWidget)
+                    {
+                        if (!_widgetWindow.IsVisible) _widgetWindow.Show();
+                        IntPtr h = new WindowInteropHelper(_widgetWindow).Handle;
+                        if (h != IntPtr.Zero && Win32.IsWindow(h))
+                        {
+                            Win32.SetWindowPos(h, Win32.HWND_TOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE | Win32.SWP_SHOWWINDOW);
+                        }
+                    }
+                }
+
+                if (_shiftWidgetWindow != null && _cfg.ShowShiftWidget)
+                {
+                    if (!_shiftWidgetWindow.IsVisible) _shiftWidgetWindow.Show();
+                    IntPtr h = new WindowInteropHelper(_shiftWidgetWindow).Handle;
+                    if (h != IntPtr.Zero && Win32.IsWindow(h))
+                    {
+                        Win32.SetWindowPos(h, Win32.HWND_TOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE | Win32.SWP_SHOWWINDOW);
+                    }
+                }
+
+                if (_zenNotesWindow != null && _cfg.ShowZenNotes)
+                {
+                    if (!_zenNotesWindow.IsVisible) _zenNotesWindow.Show();
+                    IntPtr h = new WindowInteropHelper(_zenNotesWindow).Handle;
+                    if (h != IntPtr.Zero && Win32.IsWindow(h))
+                    {
+                        Win32.SetWindowPos(h, Win32.HWND_TOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE | Win32.SWP_SHOWWINDOW);
+                    }
+                }
+
+                if (_zenDockWindow != null && _cfg.ShowZenDock)
+                {
+                    if (!_zenDockWindow.IsVisible) _zenDockWindow.Show();
+                    IntPtr h = new WindowInteropHelper(_zenDockWindow).Handle;
+                    if (h != IntPtr.Zero && Win32.IsWindow(h))
+                    {
+                        Win32.SetWindowPos(h, Win32.HWND_TOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE | Win32.SWP_SHOWWINDOW);
+                    }
+                }
+
+                if (_inspirationManager != null)
+                {
+                    if (!_inspirationManager.IsShowing)
+                    {
+                        _inspirationManager.ShowInspirations(_widgetWindow);
+                    }
+                    _inspirationManager.BringToTopAmbient();
+                }
+
+                // 3. Takım Zafer Bayrağı (Balkon tipi dikey saten flama)
+                // KULLANICI KURALI:
+                // "demoyu aktifledim bir kere sürekli bayragı gosterıyor bugun takımın maçı yok demo aktiflendiginde bir kez göstersin maç bittiginde seçili takım kazandıgında yukarıdan aşağıya bayrak insin, 1 saat sonra bayragı da kaldır"
+                bool showFlag = false;
+                string flagTeam = null;
+                string flagScore = null;
+
+                if (_isFlagDemoActive)
+                {
+                    showFlag = true;
+                    flagTeam = !string.IsNullOrEmpty(_flagDemoTeam) ? _flagDemoTeam : GetEffectiveVictoryTeam();
+                    flagScore = "⚽ 2 - 0 MAÇ SONUCU (DEMO)";
+                }
+                else if (!_userDismissedFlag)
+                {
+                    // Sadece maç bittiğinde ve seçili takım kazandıysa (ve maç biteli 1 saat dolmadıysa) göster
+                    showFlag = MatchService.GetActiveVictoryInfo(_cfg, DateTime.Now, out flagTeam, out flagScore);
+                }
+
+                if (showFlag && _victoryFlagWindow != null)
+                {
+                    _victoryFlagWindow.ShowFlag(flagTeam, flagScore);
+                }
+                else if (_victoryFlagWindow != null && _victoryFlagWindow.IsVisible)
+                {
+                    _victoryFlagWindow.HideFlag();
+                }
+
+                // 4. Görev çubuğunun daima görünür ve en üstte kalmasını sağla
+                Win32.EnsureTaskbarVisible();
+            }
+            catch { }
+        }
+
+        public void ExitAmbientMode()
+        {
+            if (!_isAmbientActive) return;
+            _isAmbientActive = false;
+
+            try
+            {
+                if (_widgetWindow != null)
+                {
+                    _widgetWindow.IsAmbientMode = false;
+                }
+
+                if (_flagDemoDismissTimer != null) _flagDemoDismissTimer.Stop();
+                _isFlagDemoActive = false;
+                _flagDemoTeam = null;
+
+                // KULLANICI KURALI: "maç bittiginde seçili takım kazandıgında yukarıdan aşağıya bayrak insin, 1 saat sonra bayragı da kaldır"
+                // Eğer maç bittiyse ve takım kazandıysa 1 saatlik zafer kutlaması devam eder, aksi halde veya demo ise bayrak kapatılır
+                string winTeam;
+                string winScore;
+                if (!MatchService.GetActiveVictoryInfo(_cfg, DateTime.Now, out winTeam, out winScore) || _userDismissedFlag)
+                {
+                    if (_victoryFlagWindow != null)
+                    {
+                        _victoryFlagWindow.HideFlag();
+                    }
+                }
+
+                bool iconsVisible = Win32.AreIconsVisible();
+
+                if (iconsVisible)
+                {
+                    if (_wallpaperWindow != null)
+                    {
+                        _wallpaperWindow.HideWallpaper();
+                    }
+                    UpdateWidgetsVisibility(true);
+                    if (_inspirationManager != null)
+                    {
+                        _inspirationManager.HideInspirations();
+                    }
+                }
+                else
+                {
+                    if (_wallpaperWindow != null)
+                    {
+                        if (_cfg.ShowWallpaperOnHide) _wallpaperWindow.ShowWallpaper();
+                        else _wallpaperWindow.HideWallpaper();
+                    }
+                    UpdateWidgetsVisibility(false);
+                    if (_inspirationManager != null)
+                    {
+                        _inspirationManager.ShowInspirations(_widgetWindow);
+                    }
+                }
+
+                // Widget'ların Z-Order'ını masaüstü seviyesine geri döndür
+                if (_widgetWindow != null && _widgetWindow.IsVisible) _widgetWindow.ApplyZOrder();
+                if (_shiftWidgetWindow != null && _shiftWidgetWindow.IsVisible) _shiftWidgetWindow.ApplyZOrder();
+                if (_zenNotesWindow != null && _zenNotesWindow.IsVisible) _zenNotesWindow.ApplyZOrder();
+                if (_zenDockWindow != null && _zenDockWindow.IsVisible) _zenDockWindow.ApplyZOrder();
+                if (_inspirationManager != null) _inspirationManager.ApplyZOrder();
+
+                Win32.EnsureTaskbarVisible();
+            }
+            catch { }
+        }
+
+        private DispatcherTimer _flagDemoDismissTimer;
+
+        public void TriggerVictoryFlagDemo(string teamKey = null)
+        {
+            _userDismissedFlag = false;
+            _isFlagDemoActive = true;
+            _flagDemoTeam = (string.IsNullOrEmpty(teamKey) || teamKey == "auto") 
+                ? GetEffectiveVictoryTeam() 
+                : teamKey.ToLowerInvariant();
+
+            // KULLANICI KURALI: "demo aktiflendiginde bir kez göstersin"
+            // Demo 1 kez (15 saniye) gösterilir ve sonra otomatik olarak sonlandırılır
+            if (_flagDemoDismissTimer == null)
+            {
+                _flagDemoDismissTimer = new DispatcherTimer();
+                _flagDemoDismissTimer.Tick += delegate
+                {
+                    _flagDemoDismissTimer.Stop();
+                    _isFlagDemoActive = false;
+                    _flagDemoTeam = null;
+                    if (_isAmbientActive)
+                    {
+                        ExitAmbientMode();
+                    }
+                    else if (_victoryFlagWindow != null)
+                    {
+                        _victoryFlagWindow.HideFlag();
+                    }
+                };
+            }
+            _flagDemoDismissTimer.Stop();
+            _flagDemoDismissTimer.Interval = TimeSpan.FromSeconds(15);
+            _flagDemoDismissTimer.Start();
+
+            // Eğer zaten ambiyans modundaysa hemen bayrağı güncelle ve göster
+            if (_isAmbientActive)
+            {
+                if (_victoryFlagWindow != null)
+                {
+                    _victoryFlagWindow.ShowFlag(_flagDemoTeam, "⚽ 2 - 0 MAÇ SONUCU (DEMO)");
+                }
+                return;
+            }
+
+            EnterAmbientMode();
+        }
+
+        public string GetEffectiveVictoryTeam()
+        {
+            if (!string.IsNullOrEmpty(_cfg.ZenVictoryTeam) && _cfg.ZenVictoryTeam != "auto")
+            {
+                return _cfg.ZenVictoryTeam.ToLowerInvariant();
+            }
+
+            try
+            {
+                var matchInfo = MatchService.GetCurrentMatchInfo(_cfg);
+                if (matchInfo != null && matchInfo.TodayMatchItem != null)
+                {
+                    var tm = matchInfo.TodayMatchItem;
+                    if (tm.HomeScore > tm.AwayScore)
+                    {
+                        string k = MatchService.DetectTeamKeyByName(tm.HomeTeam);
+                        if (!string.IsNullOrEmpty(k) && IsTeamTracked(k)) return k;
+                    }
+                    else if (tm.AwayScore > tm.HomeScore)
+                    {
+                        string k = MatchService.DetectTeamKeyByName(tm.AwayTeam);
+                        if (!string.IsNullOrEmpty(k) && IsTeamTracked(k)) return k;
+                    }
+                    else
+                    {
+                        string hk = MatchService.DetectTeamKeyByName(tm.HomeTeam);
+                        if (!string.IsNullOrEmpty(hk) && IsTeamTracked(hk)) return hk;
+                        string ak = MatchService.DetectTeamKeyByName(tm.AwayTeam);
+                        if (!string.IsNullOrEmpty(ak) && IsTeamTracked(ak)) return ak;
+                    }
+                }
+
+                var list = MatchService.LoadMatches(_cfg);
+                if (list != null)
+                {
+                    DateTime today = DateTime.Now.Date;
+                    for (int i = list.Count - 1; i >= 0; i--)
+                    {
+                        var m = list[i];
+                        if (m.MatchDate.Date == today && (m.IsFinished || m.HasScore))
+                        {
+                            if (m.HomeScore > m.AwayScore)
+                            {
+                                string k = MatchService.DetectTeamKeyByName(m.HomeTeam);
+                                if (!string.IsNullOrEmpty(k) && IsTeamTracked(k)) return k;
+                            }
+                            else if (m.AwayScore > m.HomeScore)
+                            {
+                                string k = MatchService.DetectTeamKeyByName(m.AwayTeam);
+                                if (!string.IsNullOrEmpty(k) && IsTeamTracked(k)) return k;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            if (_cfg.TrackGalatasaray) return "galatasaray";
+            if (_cfg.TrackFenerbahce) return "fenerbahce";
+            if (_cfg.TrackBesiktas) return "besiktas";
+            if (_cfg.TrackTrabzonspor) return "trabzonspor";
+            if (_cfg.TrackTurkey) return "turkiye";
+
+            return "galatasaray";
+        }
+
+        private bool IsTeamTracked(string teamKey)
+        {
+            if (string.IsNullOrEmpty(teamKey)) return false;
+            switch (teamKey.ToLowerInvariant())
+            {
+                case "galatasaray": return _cfg.TrackGalatasaray;
+                case "fenerbahce": return _cfg.TrackFenerbahce;
+                case "besiktas": return _cfg.TrackBesiktas;
+                case "trabzonspor": return _cfg.TrackTrabzonspor;
+                case "turkiye": return _cfg.TrackTurkey;
+                default: return true;
+            }
+        }
+
+        private void InactivityCheck(object sender, EventArgs e)
+        {
+            uint idleMs = Win32.GetIdleTimeMs();
+
+            // Zafer Bayrağı 1 saatlik süre sonu kontrolü:
+            // "1 saat sonra bayragı da kaldır" kuralı uyarınca, bayrak açıksa ve 1 saat dolmuşsa (veya kapatılmışsa) kaldırılır
+            if (_victoryFlagWindow != null && _victoryFlagWindow.IsVisible && !_isFlagDemoActive)
+            {
+                if (++_flagCheckCounter % 16 == 0) // ~4 saniyede bir kontrol et
+                {
+                    string winTeam;
+                    string winScore;
+                    if (!MatchService.GetActiveVictoryInfo(_cfg, DateTime.Now, out winTeam, out winScore) || _userDismissedFlag)
+                    {
+                        _victoryFlagWindow.HideFlag();
+                    }
+                }
+            }
+
+            // 1. Zen Dinlenme Modu (Ön Plan Ambiyans Modu)
+            if (_isAmbientActive)
+            {
+                // Ambiyans aktifken herhangi bir fare hareketi veya tuş basımı modu sonlandırır
+                if (idleMs < 600)
+                {
+                    ExitAmbientMode();
+                }
+                else if (++_taskbarCheckCounter % 8 == 0) // ~2 saniyede bir
+                {
+                    Win32.EnsureTaskbarVisible();
+                }
+            }
+            else if (_cfg.ZenAmbientModeEnabled)
+            {
+                uint ambientTimeoutMs = (uint)Math.Max(2, _cfg.ZenAmbientTimeoutSeconds) * 1000;
+                if (idleMs >= ambientTimeoutMs)
+                {
+                    EnterAmbientMode();
+                }
+            }
+
+            // 2. İkon Otomatik Gizleme Kontrolü
+            if (!_cfg.AutoHideEnabled) return;
+
+            uint timeoutMs = (uint)_cfg.TimeoutSeconds * 1000;
+            bool iconsVisible = Win32.AreIconsVisible();
+
+            if (idleMs >= timeoutMs)
+            {
+                if (iconsVisible)
+                {
+                    SetIconsAndWallpaperVisibility(false, true);
+                }
+                else
+                {
+                    // Simgeler gizliyken görev çubuğunun daima görünür ve en üstte kalmasını periyodik olarak teyit et
+                    if (++_taskbarCheckCounter % 8 == 0) // ~2 saniyede bir
+                    {
+                        Win32.EnsureTaskbarVisible();
+                    }
+                }
+            }
+            else
+            {
+                if (_cfg.RestoreOnMouseMove && !iconsVisible && _wasIconsHiddenByAuto && idleMs < 400)
+                {
+                    SetIconsAndWallpaperVisibility(true, false);
+                }
+            }
+        }
+
+        private bool IsCursorOverOurWindows(Win32.POINT pt)
+        {
+            IntPtr clickedHwnd = Win32.WindowFromPoint(pt);
+            if (clickedHwnd == IntPtr.Zero) return false;
+
+            IntPtr clickedRoot = Win32.GetAncestor(clickedHwnd, Win32.GA_ROOT);
+
+            if (_widgetWindow != null && _widgetWindow.IsVisible)
+            {
+                var helper = new WindowInteropHelper(_widgetWindow);
+                IntPtr wHwnd = helper.Handle;
+                if (wHwnd != IntPtr.Zero && (clickedHwnd == wHwnd || clickedRoot == wHwnd))
+                {
+                    return true;
+                }
+            }
+
+            if (_settingsWindow != null && _settingsWindow.IsVisible)
+            {
+                var helper = new WindowInteropHelper(_settingsWindow);
+                IntPtr sHwnd = helper.Handle;
+                if (sHwnd != IntPtr.Zero && (clickedHwnd == sHwnd || clickedRoot == sHwnd))
+                {
+                    return true;
+                }
+            }
+
+            if (Win32.InspirationWindowHandles.Contains(clickedHwnd) || (clickedRoot != IntPtr.Zero && Win32.InspirationWindowHandles.Contains(clickedRoot)))
+            {
+                return true;
+            }
+
+            if (_inspirationManager != null && _inspirationManager.IsPointOverCards(pt))
+            {
+                return true;
+            }
+
+            if (_shiftWidgetWindow != null && _shiftWidgetWindow.IsVisible)
+            {
+                var helper = new WindowInteropHelper(_shiftWidgetWindow);
+                IntPtr shHwnd = helper.Handle;
+                if (shHwnd != IntPtr.Zero && (clickedHwnd == shHwnd || clickedRoot == shHwnd))
+                {
+                    return true;
+                }
+            }
+
+            if (_zenNotesWindow != null && _zenNotesWindow.IsVisible)
+            {
+                var helper = new WindowInteropHelper(_zenNotesWindow);
+                IntPtr znHwnd = helper.Handle;
+                if (znHwnd != IntPtr.Zero && (clickedHwnd == znHwnd || clickedRoot == znHwnd))
+                {
+                    return true;
+                }
+            }
+
+            if (_zenDockWindow != null && _zenDockWindow.IsVisible)
+            {
+                var helper = new WindowInteropHelper(_zenDockWindow);
+                IntPtr zdHwnd = helper.Handle;
+                if (zdHwnd != IntPtr.Zero && (clickedHwnd == zdHwnd || clickedRoot == zdHwnd))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void DesktopClickCheck(object sender, EventArgs e)
+        {
+            try
+            {
+                // Sol fare tuşu durumu
+                bool isLDown = (Win32.GetAsyncKeyState(0x01) & 0x8000) != 0;
+                // Sağ fare tuşu durumu
+                bool isRDown = (Win32.GetAsyncKeyState(0x02) & 0x8000) != 0;
+
+                if (_isAmbientActive && (isLDown || isRDown))
+                {
+                    ExitAmbientMode();
+                }
+
+                if (isLDown && !_wasLButtonPressed)
+                {
+                    _wasLButtonPressed = true;
+                    Win32.POINT pt;
+                    if (Win32.GetCursorPos(out pt) && !IsCursorOverOurWindows(pt) && Win32.IsPointOverDesktop(pt))
+                    {
+                        int now = Environment.TickCount;
+                        int delta = now - _lastLeftClickTime;
+                        int dist = Math.Max(Math.Abs(pt.X - _lastLeftClickPt.X), Math.Abs(pt.Y - _lastLeftClickPt.Y));
+                        int maxDelta = Math.Max(500, Win32.GetDoubleClickTime());
+
+                        bool isDoubleClick = (_lastLeftClickTime != 0 && delta <= maxDelta && dist <= 16);
+
+                        if (_singleClickTimer != null)
+                        {
+                            _singleClickTimer.Stop();
+                        }
+
+                        if (isDoubleClick)
+                        {
+                            _lastLeftClickTime = 0;
+                            if (_cfg.DesktopDoubleClickToggle)
+                            {
+                                ToggleIcons();
+                            }
+                        }
+                        else
+                        {
+                            _lastLeftClickTime = now;
+                            _lastLeftClickPt = pt;
+
+                            if (_cfg.RestoreOnDesktopClick && !Win32.AreIconsVisible())
+                            {
+                                if (_cfg.DesktopDoubleClickToggle)
+                                {
+                                    if (_singleClickTimer == null)
+                                    {
+                                        _singleClickTimer = new DispatcherTimer();
+                                        _singleClickTimer.Tick += delegate
+                                        {
+                                            _singleClickTimer.Stop();
+                                            if (!Win32.AreIconsVisible())
+                                            {
+                                                SetIconsAndWallpaperVisibility(true, false);
+                                            }
+                                        };
+                                    }
+                                    _singleClickTimer.Interval = TimeSpan.FromMilliseconds(maxDelta + 50);
+                                    _singleClickTimer.Start();
+                                }
+                                else
+                                {
+                                    SetIconsAndWallpaperVisibility(true, false);
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (!isLDown)
+                {
+                    _wasLButtonPressed = false;
+                }
+
+                // Sağ fare tuşu durumu
+                if (isRDown && !_wasRButtonPressed)
+                {
+                    _wasRButtonPressed = true;
+                    Win32.POINT pt;
+                    if (Win32.GetCursorPos(out pt) && !IsCursorOverOurWindows(pt) && Win32.IsPointOverDesktop(pt))
+                    {
+                        if (_cfg.RestoreOnDesktopRightClick && !Win32.AreIconsVisible())
+                        {
+                            if (_singleClickTimer != null)
+                            {
+                                _singleClickTimer.Stop();
+                            }
+                            SetIconsAndWallpaperVisibility(true, false);
+                        }
+                    }
+                }
+                else if (!isRDown)
+                {
+                    _wasRButtonPressed = false;
+                }
+            }
+            catch { }
+        }
+
+        public void ToggleIcons()
+        {
+            bool current = Win32.AreIconsVisible();
+            SetIconsAndWallpaperVisibility(!current, false);
+        }
+
+        public void OpenSettings(string tabKey = null)
+        {
+            if (_settingsWindow == null)
+            {
+                _settingsWindow = new SettingsWindow(_cfg, OnConfigChanged, ToggleIcons,
+                    delegate { if (_widgetWindow != null) _widgetWindow.TriggerTestAlert(); },
+                    delegate { if (_widgetWindow != null) _widgetWindow.TriggerTestGoal(); },
+                    delegate(string effect) { if (_wallpaperWindow != null) _wallpaperWindow.TestWeatherEffect(effect); },
+                    delegate { EnterAmbientMode(); },
+                    delegate(string team) { TriggerVictoryFlagDemo(team); },
+                    delegate { if (_widgetWindow != null) _widgetWindow.TriggerTestFinalWhistle(); });
+            }
+            if (_settingsWindow.WindowState == WindowState.Minimized)
+            {
+                _settingsWindow.WindowState = WindowState.Normal;
+            }
+            if (!string.IsNullOrEmpty(tabKey))
+            {
+                _settingsWindow.SelectTab(tabKey);
+            }
+            _settingsWindow.Show();
+            _settingsWindow.Topmost = true;
+            _settingsWindow.Topmost = false;
+            _settingsWindow.Activate();
+            _settingsWindow.Focus();
+
+            try
+            {
+                var helper = new WindowInteropHelper(_settingsWindow);
+                if (helper.Handle != IntPtr.Zero)
+                {
+                    Win32.SetForegroundWindow(helper.Handle);
+                    Win32.BringWindowToTop(helper.Handle);
+                }
+            }
+            catch { }
+        }
+
+        private void OnConfigChanged()
+        {
+            bool iconsVisible = Win32.AreIconsVisible();
+
+            if (_widgetWindow != null)
+            {
+                _widgetWindow.ApplyWindowPosition();
+                _widgetWindow.ApplyThemeAndSurface();
+                _widgetWindow.RefreshWeather();
+                _widgetWindow.RefreshFinance();
+                _widgetWindow.RefreshPrayerTimes();
+            }
+
+            if (_shiftWidgetWindow != null)
+            {
+                _shiftWidgetWindow.ApplyConfig();
+            }
+
+            if (_zenNotesWindow != null)
+            {
+                _zenNotesWindow.ApplyThemeAndStyle();
+            }
+
+            if (_zenDockWindow != null)
+            {
+                _zenDockWindow.ApplyThemeAndStyle();
+            }
+
+            if (_inspirationManager != null)
+            {
+                _inspirationManager.UpdateConfigAndTheme(_widgetWindow);
+            }
+
+            UpdateWidgetsVisibility(iconsVisible);
+            UpdateTaskbarVisibility(iconsVisible);
+
+            if (_wallpaperWindow != null)
+            {
+                _wallpaperWindow.ReloadWallpaper();
+                _wallpaperWindow.ApplyWeatherSetting();
+                if (!iconsVisible && _cfg.ShowWallpaperOnHide)
+                {
+                    _wallpaperWindow.ShowWallpaper();
+                    if (_widgetWindow != null && _widgetWindow.IsVisible)
+                    {
+                        _widgetWindow.ApplyZOrder();
+                    }
+                    if (_shiftWidgetWindow != null && _shiftWidgetWindow.IsVisible)
+                    {
+                        _shiftWidgetWindow.ApplyZOrder();
+                    }
+                    if (_zenNotesWindow != null && _zenNotesWindow.IsVisible)
+                    {
+                        _zenNotesWindow.ApplyZOrder();
+                    }
+                    if (_zenDockWindow != null && _zenDockWindow.IsVisible)
+                    {
+                        _zenDockWindow.ApplyZOrder();
+                    }
+                    if (_inspirationManager != null)
+                    {
+                        _inspirationManager.ApplyZOrder();
+                    }
+                }
+                else if (!_cfg.ShowWallpaperOnHide || iconsVisible)
+                {
+                    _wallpaperWindow.HideWallpaper();
+                    if (_widgetWindow != null && _widgetWindow.IsVisible)
+                    {
+                        _widgetWindow.ApplyZOrder();
+                    }
+                    if (_shiftWidgetWindow != null && _shiftWidgetWindow.IsVisible)
+                    {
+                        _shiftWidgetWindow.ApplyZOrder();
+                    }
+                    if (_zenNotesWindow != null && _zenNotesWindow.IsVisible)
+                    {
+                        _zenNotesWindow.ApplyZOrder();
+                    }
+                    if (_zenDockWindow != null && _zenDockWindow.IsVisible)
+                    {
+                        _zenDockWindow.ApplyZOrder();
+                    }
+                    if (!iconsVisible && _inspirationManager != null)
+                    {
+                        _inspirationManager.ApplyZOrder();
+                    }
+                }
+            }
+
+            if (_trayIcon != null && _trayIcon.ContextMenu != null)
+            {
+                _trayIcon.ContextMenu.MenuItems[1].Checked = _cfg.AutoHideEnabled;
+                _trayIcon.ContextMenu.MenuItems[2].Checked = _cfg.ShowWidget;
+                if (_trayMiWeatherFx != null) _trayMiWeatherFx.Checked = _cfg.ShowWeatherWallpaperEffects;
+                if (_trayMiPrayer != null) _trayMiPrayer.Checked = _cfg.ShowPrayerTimes;
+                if (_trayMiLock != null) _trayMiLock.Checked = _cfg.LockWidgetPosition;
+                if (_trayMiLockShift != null) _trayMiLockShift.Checked = _cfg.LockShiftWidgetPosition;
+                if (_trayMiLockInspiration != null) _trayMiLockInspiration.Checked = _cfg.LockInspirationPosition;
+                if (_trayMiLockHoliday != null) _trayMiLockHoliday.Checked = _cfg.LockHolidayPosition;
+                if (_trayMiLockMedia != null) _trayMiLockMedia.Checked = _cfg.LockMediaPosition;
+                if (_trayMiLockZenNotes != null) _trayMiLockZenNotes.Checked = _cfg.LockZenNotesPosition;
+                if (_trayMiLockZenDock != null) _trayMiLockZenDock.Checked = _cfg.LockDockPosition;
+
+                if (_trayMiMasterLock != null)
+                {
+                    bool allLocked = _cfg.LockWidgetPosition && _cfg.LockShiftWidgetPosition && _cfg.LockInspirationPosition && _cfg.LockHolidayPosition && _cfg.LockMediaPosition && _cfg.LockZenNotesPosition && _cfg.LockDockPosition;
+                    _trayMiMasterLock.Text = allLocked ? "🔓 Tüm Widget Konumlarının Kilidini Aç (Serbest Taşıma)" : "🔒 Tüm Widget Konumlarını Kilitle";
+                }
+
+                if (_trayMiShiftWidget != null) _trayMiShiftWidget.Checked = _cfg.ShowShiftWidget;
+                if (_trayMiZenNotes != null) _trayMiZenNotes.Checked = _cfg.ShowZenNotes;
+                if (_trayMiZenNotesAlways != null) _trayMiZenNotesAlways.Checked = !_cfg.ZenNotesOnlyWhenIconsHidden;
+                if (_trayMiZenDock != null) _trayMiZenDock.Checked = _cfg.ShowZenDock;
+                if (_trayMiAmbientMode != null) _trayMiAmbientMode.Checked = _cfg.ZenAmbientModeEnabled;
+            }
+
+            if (_inspirationManager != null)
+            {
+                _inspirationManager.UpdateConfigAndTheme(_widgetWindow);
+            }
+        }
+
+        private void RegisterGlobalHotkey()
+        {
+            try
+            {
+                var helper = new WindowInteropHelper(_widgetWindow);
+                _hotkeySource = HwndSource.FromHwnd(helper.Handle);
+                if (_hotkeySource != null)
+                {
+                    _hotkeySource.AddHook(HwndHook);
+                    Win32.RegisterHotKey(helper.Handle, HOTKEY_ID, 0x0008 | 0x0002, 0x44);
+                }
+            }
+            catch { }
+        }
+
+        private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            const int WM_HOTKEY = 0x0312;
+            if (msg == WM_HOTKEY && wParam.ToInt32() == HOTKEY_ID)
+            {
+                ToggleIcons();
+                handled = true;
+            }
+            return IntPtr.Zero;
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            try
+            {
+                if (_wallpaperWindow != null)
+                {
+                    _wallpaperWindow.Close();
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (_zenNotesWindow != null)
+                {
+                    _zenNotesWindow.SaveNotesToFile();
+                    _zenNotesWindow.Close();
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (_zenDockWindow != null)
+                {
+                    _zenDockWindow.Close();
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (_inspirationManager != null)
+                {
+                    _inspirationManager.Close();
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (_hotkeySource != null)
+                {
+                    var helper = new WindowInteropHelper(_widgetWindow);
+                    Win32.UnregisterHotKey(helper.Handle, HOTKEY_ID);
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (_desktopClickTimer != null)
+                {
+                    _desktopClickTimer.Stop();
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (_victoryFlagWindow != null)
+                {
+                    _victoryFlagWindow.Close();
+                }
+            }
+            catch { }
+
+            base.OnExit(e);
+        }
+    }
+}

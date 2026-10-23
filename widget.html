@@ -1,0 +1,2943 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minimal Masaüstü Widget</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Koyu Tema (Varsayılan) */
+      --bg-canvas: #090a0f;
+      --card-glass-bg: rgba(18, 20, 28, 0.55);
+      --card-matte-bg: #15171e;
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.45);
+      --text-primary: #f8fafc;
+      --text-secondary: rgba(241, 245, 249, 0.65);
+      --text-muted: rgba(241, 245, 249, 0.38);
+      --accent: #38bdf8;
+      --icon-color: #f8fafc;
+      --pill-bg: rgba(255, 255, 255, 0.06);
+      --pill-hover: rgba(255, 255, 255, 0.12);
+      --pill-border: rgba(255, 255, 255, 0.08);
+      --widget-scale: 1;
+    }
+
+    [data-theme="light"] {
+      --bg-canvas: #eef2f6;
+      --card-glass-bg: rgba(255, 255, 255, 0.65);
+      --card-matte-bg: #ffffff;
+      --card-border: rgba(255, 255, 255, 0.85);
+      --card-shadow: 0 20px 40px -15px rgba(100, 116, 139, 0.18);
+      --text-primary: #0f172a;
+      --text-secondary: rgba(15, 23, 42, 0.65);
+      --text-muted: rgba(15, 23, 42, 0.38);
+      --accent: #0284c7;
+      --icon-color: #0f172a;
+      --pill-bg: rgba(0, 0, 0, 0.04);
+      --pill-hover: rgba(0, 0, 0, 0.08);
+      --pill-border: rgba(0, 0, 0, 0.06);
+      --widget-scale: 1;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--bg-canvas);
+      background-image: 
+        radial-gradient(circle at 50% 30%, rgba(56, 189, 248, 0.05) 0%, transparent 60%),
+        radial-gradient(circle at 80% 80%, rgba(99, 102, 241, 0.04) 0%, transparent 50%);
+      color: var(--text-primary);
+      transition: background-color 0.4s ease, color 0.4s ease, padding 0.4s cubic-bezier(0.16, 1, 0.3, 1), justify-content 0.4s ease;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Üst Orta Konum Modu */
+    body.position-top {
+      justify-content: flex-start;
+      padding-top: 48px;
+    }
+
+    /* Arka Plan Görseli Seçeneği (Opsiyonel Masaüstü Önizlemesi) */
+    body.show-wallpaper {
+      background-image: url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=2560&auto=format&fit=crop');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      image-rendering: -webkit-optimize-contrast;
+    }
+
+    /* Ana Widget Konteyneri (Ekranın Tam Ortasında) */
+    .widget-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    /* Widget Kartı */
+    .widget-card {
+      position: relative;
+      background: var(--card-glass-bg);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border: 1px solid var(--card-border);
+      border-radius: 32px;
+      box-shadow: var(--card-shadow);
+      padding: 36px 48px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      transform: scale(var(--widget-scale, 1));
+      transform-origin: center center;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.35s ease, border-color 0.35s ease;
+    }
+
+    .widget-main-row {
+      display: flex;
+      align-items: center;
+      gap: 56px;
+    }
+
+    /* Finans Paneli Stilleri */
+    .finance-divider {
+      width: 100%;
+      height: 1px;
+      background: var(--card-border);
+      opacity: 0.5;
+      margin: 22px 0 16px 0;
+      transition: opacity 0.3s;
+    }
+
+    .finance-section {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .finance-section.hidden, .finance-divider.hidden {
+      display: none;
+    }
+
+    .finance-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+      gap: 12px;
+    }
+
+    .match-badge {
+      margin-top: 14px;
+      padding: 7px 14px;
+      border-radius: 10px;
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      align-self: flex-start;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    /* Koyu Tema: Siyah arka planda beyaz yazı ve yumuşak açık kapsül */
+    :root:not([data-theme="light"]) .match-badge,
+    [data-theme="dark"] .match-badge {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+    }
+
+    /* Açık Tema: Beyaz arka planda koyu renk yazı ve yumuşak koyu kapsül */
+    [data-theme="light"] .match-badge {
+      background: rgba(0, 0, 0, 0.05);
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      color: #0f172a;
+    }
+
+    /* Maç Günü (Canlı) */
+    :root:not([data-theme="light"]) .match-badge.today,
+    [data-theme="dark"] .match-badge.today {
+      background: rgba(239, 68, 68, 0.22);
+      border-color: rgba(239, 68, 68, 0.45);
+      color: #ffffff;
+    }
+
+    [data-theme="light"] .match-badge.today {
+      background: rgba(220, 38, 38, 0.12);
+      border-color: rgba(220, 38, 38, 0.40);
+      color: #b91c1c;
+    }
+
+    .match-badge.hidden {
+      display: none;
+    }
+
+    /* Maç Öncesi Seken Top & Başlangıç Düdüğü Uyarısı */
+    .match-alert-banner {
+      margin-top: 12px;
+      padding: 7px 12px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(220, 38, 38, 0.20);
+      border: 1px solid rgba(253, 185, 18, 0.40);
+      transition: all 0.3s ease;
+      cursor: default;
+    }
+
+    .match-alert-banner.hidden {
+      display: none;
+    }
+
+    .bouncing-ball-box {
+      width: 32px;
+      height: 38px;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      flex-shrink: 0;
+    }
+
+    .bouncing-ball {
+      width: 24px;
+      height: 24px;
+      position: absolute;
+      bottom: 4px;
+      animation: ballBounce 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite alternate;
+    }
+
+    .bouncing-shadow {
+      width: 18px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.45);
+      position: absolute;
+      bottom: 1px;
+      animation: shadowPulse 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite alternate;
+    }
+
+    @keyframes ballBounce {
+      0% {
+        transform: translateY(0) rotate(-15deg);
+      }
+      100% {
+        transform: translateY(-15px) rotate(15deg);
+      }
+    }
+
+    @keyframes shadowPulse {
+      0% {
+        transform: scale(1);
+        opacity: 0.65;
+      }
+      100% {
+        transform: scale(0.4);
+        opacity: 0.15;
+      }
+    }
+
+    .match-alert-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .match-alert-header {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .match-alert-detail {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .finance-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .finance-title-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .finance-title {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+
+    .bist-badge {
+      font-size: 9px;
+      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(74, 222, 128, 0.15);
+      color: #4ade80;
+    }
+
+    .bist-badge.closed {
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--text-muted);
+    }
+
+    .finance-val-row {
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+    }
+
+    .finance-price {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .finance-change {
+      font-size: 11px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .change-up {
+      color: #4ade80;
+    }
+
+    .change-down {
+      color: #f87171;
+    }
+
+    [data-theme="light"] .change-up {
+      color: #16a34a;
+    }
+
+    [data-theme="light"] .change-down {
+      color: #dc2626;
+    }
+
+    .finance-footer {
+      font-size: 10px;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      user-select: none;
+      transition: color 0.2s;
+    }
+
+    .finance-footer:hover {
+      color: var(--accent);
+    }
+
+    /* Mat Modu */
+    .widget-card.matte {
+      background: var(--card-matte-bg);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    /* Sol Bölüm: Saat, Saniye, Tarih ve Gün */
+    .time-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 220px;
+    }
+
+    .clock-display {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      line-height: 0.95;
+    }
+
+    .time-digits, .time-hour, .time-minute {
+      font-size: 76px;
+      font-weight: 200;
+      letter-spacing: -2.5px;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+      transition: color 0.3s, text-shadow 0.3s;
+    }
+
+    .time-colon {
+      font-size: 72px;
+      font-weight: 200;
+      color: var(--text-primary);
+      margin: 0 1px;
+      transition: color 0.3s;
+    }
+
+    .crescent-star-sep {
+      display: inline-flex;
+      align-items: center;
+      margin: 0 4px 6px 4px;
+      align-self: center;
+      color: #ffffff;
+      transition: all 0.3s;
+    }
+
+    .crescent-star-sep.hidden {
+      display: none;
+    }
+
+    .time-seconds {
+      font-size: 26px;
+      font-weight: 300;
+      color: var(--text-muted);
+      letter-spacing: -0.5px;
+      min-width: 32px;
+      font-variant-numeric: tabular-nums;
+      margin-left: 2px;
+    }
+
+    .date-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      letter-spacing: 0.2px;
+    }
+
+    .date-text {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .date-separator {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      opacity: 0.6;
+    }
+
+    .day-name {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    /* Dikey Ayırıcı (Ultra ince, silik) */
+    .divider {
+      width: 1px;
+      height: 72px;
+      background: var(--card-border);
+      opacity: 0.6;
+    }
+
+    /* Sağ Bölüm: Hava Durumu */
+    .weather-section {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .weather-icon-wrap {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--icon-color);
+      flex-shrink: 0;
+    }
+
+    .weather-icon-wrap svg {
+      width: 44px;
+      height: 44px;
+      filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.16));
+      transition: transform 0.25s ease;
+    }
+
+    .weather-icon-wrap:hover svg {
+      transform: scale(1.08);
+    }
+
+    .weather-details {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .temperature {
+      font-size: 34px;
+      font-weight: 300;
+      color: var(--text-primary);
+      letter-spacing: -1px;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .weather-sub {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .weather-status {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text-secondary);
+    }
+
+    .city-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: color 0.2s;
+    }
+
+    .city-name:hover {
+      color: var(--accent);
+    }
+
+    /* Alt Minimalist Kontroller */
+    .widget-toolbar {
+      margin-top: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      border-radius: 999px;
+      padding: 6px 14px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      opacity: 0.7;
+      transition: opacity 0.25s, transform 0.25s;
+    }
+
+    .widget-toolbar:hover {
+      opacity: 1;
+      transform: translateY(-2px);
+    }
+
+    .tool-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-family: inherit;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .tool-btn:hover {
+      background: var(--pill-hover);
+      color: var(--text-primary);
+    }
+
+    .tool-btn svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    /* Şehir Seçme Kutucuğu (Modal/Dropdown) */
+    .city-modal {
+      display: none;
+      position: absolute;
+      top: calc(100% + 12px);
+      background: var(--card-glass-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: var(--card-shadow);
+      width: 260px;
+      z-index: 100;
+    }
+
+    .city-modal.open {
+      display: block;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .city-input {
+      width: 100%;
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+      margin-bottom: 10px;
+    }
+
+    .city-input:focus {
+      border-color: var(--accent);
+    }
+
+    .city-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+
+    .city-tag {
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 8px;
+      background: var(--pill-bg);
+      color: var(--text-secondary);
+      cursor: pointer;
+      border: 1px solid var(--pill-border);
+      transition: all 0.15s;
+    }
+
+    .city-tag:hover {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+    }
+
+    /* Ayarlar Modalı - Desktop Zen Stili */
+    .settings-modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--card-glass-bg);
+      backdrop-filter: blur(36px);
+      -webkit-backdrop-filter: blur(36px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
+      width: 660px;
+      max-width: 94vw;
+      height: 480px;
+      max-height: 88vh;
+      z-index: 200;
+      color: var(--text-primary);
+      overflow: hidden;
+      flex-direction: column;
+    }
+
+    .settings-modal.open {
+      display: flex;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .pt-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(128, 128, 128, 0.05);
+      height: 46px;
+      box-sizing: border-box;
+    }
+
+    .pt-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pt-logo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-gap: 2px;
+      width: 16px;
+      height: 16px;
+    }
+    .pt-logo-sq { border-radius: 2px; }
+    .pt-sq-red { background: #e81123; }
+    .pt-sq-green { background: #107c41; }
+    .pt-sq-blue { background: #0078d4; }
+    .pt-sq-yellow { background: #ffb900; }
+
+    .pt-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+    }
+
+    .pt-search-mock {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+      width: 180px;
+    }
+
+    .settings-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .settings-close:hover {
+      color: var(--text-primary);
+      background: rgba(128, 128, 128, 0.15);
+    }
+
+    .pt-body {
+      display: flex;
+      flex: 1;
+      height: calc(100% - 46px);
+      overflow: hidden;
+    }
+
+    .pt-sidebar {
+      width: 190px;
+      background: rgba(128, 128, 128, 0.04);
+      border-right: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 10px 8px;
+      box-sizing: border-box;
+    }
+
+    .pt-nav-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .pt-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+      transition: background 0.15s, color 0.15s;
+      position: relative;
+    }
+
+    .pt-nav-item:hover {
+      background: var(--pill-bg);
+      color: var(--text-primary);
+    }
+
+    .pt-nav-item.active {
+      background: var(--pill-bg);
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .pt-nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: 2px;
+      top: 8px;
+      bottom: 8px;
+      width: 3px;
+      border-radius: 2px;
+      background: var(--accent);
+    }
+
+    .pt-creator-card {
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 10px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: transform 0.15s, background 0.15s;
+    }
+    .pt-creator-card:hover {
+      background: rgba(56, 189, 248, 0.14);
+      transform: translateY(-1px);
+    }
+    .pt-creator-avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .pt-creator-meta {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .pt-creator-role {
+      font-size: 8.5px;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .pt-creator-name {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+
+    .pt-content {
+      flex: 1;
+      padding: 20px 24px;
+      overflow-y: auto;
+      box-sizing: border-box;
+    }
+
+    .pt-tab-pane {
+      display: none;
+    }
+    .pt-tab-pane.active {
+      display: block;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .pt-hero-card {
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .pt-hero-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: var(--text-primary);
+    }
+    .pt-hero-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .settings-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-muted);
+      margin: 14px 0 8px 0;
+    }
+
+    .settings-hint {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+
+    .settings-options-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    .settings-check-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: rgba(128, 128, 128, 0.04);
+      border: 1px solid transparent;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .settings-check-label:hover {
+      background: var(--pill-bg);
+      border-color: var(--pill-border);
+      color: var(--text-primary);
+    }
+
+    .settings-check-label.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .settings-check-label input[type="checkbox"] {
+      accent-color: #0078d4;
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+    }
+
+    .settings-input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .settings-text-input {
+      flex: 1;
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 12.5px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .settings-text-input:focus {
+      border-color: var(--accent);
+    }
+
+    .settings-btn {
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: filter 0.15s, transform 0.1s;
+    }
+
+    .settings-btn:hover {
+      filter: brightness(1.1);
+    }
+    .settings-btn:active {
+      transform: scale(0.97);
+    }
+
+    .dev-badge-hero {
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .dev-badge-tag {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .dev-badge-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+    .dev-badge-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+    .dev-meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11.5px;
+    }
+    .dev-meta-table td {
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(128, 128, 128, 0.1);
+    }
+    .dev-meta-table td:first-child {
+      color: var(--text-muted);
+      width: 120px;
+    }
+    .dev-meta-table td:last-child {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    /* Mobil / Küçük Ekran Uyumu */
+    @media (max-width: 640px) {
+      .widget-card {
+        padding: 28px 24px;
+        border-radius: 28px;
+      }
+      .widget-main-row {
+        flex-direction: column;
+        gap: 24px;
+      }
+      .finance-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+      .divider {
+        width: 100%;
+        height: 1px;
+      }
+      .time-digits {
+        font-size: 56px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="widget-container">
+    <!-- Ana Widget Kartı -->
+    <div class="widget-card" id="widgetCard">
+      
+      <!-- Üst Satır: Saat ve Hava Durumu -->
+      <div class="widget-main-row">
+        <!-- Sol: Saat ve Tarih -->
+        <div class="time-section">
+          <div class="clock-display">
+            <span class="time-hour" id="clockHour">12</span>
+            <span class="time-colon" id="clockColon">:</span>
+            <span class="crescent-star-sep hidden" id="crescentStarSep">
+              <svg width="24" height="28" viewBox="0 0 100 100" fill="currentColor">
+                <path d="M 80.4,30.7 A 36,36 0 1,0 80.4,69.3 A 28.8,28.8 0 1,1 80.4,30.7 Z M 68,50 L 74.9,47.7 L 74.9,40.5 L 79.2,44.4 L 86.1,44.1 L 81.8,50 L 86.1,55.9 L 79.2,55.6 L 74.9,59.5 L 74.9,52.3 Z"/>
+              </svg>
+            </span>
+            <span class="time-minute" id="clockMinute">00</span>
+            <span class="time-seconds" id="clockSeconds">:00</span>
+          </div>
+          
+          <div class="date-row">
+            <span class="date-text" id="dateText">01.01.2026</span>
+            <span class="date-separator"></span>
+            <span class="day-name" id="dayName">Pazartesi</span>
+          </div>
+        </div>
+
+        <!-- Ayırıcı -->
+        <div class="divider"></div>
+
+        <!-- Sağ: Canlı Hava Durumu -->
+        <div class="weather-section">
+          <div class="weather-icon-wrap" id="weatherIcon">
+            <!-- Varsayılan Renkli 3D Güneş & Bulut İkonu -->
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="initSunGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#FFE043"/>
+                  <stop offset="55%" stop-color="#FF9500"/>
+                  <stop offset="100%" stop-color="#FF5E00"/>
+                </linearGradient>
+                <radialGradient id="initSunGlow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#FFAE00" stop-opacity="0.35"/>
+                  <stop offset="100%" stop-color="#FFAE00" stop-opacity="0"/>
+                </radialGradient>
+                <linearGradient id="initCloudGrad" x1="25%" y1="0%" x2="65%" y2="100%">
+                  <stop offset="0%" stop-color="#E2F1FF"/>
+                  <stop offset="35%" stop-color="#A5CEFF"/>
+                  <stop offset="75%" stop-color="#5E9EF7"/>
+                  <stop offset="100%" stop-color="#3B82F6"/>
+                </linearGradient>
+                <linearGradient id="initCloudHi" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.8"/>
+                  <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <circle cx="43" cy="22" r="17" fill="url(#initSunGlow)"/>
+              <circle cx="43" cy="22" r="13" fill="url(#initSunGrad)"/>
+              <path d="M 19 49 C 13.5 49 9 44.5 9 39 C 9 34 12.8 29.8 17.7 29.1 C 19.8 21.2 27 15.5 35.5 15.5 C 44.8 15.5 52.4 22.4 53.6 31.5 C 57.6 32.8 60.5 36.6 60.5 41 C 60.5 45.4 56.9 49 52.5 49 Z" fill="url(#initCloudGrad)"/>
+              <path d="M 18.5 30 C 20.5 22.5 27.2 17 35.5 17 C 43.8 17 50.8 22.8 52.3 31 C 49 29.5 42 28.5 35 29 C 27 29.5 21 30.5 18.5 30 Z" fill="url(#initCloudHi)"/>
+            </svg>
+          </div>
+
+          <div class="weather-details">
+            <div class="temperature" id="weatherTemp">--°C</div>
+            <div class="weather-sub">
+              <div class="weather-status" id="weatherStatus">Yükleniyor...</div>
+              <div class="city-name" id="cityLabel" title="Şehri değiştirmek için tıklayın">
+                <span id="cityName">İstanbul</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M6 9l6 6 6-6"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Maç Öncesi Seken Takım Topu ve Başlangıç Bildirimi (5 dk önce başlar, 6 dk sürer) -->
+      <div class="match-alert-banner hidden" id="matchAlertBanner">
+        <div class="bouncing-ball-box" id="matchAlertBallBox">
+          <div class="bouncing-shadow"></div>
+          <div class="bouncing-ball" id="matchAlertBall"></div>
+        </div>
+        <div class="match-alert-info">
+          <div class="match-alert-header" id="matchAlertHeader">⚽ MAÇ BAŞLIYOR!</div>
+          <div class="match-alert-detail" id="matchAlertDetail">--</div>
+        </div>
+      </div>
+
+      <!-- Futbol Maç Takip Rozeti -->
+      <div class="match-badge hidden" id="matchBadge" title="Fikstürdeki diğer maçları görmek için tıklayın">
+        <span id="matchText">⚽ Maç bilgisi</span>
+      </div>
+
+      <!-- Finans Ayırıcı & Panel -->
+      <div class="finance-divider" id="financeDivider"></div>
+      <div class="finance-section" id="financeSection">
+        <div class="finance-grid" id="financeGrid">
+          <!-- Finans ve Kripto pariteleri dinamik olarak doldurulur -->
+        </div>
+        <div class="finance-footer" id="financeFooter" title="Finans verilerini yenilemek için tıklayın">
+          <span id="financeStatus">Son güncelleme: --:--</span>
+        </div>
+      </div>
+
+      <!-- Şehir Seçici Açılır Menü -->
+      <div class="city-modal" id="cityModal">
+        <input type="text" id="citySearchInput" class="city-input" placeholder="Şehir adı yazıp Enter'a basın...">
+        <div class="city-list">
+          <span class="city-tag" onclick="selectCity('İstanbul')">İstanbul</span>
+          <span class="city-tag" onclick="selectCity('Ankara')">Ankara</span>
+          <span class="city-tag" onclick="selectCity('İzmir')">İzmir</span>
+          <span class="city-tag" onclick="selectCity('Bursa')">Bursa</span>
+          <span class="city-tag" onclick="selectCity('Antalya')">Antalya</span>
+          <span class="city-tag" onclick="selectCity('Adana')">Adana</span>
+          <span class="city-tag" onclick="selectCity('Trabzon')">Trabzon</span>
+          <span class="city-tag" onclick="selectCity('Eskişehir')">Eskişehir</span>
+        </div>
+      </div>
+
+      <!-- Ayarlar Modalı (Desktop Zen Stili) -->
+      <div class="settings-modal" id="settingsModal">
+        <!-- Desktop Zen Üst Bar -->
+        <div class="pt-header">
+          <div class="pt-brand">
+            <div class="pt-logo-grid">
+              <div class="pt-logo-sq pt-sq-red"></div>
+              <div class="pt-logo-sq pt-sq-green"></div>
+              <div class="pt-logo-sq pt-sq-blue"></div>
+              <div class="pt-logo-sq pt-sq-yellow"></div>
+            </div>
+            <span class="pt-title">Desktop Zen Ayarları</span>
+          </div>
+          <div class="pt-search-mock">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <span>Ayarları arama</span>
+          </div>
+          <button class="settings-close" id="settingsCloseBtn" title="Kapat">&times;</button>
+        </div>
+
+        <!-- Desktop Zen Gövde: Sol Sidebar + Sağ Sekme İçeriği -->
+        <div class="pt-body">
+          <!-- Sol Kenar Çubuğu -->
+          <div class="pt-sidebar">
+            <div class="pt-nav-list">
+              <button class="pt-nav-item active" data-tab="tabHome">
+                <span>🏠</span>
+                <span>Giriş & Genel</span>
+              </button>
+              <button class="pt-nav-item" data-tab="tabMatches">
+                <span>⚽</span>
+                <span>Maç Takipçisi</span>
+              </button>
+              <button class="pt-nav-item" data-tab="tabFinance">
+                <span>📈</span>
+                <span>Finans & Parite</span>
+              </button>
+              <button class="pt-nav-item" data-tab="tabAbout">
+                <span>ℹ️</span>
+                <span>Hakkında</span>
+              </button>
+            </div>
+
+            <!-- Geliştirici Serkan ŞENTÜRK Kartı -->
+            <div class="pt-creator-card" id="ptCreatorBadge" title="Geliştirici Hakkında">
+              <div class="pt-creator-avatar">⚡</div>
+              <div class="pt-creator-meta">
+                <span class="pt-creator-role">GELİŞTİRİCİ</span>
+                <span class="pt-creator-name">Serkan ŞENTÜRK</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sağ İçerik Alanı -->
+          <div class="pt-content">
+            <!-- Sekme 1: Giriş & Genel -->
+            <div class="pt-tab-pane active" id="tabHome">
+              <div class="pt-hero-card">
+                <div class="pt-hero-title">Modern Desktop Zen v2.5</div>
+                <div class="pt-hero-desc">Masaüstü deneyiminizi pürüzsüz kılan akıllı widget ve takip paneli. Tüm modülleri sol menüden yönetebilirsiniz.</div>
+              </div>
+
+              <div class="settings-section-title">WİDGET BOYUTU & SAYDAMLIK</div>
+              <div class="settings-hint">Widget boyutunu (%50 - %150) ve kart arka plan saydamlığını (%20 - %100) ayarlayın:</div>
+              <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px; margin-bottom:16px;">
+                <div>
+                  <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:600; margin-bottom:4px;">
+                    <span>Widget Boyutu (Yüzdelik Ölçek)</span>
+                    <span id="lblWidgetScale" style="color:var(--accent); font-weight:700;">%100</span>
+                  </div>
+                  <input type="range" id="rngWidgetScale" min="50" max="150" step="5" value="100" style="width:100%; accent-color:var(--accent); cursor:pointer;">
+                </div>
+                <div>
+                  <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:600; margin-bottom:4px;">
+                    <span>Kart Arka Plan Saydamlığı (Opaklık)</span>
+                    <span id="lblWidgetOpacity" style="color:var(--accent); font-weight:700;">%100</span>
+                  </div>
+                  <input type="range" id="rngWidgetOpacity" min="0" max="100" step="5" value="100" style="width:100%; accent-color:var(--accent); cursor:pointer;">
+                </div>
+              </div>
+
+              <div class="settings-section-title">GÖRÜNÜM TEMASI</div>
+              <div class="settings-hint">Widget renk paletini seçin (Koyu veya Açık):</div>
+              <div style="margin-top:10px; margin-bottom:16px;">
+                <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Renk Teması</label>
+                <select id="selModalTheme" style="width:100%; max-width:240px; padding:7px 10px; background:var(--pill-bg); color:var(--text-primary); border:1px solid var(--pill-border); border-radius:6px; font-size:12px; cursor:pointer;">
+                  <option value="dark">Koyu Tema (Dark)</option>
+                  <option value="light">Açık Tema (Light)</option>
+                </select>
+              </div>
+
+              <div class="settings-section-title">KONUM VE KİLİTLEME</div>
+              <div class="settings-hint">Widget'ın ekran konumu ve fare ile hareket kilidi:</div>
+              <div style="margin-top:10px; margin-bottom:16px; display:flex; flex-direction:column; gap:10px;">
+                <label class="settings-check-label full-width">
+                  <input type="checkbox" id="chkLockPositionWeb" checked>
+                  <span>🔒 Widget Konumunu Kilitle (Fareyle sürüklemeyi engelle)</span>
+                </label>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <button type="button" class="settings-btn" id="btnPosTopWeb" style="padding:6px 12px; font-size:12px;">⬆️ Üst Orta (Varsayılan)</button>
+                  <button type="button" class="settings-btn" id="btnPosCenterWeb" style="padding:6px 12px; font-size:12px; background:var(--pill-bg); color:var(--text-primary); border:1px solid var(--pill-border);">🎯 Ekran Ortası</button>
+                </div>
+              </div>
+
+              <div class="settings-section-title">DUVAR KAĞIDI GÖRÜNÜMÜ</div>
+              <div class="settings-hint">Arka planda duvar kağıdı gösterimi ve manuel dosya seçimi:</div>
+              <div style="margin-top:10px; margin-bottom:16px; display:flex; flex-direction:column; gap:10px;">
+                <label class="settings-check-label full-width">
+                  <input type="checkbox" id="chkShowWallpaperWeb">
+                  <span>Arka planda duvar kağıdını göster</span>
+                </label>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                  <button type="button" class="settings-btn" id="btnBrowseWallpaperWeb" style="padding:6px 12px; font-size:12px;">📁 Duvar Kağıdı Seç...</button>
+                  <button type="button" class="settings-btn" id="btnClearWallpaperWeb" style="padding:6px 12px; font-size:12px; background:var(--pill-bg); color:var(--text-primary); border:1px solid var(--pill-border);">🔄 Varsayılana Dön</button>
+                  <input type="file" id="fileWallpaperWeb" accept="image/*" style="display:none;">
+                </div>
+                <div id="lblWallpaperStatusWeb" style="font-size:11px; color:var(--text-muted); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">Mevcut Duvar Kağıdı (Varsayılan)</div>
+              </div>
+
+              <div class="settings-section-title">HIZLI BAĞLANTILAR</div>
+              <div class="settings-hint">İstediğiniz bölüme tıklayarak doğrudan ayarlara ulaşabilirsiniz:</div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <button class="settings-btn" style="text-align:left; background:var(--pill-bg); color:var(--text-primary); border:1px solid var(--pill-border);" onclick="switchPtTab('tabMatches')">⚽ Futbol Maç Takipçisi ve Saat Renkleri</button>
+                <button class="settings-btn" style="text-align:left; background:var(--pill-bg); color:var(--text-primary); border:1px solid var(--pill-border);" onclick="switchPtTab('tabFinance')">📈 Döviz, Altın, BIST 100 ve Kripto Pariteleri</button>
+                <button class="settings-btn" style="text-align:left; background:var(--pill-bg); color:var(--text-primary); border:1px solid var(--pill-border);" onclick="switchPtTab('tabAbout')">ℹ️ Proje Sahibi & Geliştirici (Serkan ŞENTÜRK)</button>
+              </div>
+            </div>
+
+            <!-- Sekme 2: Maç Takipçisi -->
+            <div class="pt-tab-pane" id="tabMatches">
+              <div class="pt-hero-card">
+                <div class="pt-hero-title">⚽ Maç Takibi & Takım Teması</div>
+                <div class="pt-hero-desc">Milli Takım ve 4 Büyüklerin maç saatleri, maç gününe özel dinamik saat renkleri ve Türkiye maçında Ay-Yıldız ayraç.</div>
+              </div>
+
+              <div class="settings-section-title">TAKİP EDİLECEK TAKIMLAR</div>
+              <div class="settings-hint">Türkiye varsayılan olarak seçilidir. Diğer takımları isteğe bağlı açabilirsiniz:</div>
+              <div class="settings-options-grid">
+                <label class="settings-check-label">
+                  <input type="checkbox" id="chkTrackTurkey">
+                  <span>🇹🇷 Türkiye (Milli Takım)</span>
+                </label>
+                <label class="settings-check-label">
+                  <input type="checkbox" id="chkTrackGS">
+                  <span>🟡🔴 Galatasaray</span>
+                </label>
+                <label class="settings-check-label">
+                  <input type="checkbox" id="chkTrackFB">
+                  <span>🟡🔵 Fenerbahçe</span>
+                </label>
+                <label class="settings-check-label">
+                  <input type="checkbox" id="chkTrackBJK">
+                  <span>⚪⚫ Beşiktaş</span>
+                </label>
+                <label class="settings-check-label">
+                  <input type="checkbox" id="chkTrackTS">
+                  <span>🍷🔵 Trabzonspor</span>
+                </label>
+                <label class="settings-check-label full-width">
+                  <input type="checkbox" id="chkMatchClockTheme">
+                  <span>Maç günü saat takım renklerine bürünsün</span>
+                </label>
+              </div>
+              <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="settings-btn" id="btnSaveMatches">Değişiklikleri Kaydet</button>
+                <button class="settings-btn" type="button" id="btnTestMatchAlert" style="background:rgba(56, 189, 248, 0.18); border:1px solid rgba(56, 189, 248, 0.45); color:#38bdf8;">🔊 Seken Topu ve Düdüğü Test Et</button>
+              </div>
+            </div>
+
+            <!-- Sekme 3: Finans & Pariteler -->
+            <div class="pt-tab-pane" id="tabFinance">
+              <div class="pt-hero-card">
+                <div class="pt-hero-title">📈 Finans & Kripto Pariteleri</div>
+                <div class="pt-hero-desc">Döviz, altın, borsa ve kripto paralar 5 dakikada bir otomatik yenilenir. Kutucuklara tıklayarak da güncelleyebilirsiniz.</div>
+              </div>
+
+              <div class="settings-section-title">GÖSTERİLECEK PARİTELER</div>
+              <div class="settings-options-grid">
+                <label class="settings-check-label">
+                  <input type="checkbox" id="chkShowUsd">
+                  <span>💵 USD / TRY</span>
+                </label>
+                <label class="settings-check-label">
+                  <input type="checkbox" id="chkShowEur">
+                  <span>💶 EUR / TRY</span>
+                </label>
+                <label class="settings-check-label">
+                  <input type="checkbox" id="chkShowGram">
+                  <span>🪙 Gram Altın</span>
+                </label>
+                <label class="settings-check-label">
+                  <input type="checkbox" id="chkShowOunce">
+                  <span>🥇 Ons Altın</span>
+                </label>
+                <label class="settings-check-label">
+                  <input type="checkbox" id="chkShowBist">
+                  <span>📈 BIST 100</span>
+                </label>
+                <label class="settings-check-label">
+                  <input type="checkbox" id="chkShowBtc">
+                  <span>₿ BTC / USDT</span>
+                </label>
+                <label class="settings-check-label">
+                  <input type="checkbox" id="chkShowEth">
+                  <span>🔷 ETH / USDT</span>
+                </label>
+              </div>
+
+              <div class="settings-section-title">➕ ÖZEL PARİTE EKLE (KISA KOD İLE)</div>
+              <div class="settings-hint">Virgülle ayırarak döviz (GBP, CHF) veya kripto (SOL, AVAX, DOGE, XRP) ekleyin:</div>
+              <div class="settings-input-row">
+                <input type="text" id="txtCustomParities" class="settings-text-input" placeholder="Örn: SOL, AVAX, GBP, DOGE">
+                <button class="settings-btn" id="btnSaveSettings">Kaydet</button>
+              </div>
+            </div>
+
+            <!-- Sekme 4: Hakkında & Geliştirici (Serkan ŞENTÜRK) -->
+            <div class="pt-tab-pane" id="tabAbout">
+              <div class="dev-badge-hero">
+                <span class="dev-badge-tag">PROJE SAHİBİ VE BAŞ GELİŞTİRİCİ</span>
+                <div class="dev-badge-title">Serkan ŞENTÜRK</div>
+                <div class="dev-badge-desc">
+                  Modern Desktop Zen ekosisteminin tüm tasarımı, mimarisi, masaüstü ikon gizleme algoritmaları, canlı bilgi widget'ı, 3D renkli hava durumu vektörleri, finans/kripto parite takibi ve dinamik futbol takımı maç saatleri <b>Serkan ŞENTÜRK</b> tarafından tasarlanmış ve baştan sona kodlanmıştır.
+                </div>
+                <table class="dev-meta-table">
+                  <tr>
+                    <td>Geliştirici:</td>
+                    <td><b>Serkan ŞENTÜRK</b></td>
+                  </tr>
+                  <tr>
+                    <td>Uygulama Sürümü:</td>
+                    <td>v2.5 (Modern Zen Edition)</td>
+                  </tr>
+                  <tr>
+                    <td>Teknoloji:</td>
+                    <td>C# WPF, Win32 Native Core, Modern HTML5/JS</td>
+                  </tr>
+                  <tr>
+                    <td>Telif Hakkı:</td>
+                    <td>© 2026 Serkan ŞENTÜRK. Tüm Hakları Saklıdır.</td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    <!-- Alt Kontrol Çubuğu -->
+    <div class="widget-toolbar">
+      <!-- Finans Paneli Aç/Kapat -->
+      <button class="tool-btn" id="financeBtn" title="Finans Paneli Aç/Kapat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+          <polyline points="17 6 23 6 23 12"></polyline>
+        </svg>
+        <span id="financeLabel">Finans</span>
+      </button>
+
+      <!-- Tema Değiştir -->
+      <button class="tool-btn" id="themeBtn" title="Açık / Koyu Tema">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+        <span id="themeLabel">Koyu</span>
+      </button>
+
+      <!-- Konum: Orta / Üst Orta -->
+      <button class="tool-btn" id="posBtn" title="Konum: Ekranın Ortası / Üst Orta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 19V5M5 12l7-7 7 7"/>
+        </svg>
+        <span id="posLabel">Orta</span>
+      </button>
+
+      <!-- Ayarlar -->
+      <button class="tool-btn" id="settingsBtn" title="Ayarlar (Takımlar, Pariteler)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        <span>Ayarlar</span>
+      </button>
+
+      <!-- Duvar Kağıdı Önizleme -->
+      <button class="tool-btn" id="wallpaperBtn" title="Duvar Kağıdı Görünümünü Aç/Kapat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+          <line x1="8" y1="21" x2="16" y2="21"></line>
+          <line x1="12" y1="17" x2="12" y2="21"></line>
+        </svg>
+        <span>Masaüstü</span>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Türkçe Gün İsimleri
+    const turkishDays = [
+      'Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'
+    ];
+
+    // Renkli Minimalist 3D Vektör Hava Durumu İkonları
+    const WeatherIcons = {
+      clear: `
+        <svg viewBox="0 0 64 64" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="clrSunGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FFF066"/>
+              <stop offset="45%" stop-color="#FFA800"/>
+              <stop offset="100%" stop-color="#FF5500"/>
+            </linearGradient>
+            <radialGradient id="clrSunGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#FFB300" stop-opacity="0.4"/>
+              <stop offset="100%" stop-color="#FF7700" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <circle cx="32" cy="32" r="28" fill="url(#clrSunGlow)"/>
+          <g stroke="url(#clrSunGrad)" stroke-width="3.2" stroke-linecap="round" opacity="0.85">
+            <line x1="32" y1="6" x2="32" y2="11"/>
+            <line x1="32" y1="53" x2="32" y2="58"/>
+            <line x1="6" y1="32" x2="11" y2="32"/>
+            <line x1="53" y1="32" x2="58" y2="32"/>
+            <line x1="14" y1="14" x2="18" y2="18"/>
+            <line x1="46" y1="46" x2="50" y2="50"/>
+            <line x1="14" y1="50" x2="18" y2="46"/>
+            <line x1="46" y1="18" x2="50" y2="14"/>
+          </g>
+          <circle cx="32" cy="32" r="15" fill="url(#clrSunGrad)"/>
+          <circle cx="27" cy="27" r="4" fill="#FFFFFF" opacity="0.4"/>
+        </svg>`,
+      partlyCloudy: `
+        <svg viewBox="0 0 64 64" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="pcSunGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FFE043"/>
+              <stop offset="55%" stop-color="#FF9500"/>
+              <stop offset="100%" stop-color="#FF5E00"/>
+            </linearGradient>
+            <radialGradient id="pcSunGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#FFAE00" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#FFAE00" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="pcCloudGrad" x1="25%" y1="0%" x2="65%" y2="100%">
+              <stop offset="0%" stop-color="#E2F1FF"/>
+              <stop offset="35%" stop-color="#A5CEFF"/>
+              <stop offset="75%" stop-color="#5E9EF7"/>
+              <stop offset="100%" stop-color="#3B82F6"/>
+            </linearGradient>
+            <linearGradient id="pcCloudHi" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.8"/>
+              <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <circle cx="43" cy="22" r="17" fill="url(#pcSunGlow)"/>
+          <circle cx="43" cy="22" r="13" fill="url(#pcSunGrad)"/>
+          <path d="M 19 49 C 13.5 49 9 44.5 9 39 C 9 34 12.8 29.8 17.7 29.1 C 19.8 21.2 27 15.5 35.5 15.5 C 44.8 15.5 52.4 22.4 53.6 31.5 C 57.6 32.8 60.5 36.6 60.5 41 C 60.5 45.4 56.9 49 52.5 49 Z" fill="url(#pcCloudGrad)"/>
+          <path d="M 18.5 30 C 20.5 22.5 27.2 17 35.5 17 C 43.8 17 50.8 22.8 52.3 31 C 49 29.5 42 28.5 35 29 C 27 29.5 21 30.5 18.5 30 Z" fill="url(#pcCloudHi)"/>
+        </svg>`,
+      overcast: `
+        <svg viewBox="0 0 64 64" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="ovBackCloud" x1="20%" y1="0%" x2="80%" y2="100%">
+              <stop offset="0%" stop-color="#CBD5E1"/>
+              <stop offset="100%" stop-color="#64748B"/>
+            </linearGradient>
+            <linearGradient id="ovFrontCloud" x1="20%" y1="0%" x2="70%" y2="100%">
+              <stop offset="0%" stop-color="#F1F5F9"/>
+              <stop offset="40%" stop-color="#BFDBFE"/>
+              <stop offset="100%" stop-color="#60A5FA"/>
+            </linearGradient>
+          </defs>
+          <path d="M 28 38 C 24 38 21 34.5 21 30 C 21 26 24 23 28 22.5 C 29.5 16 35.5 11 42.5 11 C 50.5 11 57 17 58 24.5 C 61 25.5 63 28.5 63 32 C 63 35.5 60 38 56.5 38 Z" fill="url(#ovBackCloud)" opacity="0.8"/>
+          <path d="M 18 51 C 12.5 51 8 46.5 8 41 C 8 36 11.8 31.8 16.7 31.1 C 18.8 23.2 26 17.5 34.5 17.5 C 43.8 17.5 51.4 24.4 52.6 33.5 C 56.6 34.8 59.5 38.6 59.5 43 C 59.5 47.4 55.9 51 51.5 51 Z" fill="url(#ovFrontCloud)"/>
+        </svg>`,
+      rain: `
+        <svg viewBox="0 0 64 64" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="rnCloud" x1="20%" y1="0%" x2="70%" y2="100%">
+              <stop offset="0%" stop-color="#E2EEFE"/>
+              <stop offset="40%" stop-color="#93C5FD"/>
+              <stop offset="100%" stop-color="#3B82F6"/>
+            </linearGradient>
+            <linearGradient id="rnDrop" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#60A5FA"/>
+              <stop offset="100%" stop-color="#0284C7"/>
+            </linearGradient>
+          </defs>
+          <path d="M 18 43 C 12.5 43 8 38.5 8 33 C 8 28 11.8 23.8 16.7 23.1 C 18.8 15.2 26 9.5 34.5 9.5 C 43.8 9.5 51.4 16.4 52.6 25.5 C 56.6 26.8 59.5 30.6 59.5 35 C 59.5 39.4 55.9 43 51.5 43 Z" fill="url(#rnCloud)"/>
+          <g stroke="url(#rnDrop)" stroke-width="3.2" stroke-linecap="round">
+            <line x1="21" y1="48" x2="18" y2="57"/>
+            <line x1="33" y1="48" x2="30" y2="57"/>
+            <line x1="45" y1="48" x2="42" y2="57"/>
+          </g>
+        </svg>`,
+      thunder: `
+        <svg viewBox="0 0 64 64" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="thCloud" x1="20%" y1="0%" x2="70%" y2="100%">
+              <stop offset="0%" stop-color="#94A3B8"/>
+              <stop offset="50%" stop-color="#475569"/>
+              <stop offset="100%" stop-color="#1E293B"/>
+            </linearGradient>
+            <linearGradient id="thBolt" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FEF08A"/>
+              <stop offset="50%" stop-color="#FACC15"/>
+              <stop offset="100%" stop-color="#EA580C"/>
+            </linearGradient>
+          </defs>
+          <path d="M 18 43 C 12.5 43 8 38.5 8 33 C 8 28 11.8 23.8 16.7 23.1 C 18.8 15.2 26 9.5 34.5 9.5 C 43.8 9.5 51.4 16.4 52.6 25.5 C 56.6 26.8 59.5 30.6 59.5 35 C 59.5 39.4 55.9 43 51.5 43 Z" fill="url(#thCloud)"/>
+          <path d="M 33 35 L 25 48 L 32 48 L 29 60 L 41 46 L 34 46 Z" fill="url(#thBolt)"/>
+        </svg>`,
+      snow: `
+        <svg viewBox="0 0 64 64" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="snCloud" x1="20%" y1="0%" x2="70%" y2="100%">
+              <stop offset="0%" stop-color="#F0F9FF"/>
+              <stop offset="40%" stop-color="#BAE6FD"/>
+              <stop offset="100%" stop-color="#38BDF8"/>
+            </linearGradient>
+          </defs>
+          <path d="M 18 43 C 12.5 43 8 38.5 8 33 C 8 28 11.8 23.8 16.7 23.1 C 18.8 15.2 26 9.5 34.5 9.5 C 43.8 9.5 51.4 16.4 52.6 25.5 C 56.6 26.8 59.5 30.6 59.5 35 C 59.5 39.4 55.9 43 51.5 43 Z" fill="url(#snCloud)"/>
+          <circle cx="21" cy="51" r="3" fill="#FFFFFF" stroke="#BAE6FD" stroke-width="1"/>
+          <circle cx="33" cy="55" r="3" fill="#FFFFFF" stroke="#BAE6FD" stroke-width="1"/>
+          <circle cx="45" cy="51" r="3" fill="#FFFFFF" stroke="#BAE6FD" stroke-width="1"/>
+        </svg>`,
+      fog: `
+        <svg viewBox="0 0 64 64" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="fgSun" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FDE047"/>
+              <stop offset="100%" stop-color="#FB923C"/>
+            </linearGradient>
+            <linearGradient id="fgLine" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#93C5FD" stop-opacity="0.3"/>
+              <stop offset="50%" stop-color="#93C5FD" stop-opacity="0.9"/>
+              <stop offset="100%" stop-color="#93C5FD" stop-opacity="0.3"/>
+            </linearGradient>
+          </defs>
+          <circle cx="32" cy="24" r="13" fill="url(#fgSun)" opacity="0.75"/>
+          <rect x="12" y="38" width="40" height="4.5" rx="2.25" fill="url(#fgLine)"/>
+          <rect x="16" y="46" width="32" height="4.5" rx="2.25" fill="url(#fgLine)"/>
+          <rect x="20" y="54" width="24" height="4" rx="2" fill="url(#fgLine)"/>
+        </svg>`
+    };
+
+    // WMO Hava Durumu Kodu Haritası
+    function mapWeatherCode(code) {
+      if (code === 0) return { text: "Açık", icon: WeatherIcons.clear };
+      if (code === 1) return { text: "Çoğunlukla Açık", icon: WeatherIcons.clear };
+      if (code === 2) return { text: "Parçalı Bulutlu", icon: WeatherIcons.partlyCloudy };
+      if (code === 3) return { text: "Bulutlu", icon: WeatherIcons.overcast };
+      if (code === 45 || code === 48) return { text: "Sisli", icon: WeatherIcons.fog };
+      if (code >= 51 && code <= 55) return { text: "Çisenti", icon: WeatherIcons.rain };
+      if (code >= 61 && code <= 65) return { text: "Yağmurlu", icon: WeatherIcons.rain };
+      if (code >= 71 && code <= 77) return { text: "Karlı", icon: WeatherIcons.snow };
+      if (code >= 80 && code <= 82) return { text: "Sağanak Yağış", icon: WeatherIcons.rain };
+      if (code >= 85 && code <= 86) return { text: "Kar Sağanağı", icon: WeatherIcons.snow };
+      if (code >= 95) return { text: "Gök Gürültülü Fırtına", icon: WeatherIcons.thunder };
+      return { text: "Açık", icon: WeatherIcons.clear };
+    }
+
+    // Durum Değişkenleri
+    let currentCity = localStorage.getItem('widget_city') || 'İstanbul';
+    let currentTheme = localStorage.getItem('widget_theme') || 'dark';
+    if (currentTheme !== 'light') currentTheme = 'dark';
+
+    // DOM Elementleri
+    const clockHour = document.getElementById('clockHour');
+    const clockColon = document.getElementById('clockColon');
+    const crescentStarSep = document.getElementById('crescentStarSep');
+    const clockMinute = document.getElementById('clockMinute');
+    const clockSeconds = document.getElementById('clockSeconds');
+    const dateText = document.getElementById('dateText');
+    const dayName = document.getElementById('dayName');
+    const weatherTemp = document.getElementById('weatherTemp');
+    const weatherStatus = document.getElementById('weatherStatus');
+    const weatherIcon = document.getElementById('weatherIcon');
+    const cityName = document.getElementById('cityName');
+    const widgetCard = document.getElementById('widgetCard');
+    const cityModal = document.getElementById('cityModal');
+    const cityLabel = document.getElementById('cityLabel');
+    const citySearchInput = document.getElementById('citySearchInput');
+
+    const themeBtn = document.getElementById('themeBtn');
+    const themeLabel = document.getElementById('themeLabel');
+    const wallpaperBtn = document.getElementById('wallpaperBtn');
+
+    let activeTodayTeamKey = null;
+
+    // Canlı Saat ve Tarih Güncellemesi
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+
+      if (clockHour) clockHour.textContent = hours;
+      if (clockMinute) clockMinute.textContent = minutes;
+      if (clockSeconds) clockSeconds.textContent = `:${seconds}`;
+
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = now.getFullYear();
+
+      dateText.textContent = `${day}.${month}.${year}`;
+      dayName.textContent = turkishDays[now.getDay()];
+
+      if (typeof checkMatchCountdownAndWhistle === 'function') {
+        checkMatchCountdownAndWhistle();
+      }
+    }
+
+    // Canlı Hava Durumu Çekimi (Open-Meteo API)
+    async function fetchWeather(city) {
+      cityName.textContent = city;
+      weatherStatus.textContent = "Güncelleniyor...";
+
+      try {
+        // 1. Şehir Koordinatlarını Al
+        const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=tr&format=json`);
+        const geoData = await geoRes.json();
+
+        if (!geoData.results || geoData.results.length === 0) {
+          weatherStatus.textContent = "Şehir bulunamadı";
+          return;
+        }
+
+        const location = geoData.results[0];
+        cityName.textContent = location.name;
+
+        // 2. Hava Durumunu Al
+        const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current=temperature_2m,weather_code&timezone=auto`);
+        const weatherData = await weatherRes.json();
+
+        const current = weatherData.current;
+        const temp = Math.round(current.temperature_2m);
+        const mapped = mapWeatherCode(current.weather_code);
+
+        weatherTemp.textContent = `${temp}°C`;
+        weatherStatus.textContent = mapped.text;
+        weatherIcon.innerHTML = mapped.icon;
+
+        localStorage.setItem('widget_city', location.name);
+      } catch (err) {
+        console.error("Hava durumu hatası:", err);
+        weatherStatus.textContent = "Bağlantı hatası";
+      }
+    }
+
+    // Şehir Seçimi
+    function selectCity(city) {
+      currentCity = city;
+      cityModal.classList.remove('open');
+      fetchWeather(city);
+    }
+
+    cityLabel.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cityModal.classList.toggle('open');
+      if (cityModal.classList.contains('open')) {
+        citySearchInput.focus();
+      }
+    });
+
+    citySearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && citySearchInput.value.trim() !== '') {
+        selectCity(citySearchInput.value.trim());
+        citySearchInput.value = '';
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!cityModal.contains(e.target) && !cityLabel.contains(e.target)) {
+        cityModal.classList.remove('open');
+      }
+    });
+
+    // Tema Değiştirme (Sadece Koyu ve Açık Tema)
+    function applyTheme(theme) {
+      currentTheme = (theme === 'light') ? 'light' : 'dark';
+      if (currentTheme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        themeLabel.textContent = "Açık";
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        themeLabel.textContent = "Koyu";
+      }
+      localStorage.setItem('widget_theme', currentTheme);
+      if (typeof applyClockTeamTheme === 'function') {
+        applyClockTeamTheme(activeTodayTeamKey);
+      }
+      if (typeof applyWidgetOpacity === 'function') {
+        applyWidgetOpacity(localStorage.getItem('widget_opacity') || 100);
+      }
+      const selModalTheme = document.getElementById('selModalTheme');
+      if (selModalTheme) selModalTheme.value = currentTheme;
+    }
+
+    themeBtn.addEventListener('click', () => {
+      applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+    });
+
+    // Duvar Kağıdı Görünümü & Manuel Dosya Seçimi
+    const chkShowWallpaperWeb = document.getElementById('chkShowWallpaperWeb');
+    const btnBrowseWallpaperWeb = document.getElementById('btnBrowseWallpaperWeb');
+    const btnClearWallpaperWeb = document.getElementById('btnClearWallpaperWeb');
+    const fileWallpaperWeb = document.getElementById('fileWallpaperWeb');
+    const lblWallpaperStatusWeb = document.getElementById('lblWallpaperStatusWeb');
+
+    function applyWallpaperWeb() {
+      const isShow = localStorage.getItem('widget_show_wallpaper') === 'true';
+      const customImg = localStorage.getItem('widget_custom_wallpaper');
+      const customName = localStorage.getItem('widget_custom_wallpaper_name');
+
+      if (customImg && isShow) {
+        document.body.style.backgroundImage = `url('${customImg}')`;
+        document.body.classList.add('show-wallpaper');
+        if (lblWallpaperStatusWeb) lblWallpaperStatusWeb.textContent = 'Seçili: ' + (customName || 'Özel Görsel');
+      } else {
+        document.body.style.backgroundImage = '';
+        document.body.classList.remove('show-wallpaper');
+        if (lblWallpaperStatusWeb) lblWallpaperStatusWeb.textContent = 'Seçilmedi (Varsayılan Korunur)';
+      }
+
+      if (chkShowWallpaperWeb) chkShowWallpaperWeb.checked = isShow;
+    }
+
+    if (chkShowWallpaperWeb) {
+      chkShowWallpaperWeb.addEventListener('change', (e) => {
+        localStorage.setItem('widget_show_wallpaper', e.target.checked);
+        applyWallpaperWeb();
+      });
+    }
+
+    if (wallpaperBtn) {
+      wallpaperBtn.addEventListener('click', () => {
+        const isCurrentlyShown = document.body.classList.contains('show-wallpaper');
+        localStorage.setItem('widget_show_wallpaper', !isCurrentlyShown);
+        applyWallpaperWeb();
+      });
+    }
+
+    if (btnBrowseWallpaperWeb && fileWallpaperWeb) {
+      btnBrowseWallpaperWeb.addEventListener('click', () => fileWallpaperWeb.click());
+      fileWallpaperWeb.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target.result;
+          localStorage.setItem('widget_custom_wallpaper', dataUrl);
+          localStorage.setItem('widget_custom_wallpaper_name', file.name);
+          localStorage.setItem('widget_show_wallpaper', 'true');
+          applyWallpaperWeb();
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    if (btnClearWallpaperWeb) {
+      btnClearWallpaperWeb.addEventListener('click', () => {
+        localStorage.removeItem('widget_custom_wallpaper');
+        localStorage.removeItem('widget_custom_wallpaper_name');
+        applyWallpaperWeb();
+      });
+    }
+
+    // Konum Değiştirme (Üst Orta / Orta) & Kilitleme
+    const posBtn = document.getElementById('posBtn');
+    const posLabel = document.getElementById('posLabel');
+    const chkLockPositionWeb = document.getElementById('chkLockPositionWeb');
+    const btnPosTopWeb = document.getElementById('btnPosTopWeb');
+    const btnPosCenterWeb = document.getElementById('btnPosCenterWeb');
+
+    let currentPosition = localStorage.getItem('widget_position') || 'top';
+    let isPositionLocked = localStorage.getItem('widget_position_locked') !== 'false'; // Varsayılan kilitli (true)
+
+    function updateLockStateUI() {
+      if (chkLockPositionWeb) chkLockPositionWeb.checked = isPositionLocked;
+      if (widgetCard) {
+        widgetCard.style.cursor = isPositionLocked ? 'default' : 'grab';
+      }
+      if (posBtn) {
+        posBtn.title = isPositionLocked ? 'Konum Kilitli (Ayarlardan kilidi açabilirsiniz)' : 'Konumu Değiştir';
+        posBtn.style.opacity = isPositionLocked ? '0.6' : '1.0';
+      }
+    }
+
+    function applyPosition(pos) {
+      currentPosition = pos;
+      if (pos === 'top' || pos === 'top_center') {
+        document.body.classList.add('position-top');
+        if (posLabel) posLabel.textContent = "Üst Orta";
+      } else {
+        document.body.classList.remove('position-top');
+        if (posLabel) posLabel.textContent = "Orta";
+      }
+      localStorage.setItem('widget_position', pos);
+    }
+
+    if (chkLockPositionWeb) {
+      chkLockPositionWeb.addEventListener('change', (e) => {
+        isPositionLocked = e.target.checked;
+        localStorage.setItem('widget_position_locked', isPositionLocked);
+        updateLockStateUI();
+      });
+    }
+
+    if (btnPosTopWeb) {
+      btnPosTopWeb.addEventListener('click', () => applyPosition('top'));
+    }
+    if (btnPosCenterWeb) {
+      btnPosCenterWeb.addEventListener('click', () => applyPosition('center'));
+    }
+
+    if (posBtn) {
+      posBtn.addEventListener('click', () => {
+        if (isPositionLocked) {
+          alert("Widget konumu kilitli. Konumu değiştirmek için ⚙️ Ayarlar menüsünden 'Widget Konumunu Kilitle' seçeneğini kaldırabilirsiniz.");
+          return;
+        }
+        applyPosition(currentPosition === 'center' ? 'top' : 'center');
+      });
+    }
+
+    // Widget kartına çift tıklandığında da kilitli değilse Orta <-> Üst Orta arasında geçiş yap
+    if (widgetCard) {
+      widgetCard.addEventListener('dblclick', () => {
+        if (isPositionLocked) return;
+        applyPosition(currentPosition === 'center' ? 'top' : 'center');
+      });
+    }
+
+    // ==========================================
+    // CANLI FİNANS PANELİ MANTIĞI
+    // ==========================================
+    const financeApiUrl = "https://finans.truncgil.com/v3/today.json";
+    const financeDivider = document.getElementById('financeDivider');
+    const financeSection = document.getElementById('financeSection');
+    const financeGrid = document.getElementById('financeGrid');
+    const financeBtn = document.getElementById('financeBtn');
+    const financeStatus = document.getElementById('financeStatus');
+    const financeFooter = document.getElementById('financeFooter');
+
+    let isFinanceVisible = localStorage.getItem('widget_finance_visible') !== 'false';
+    let latestFinanceData = null;
+
+    function formatChangeHtml(rawChange) {
+      if (!rawChange) return '<span class="finance-change change-up">▲ %0,00</span>';
+      const isUp = !rawChange.includes('-');
+      const formatted = (isUp ? '▲ %' : '▼ %') + rawChange.replace(/[%+-]/g, '').trim();
+      return `<span class="finance-change ${isUp ? 'change-up' : 'change-down'}">${formatted}</span>`;
+    }
+
+    function isBistOpen() {
+      const now = new Date();
+      const day = now.getDay();
+      const hours = now.getHours();
+      return (day >= 1 && day <= 5) && (hours >= 10 && hours < 18);
+    }
+
+    function renderFinanceGrid(data) {
+      if (!data || !financeGrid) return;
+
+      const showUsd = localStorage.getItem('widget_show_usd') !== 'false';
+      const showEur = localStorage.getItem('widget_show_eur') !== 'false';
+      const showGram = localStorage.getItem('widget_show_gram') !== 'false';
+      const showOunce = localStorage.getItem('widget_show_ounce') !== 'false';
+      const showBist = localStorage.getItem('widget_show_bist') !== 'false';
+      const showBtc = localStorage.getItem('widget_show_btc') !== 'false';
+      const showEth = localStorage.getItem('widget_show_eth') !== 'false';
+
+      let itemsHtml = '';
+      let count = 0;
+
+      if (showUsd && data.UsdPrice) {
+        count++;
+        itemsHtml += `
+          <div class="finance-item">
+            <span class="finance-title">USD / TRY</span>
+            <div class="finance-val-row">
+              <span class="finance-price">${data.UsdPrice}</span>
+              ${formatChangeHtml(data.UsdChange)}
+            </div>
+          </div>
+        `;
+      }
+
+      if (showEur && data.EurPrice) {
+        count++;
+        itemsHtml += `
+          <div class="finance-item">
+            <span class="finance-title">EUR / TRY</span>
+            <div class="finance-val-row">
+              <span class="finance-price">${data.EurPrice}</span>
+              ${formatChangeHtml(data.EurChange)}
+            </div>
+          </div>
+        `;
+      }
+
+      if (showGram && data.GramGoldPrice) {
+        count++;
+        itemsHtml += `
+          <div class="finance-item">
+            <span class="finance-title">GRAM ALTIN</span>
+            <div class="finance-val-row">
+              <span class="finance-price">${data.GramGoldPrice}</span>
+              ${formatChangeHtml(data.GramGoldChange)}
+            </div>
+          </div>
+        `;
+      }
+
+      if (showOunce && data.OunceGoldPrice) {
+        count++;
+        itemsHtml += `
+          <div class="finance-item">
+            <span class="finance-title">ONS ALTIN</span>
+            <div class="finance-val-row">
+              <span class="finance-price">${data.OunceGoldPrice}</span>
+              ${formatChangeHtml(data.OunceGoldChange)}
+            </div>
+          </div>
+        `;
+      }
+
+      if (showBist && data.BistPrice) {
+        count++;
+        const open = isBistOpen();
+        itemsHtml += `
+          <div class="finance-item">
+            <div class="finance-title-row">
+              <span class="finance-title">BIST 100</span>
+              <span class="bist-badge ${open ? '' : 'closed'}">${open ? '● Açık' : '○ Kapalı'}</span>
+            </div>
+            <div class="finance-val-row">
+              <span class="finance-price">${data.BistPrice}</span>
+              ${formatChangeHtml(data.BistChange)}
+            </div>
+          </div>
+        `;
+      }
+
+      if (showBtc && data.BtcPrice) {
+        count++;
+        itemsHtml += `
+          <div class="finance-item">
+            <span class="finance-title">BTC / USDT</span>
+            <div class="finance-val-row">
+              <span class="finance-price">${data.BtcPrice}</span>
+              ${formatChangeHtml(data.BtcChange)}
+            </div>
+          </div>
+        `;
+      }
+
+      if (showEth && data.EthPrice) {
+        count++;
+        itemsHtml += `
+          <div class="finance-item">
+            <span class="finance-title">ETH / USDT</span>
+            <div class="finance-val-row">
+              <span class="finance-price">${data.EthPrice}</span>
+              ${formatChangeHtml(data.EthChange)}
+            </div>
+          </div>
+        `;
+      }
+
+      // Özel Pariteler
+      if (data.CustomItems && Array.isArray(data.CustomItems)) {
+        for (const item of data.CustomItems) {
+          count++;
+          itemsHtml += `
+            <div class="finance-item">
+              <span class="finance-title">${item.Title || item.Symbol}</span>
+              <div class="finance-val-row">
+                <span class="finance-price">${item.Price || '--'}</span>
+                ${formatChangeHtml(item.Change)}
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      if (count === 0) {
+        itemsHtml = '<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 12px; padding: 12px 0;">Ayarlardan görüntülenecek parite seçilmedi</div>';
+      }
+
+      financeGrid.innerHTML = itemsHtml;
+    }
+
+    function applyFinanceData(data, isFromCache = false) {
+      if (!data) return;
+      latestFinanceData = data;
+      renderFinanceGrid(data);
+
+      const time = data.LastUpdate || '--:--';
+      financeStatus.textContent = isFromCache ? `Son güncelleme: ${time}` : `Son güncelleme: ${time}`;
+    }
+
+    async function fetchFinance() {
+      financeStatus.textContent = "Finans güncelleniyor...";
+      try {
+        const res = await fetch(financeApiUrl, { cache: 'no-store' });
+        if (!res.ok) throw new Error("API hatası");
+        const json = await res.json();
+
+        const parseNum = (s, decimals) => {
+          if (!s) return '--';
+          let clean = s.replace(/[^0-9,\.]/g, '');
+          if (clean.includes('.') && clean.includes(',')) clean = clean.replace(/\./g, '').replace(',', '.');
+          else if (clean.includes(',')) clean = clean.replace(',', '.');
+          const n = parseFloat(clean);
+          if (isNaN(n)) return s;
+          return decimals === 0 ? Math.round(n).toLocaleString('tr-TR') : n.toLocaleString('tr-TR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+        };
+
+        const now = new Date();
+        const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+        const prevData = latestFinanceData || {};
+
+        const financeObj = {
+          UsdPrice: parseNum(json.USD?.Selling, 2) + ' ₺',
+          UsdChange: json.USD?.Change || '%0,00',
+          EurPrice: parseNum(json.EUR?.Selling, 2) + ' ₺',
+          EurChange: json.EUR?.Change || '%0,00',
+          GramGoldPrice: parseNum(json['gram-altin']?.Selling, 0) + ' ₺',
+          GramGoldChange: json['gram-altin']?.Change || '%0,00',
+          OunceGoldPrice: '$' + parseNum(json.ons?.Selling, 0),
+          OunceGoldChange: json.ons?.Change || '%0,00',
+          BistPrice: prevData.BistPrice || '11.759',
+          BistChange: prevData.BistChange || '▼ %2,56',
+          BtcPrice: prevData.BtcPrice || '$81.881',
+          BtcChange: prevData.BtcChange || '▲ %1,77',
+          EthPrice: prevData.EthPrice || '$2.459',
+          EthChange: prevData.EthChange || '▲ %4,81',
+          LastUpdate: timeStr,
+          CustomItems: []
+        };
+
+        // BTC Binance
+        try {
+          const btcRes = await fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT");
+          if (btcRes.ok) {
+            const btcJson = await btcRes.json();
+            financeObj.BtcPrice = '$' + Math.round(parseFloat(btcJson.lastPrice)).toLocaleString('tr-TR');
+            const pct = parseFloat(btcJson.priceChangePercent);
+            financeObj.BtcChange = (pct >= 0 ? '▲ %' : '▼ %') + Math.abs(pct).toFixed(2).replace('.', ',');
+          }
+        } catch(e) {}
+
+        // ETH Binance
+        try {
+          const ethRes = await fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=ETHUSDT");
+          if (ethRes.ok) {
+            const ethJson = await ethRes.json();
+            financeObj.EthPrice = '$' + Math.round(parseFloat(ethJson.lastPrice)).toLocaleString('tr-TR');
+            const pct = parseFloat(ethJson.priceChangePercent);
+            financeObj.EthChange = (pct >= 0 ? '▲ %' : '▼ %') + Math.abs(pct).toFixed(2).replace('.', ',');
+          }
+        } catch(e) {}
+
+        // Özel Pariteler (Döviz, Altın veya Kripto)
+        const customInput = localStorage.getItem('widget_custom_parities') || '';
+        if (customInput.trim().length > 0) {
+          const symbols = customInput.split(/[,;\s]+/).map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
+          for (const sym of symbols) {
+            try {
+              let found = false;
+              if (json) {
+                const matchedKey = Object.keys(json).find(k => k.toUpperCase() === sym || k.toUpperCase() === sym + '/TRY');
+                if (matchedKey && json[matchedKey] && json[matchedKey].Selling) {
+                  const it = json[matchedKey];
+                  financeObj.CustomItems.push({
+                    Symbol: sym,
+                    Title: sym + ' / TRY',
+                    Price: parseNum(it.Selling, 2) + ' ₺',
+                    Change: it.Change || '%0,00'
+                  });
+                  found = true;
+                }
+              }
+              if (!found) {
+                // Binance'den kripto olarak çek
+                const cRes = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}USDT`);
+                if (cRes.ok) {
+                  const cJson = await cRes.json();
+                  const p = parseFloat(cJson.lastPrice);
+                  const pct = parseFloat(cJson.priceChangePercent);
+                  let formattedPrice;
+                  if (p >= 1000) formattedPrice = '$' + Math.round(p).toLocaleString('tr-TR');
+                  else if (p >= 1) formattedPrice = '$' + p.toFixed(2).replace('.', ',');
+                  else formattedPrice = '$' + p.toFixed(4).replace('.', ',');
+
+                  const formattedChange = (pct >= 0 ? '▲ %' : '▼ %') + Math.abs(pct).toFixed(2).replace('.', ',');
+                  financeObj.CustomItems.push({
+                    Symbol: sym,
+                    Title: sym + ' / USDT',
+                    Price: formattedPrice,
+                    Change: formattedChange
+                  });
+                }
+              }
+            } catch(e) {
+              console.warn("Özel parite alınamadı:", sym, e);
+            }
+          }
+        }
+
+        applyFinanceData(financeObj);
+        localStorage.setItem('widget_finance_cache', JSON.stringify(financeObj));
+      } catch (err) {
+        console.warn("Finans API isteği başarısız oldu:", err);
+        const cached = localStorage.getItem('widget_finance_cache');
+        if (cached) {
+          try {
+            const data = JSON.parse(cached);
+            applyFinanceData(data, true);
+            financeStatus.textContent = `Son güncelleme: ${data.LastUpdate || '--:--'} (Veri alınamadı)`;
+          } catch (e) {
+            financeStatus.textContent = "Veri alınamadı";
+          }
+        } else {
+          financeStatus.textContent = "Veri alınamadı";
+        }
+      }
+    }
+
+    function toggleFinance(show) {
+      isFinanceVisible = (show !== undefined) ? show : !isFinanceVisible;
+      if (isFinanceVisible) {
+        financeDivider.classList.remove('hidden');
+        financeSection.classList.remove('hidden');
+        financeBtn.classList.add('active');
+      } else {
+        financeDivider.classList.add('hidden');
+        financeSection.classList.add('hidden');
+        financeBtn.classList.remove('active');
+      }
+      localStorage.setItem('widget_finance_visible', isFinanceVisible);
+    }
+
+    financeBtn.addEventListener('click', () => toggleFinance());
+    financeFooter.addEventListener('click', () => fetchFinance());
+
+    // ==========================================
+    // AYARLAR MODALI MANTIĞI
+    // ==========================================
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsModal = document.getElementById('settingsModal');
+    const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+    const btnSaveSettings = document.getElementById('btnSaveSettings');
+
+    const chkTrackTurkey = document.getElementById('chkTrackTurkey');
+    const chkTrackGS = document.getElementById('chkTrackGS');
+    const chkTrackFB = document.getElementById('chkTrackFB');
+    const chkTrackBJK = document.getElementById('chkTrackBJK');
+    const chkTrackTS = document.getElementById('chkTrackTS');
+    const chkMatchClockTheme = document.getElementById('chkMatchClockTheme');
+
+    const chkShowUsd = document.getElementById('chkShowUsd');
+    const chkShowEur = document.getElementById('chkShowEur');
+    const chkShowGram = document.getElementById('chkShowGram');
+    const chkShowOunce = document.getElementById('chkShowOunce');
+    const chkShowBist = document.getElementById('chkShowBist');
+    const chkShowBtc = document.getElementById('chkShowBtc');
+    const chkShowEth = document.getElementById('chkShowEth');
+    const txtCustomParities = document.getElementById('txtCustomParities');
+
+    const rngWidgetScale = document.getElementById('rngWidgetScale');
+    const lblWidgetScale = document.getElementById('lblWidgetScale');
+    const rngWidgetOpacity = document.getElementById('rngWidgetOpacity');
+    const lblWidgetOpacity = document.getElementById('lblWidgetOpacity');
+
+    function applyWidgetScale(val) {
+      const num = parseInt(val, 10) || 100;
+      document.documentElement.style.setProperty('--widget-scale', (num / 100).toString());
+      if (lblWidgetScale) lblWidgetScale.textContent = '%' + num;
+      if (rngWidgetScale) rngWidgetScale.value = num;
+      localStorage.setItem('widget_scale', num);
+    }
+
+    function applyWidgetOpacity(val) {
+      const num = parseInt(val, 10);
+      const valNum = isNaN(num) ? 100 : Math.max(0, Math.min(100, num));
+      const op = valNum / 100;
+      const card = document.getElementById('widgetCard');
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      
+      if (card) {
+        if (valNum <= 2) {
+          // KULLANICI İSTEĞİ: Kart yüzeyinin şeffaflığını en sona (%0) getirdiğimde kart yüzeyi ve çerçevesi hiç gözükmesin
+          card.style.background = 'transparent';
+          card.style.borderColor = 'transparent';
+          card.style.boxShadow = 'none';
+          card.style.backdropFilter = 'none';
+          card.style.webkitBackdropFilter = 'none';
+        } else {
+          card.style.boxShadow = '';
+          card.style.backdropFilter = '';
+          card.style.webkitBackdropFilter = '';
+          if (isLight) {
+            card.style.background = 'rgba(255, 255, 255, ' + (op * 0.85) + ')';
+            card.style.borderColor = 'rgba(215, 220, 230, ' + (op * 0.85) + ')';
+          } else {
+            card.style.background = 'rgba(20, 22, 30, ' + (op * 0.85) + ')';
+            card.style.borderColor = 'rgba(255, 255, 255, ' + (op * 0.15) + ')';
+          }
+        }
+      }
+      if (lblWidgetOpacity) lblWidgetOpacity.textContent = (valNum === 0) ? '%0 (Görünmez)' : ('%' + valNum);
+      if (rngWidgetOpacity) rngWidgetOpacity.value = valNum;
+      localStorage.setItem('widget_opacity', valNum);
+    }
+
+    if (rngWidgetScale) {
+      rngWidgetScale.addEventListener('input', (e) => applyWidgetScale(e.target.value));
+    }
+    if (rngWidgetOpacity) {
+      rngWidgetOpacity.addEventListener('input', (e) => applyWidgetOpacity(e.target.value));
+    }
+
+    const selModalTheme = document.getElementById('selModalTheme');
+
+    if (selModalTheme) {
+      selModalTheme.addEventListener('change', (e) => applyTheme(e.target.value));
+    }
+
+    function openSettings() {
+      // Değerleri localStorage'dan yükle (Türkiye varsayılan true, kulüpler varsayılan false)
+      chkTrackTurkey.checked = localStorage.getItem('widget_track_turkey') !== 'false';
+      chkTrackGS.checked = localStorage.getItem('widget_track_gs') === 'true';
+      chkTrackFB.checked = localStorage.getItem('widget_track_fb') === 'true';
+      chkTrackBJK.checked = localStorage.getItem('widget_track_bjk') === 'true';
+      chkTrackTS.checked = localStorage.getItem('widget_track_ts') === 'true';
+      chkMatchClockTheme.checked = localStorage.getItem('widget_match_clock_theme') !== 'false';
+
+      chkShowUsd.checked = localStorage.getItem('widget_show_usd') !== 'false';
+      chkShowEur.checked = localStorage.getItem('widget_show_eur') !== 'false';
+      chkShowGram.checked = localStorage.getItem('widget_show_gram') !== 'false';
+      chkShowOunce.checked = localStorage.getItem('widget_show_ounce') !== 'false';
+      chkShowBist.checked = localStorage.getItem('widget_show_bist') !== 'false';
+      chkShowBtc.checked = localStorage.getItem('widget_show_btc') !== 'false';
+      chkShowEth.checked = localStorage.getItem('widget_show_eth') !== 'false';
+
+      txtCustomParities.value = localStorage.getItem('widget_custom_parities') || '';
+
+      if (selModalTheme) selModalTheme.value = currentTheme;
+
+      applyWidgetScale(localStorage.getItem('widget_scale') || 100);
+      applyWidgetOpacity(localStorage.getItem('widget_opacity') || 100);
+
+      settingsModal.classList.add('open');
+    }
+
+    function closeSettings() {
+      settingsModal.classList.remove('open');
+    }
+
+    function saveSettings() {
+      if (selModalTheme) applyTheme(selModalTheme.value);
+
+      localStorage.setItem('widget_track_turkey', chkTrackTurkey.checked);
+      localStorage.setItem('widget_track_gs', chkTrackGS.checked);
+      localStorage.setItem('widget_track_fb', chkTrackFB.checked);
+      localStorage.setItem('widget_track_bjk', chkTrackBJK.checked);
+      localStorage.setItem('widget_track_ts', chkTrackTS.checked);
+      localStorage.setItem('widget_match_clock_theme', chkMatchClockTheme.checked);
+      isMatchClockTheme = chkMatchClockTheme.checked;
+
+      localStorage.setItem('widget_show_usd', chkShowUsd.checked);
+      localStorage.setItem('widget_show_eur', chkShowEur.checked);
+      localStorage.setItem('widget_show_gram', chkShowGram.checked);
+      localStorage.setItem('widget_show_ounce', chkShowOunce.checked);
+      localStorage.setItem('widget_show_bist', chkShowBist.checked);
+      localStorage.setItem('widget_show_btc', chkShowBtc.checked);
+      localStorage.setItem('widget_show_eth', chkShowEth.checked);
+
+      localStorage.setItem('widget_custom_parities', txtCustomParities.value.trim());
+
+      if (rngWidgetScale) localStorage.setItem('widget_scale', rngWidgetScale.value);
+      if (rngWidgetOpacity) localStorage.setItem('widget_opacity', rngWidgetOpacity.value);
+
+      closeSettings();
+
+      // UI'yi hemen güncelle
+      if (latestFinanceData) {
+        renderFinanceGrid(latestFinanceData);
+      }
+      fetchFinance();
+      fetchMatches();
+    }
+
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openSettings();
+    });
+
+    settingsCloseBtn.addEventListener('click', () => closeSettings());
+    btnSaveSettings.addEventListener('click', () => saveSettings());
+
+    // Desktop Zen Sekme Değiştirme
+    function switchPtTab(tabId) {
+      document.querySelectorAll('.pt-nav-item').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
+      });
+      document.querySelectorAll('.pt-tab-pane').forEach(pane => {
+        pane.classList.toggle('active', pane.id === tabId);
+      });
+    }
+
+    document.querySelectorAll('.pt-nav-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabId = btn.getAttribute('data-tab');
+        if (tabId) switchPtTab(tabId);
+      });
+    });
+
+    const ptCreatorBadge = document.getElementById('ptCreatorBadge');
+    if (ptCreatorBadge) {
+      ptCreatorBadge.addEventListener('click', () => switchPtTab('tabAbout'));
+    }
+
+    const btnSaveMatches = document.getElementById('btnSaveMatches');
+    if (btnSaveMatches) {
+      btnSaveMatches.addEventListener('click', () => saveSettings());
+    }
+
+
+    document.addEventListener('click', (e) => {
+      if (!settingsModal.contains(e.target) && !settingsBtn.contains(e.target)) {
+        closeSettings();
+      }
+    });
+
+    // ==========================================
+    // FUTBOL MAÇ TAKİPÇİSİ MANTIĞI
+    // ==========================================
+    const matchBadge = document.getElementById('matchBadge');
+    const matchText = document.getElementById('matchText');
+    const matchAlertBanner = document.getElementById('matchAlertBanner');
+    const matchAlertBallBox = document.getElementById('matchAlertBallBox');
+    const matchAlertHeader = document.getElementById('matchAlertHeader');
+    const matchAlertDetail = document.getElementById('matchAlertDetail');
+    let fixtureMatches = [];
+    let currentMatchIndex = 0;
+    let currentTodayMatch = null;
+    let lastWhistlePlayedKey = null;
+    let testAlertEndTime = null;
+    const monitoredTeams = ['galatasaray', 'fenerbahçe', 'fenerbahce', 'beşiktaş', 'besiktas', 'trabzonspor', 'türkiye', 'turkiye'];
+    let isMatchClockTheme = localStorage.getItem('widget_match_clock_theme') !== 'false';
+
+    function getTeamAlertTheme(teamKey) {
+      if (teamKey === 'galatasaray') {
+        return {
+          bg: 'rgba(200, 16, 46, 0.22)',
+          border: 'rgba(253, 185, 18, 0.55)',
+          headerColor: '#FDB912',
+          primary: '#FDB912',
+          secondary: '#C8102E'
+        };
+      } else if (teamKey === 'fenerbahce') {
+        return {
+          bg: 'rgba(0, 45, 114, 0.25)',
+          border: 'rgba(254, 213, 0, 0.55)',
+          headerColor: '#FED500',
+          primary: '#FED500',
+          secondary: '#002D72'
+        };
+      } else if (teamKey === 'besiktas') {
+        return {
+          bg: 'rgba(25, 25, 25, 0.35)',
+          border: 'rgba(255, 255, 255, 0.50)',
+          headerColor: '#FFFFFF',
+          primary: '#FFFFFF',
+          secondary: '#191919'
+        };
+      } else if (teamKey === 'trabzonspor') {
+        return {
+          bg: 'rgba(163, 0, 43, 0.25)',
+          border: 'rgba(56, 189, 248, 0.60)',
+          headerColor: '#38BDF8',
+          primary: '#A3002B',
+          secondary: '#38BDF8'
+        };
+      } else if (teamKey === 'turkiye') {
+        return {
+          bg: 'rgba(227, 10, 23, 0.25)',
+          border: 'rgba(255, 255, 255, 0.60)',
+          headerColor: '#FFFFFF',
+          primary: '#E30A17',
+          secondary: '#FFFFFF'
+        };
+      }
+      return {
+        bg: 'rgba(220, 38, 38, 0.20)',
+        border: 'rgba(253, 185, 18, 0.40)',
+        headerColor: '#FED500',
+        primary: '#FED500',
+        secondary: '#C8102E'
+      };
+    }
+
+    function getTeamBallSvg(teamKey) {
+      const theme = getTeamAlertTheme(teamKey);
+      const c1 = theme.primary;
+      const c2 = theme.secondary;
+
+      return `
+        <svg width="24" height="24" viewBox="0 0 100 100" style="overflow: visible;">
+          <defs>
+            <clipPath id="ballClip_${teamKey}">
+              <circle cx="50" cy="50" r="48" />
+            </clipPath>
+            <radialGradient id="ballShine_${teamKey}" cx="35%" cy="35%" r="65%">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6" />
+              <stop offset="50%" stop-color="#ffffff" stop-opacity="0" />
+              <stop offset="85%" stop-color="#000000" stop-opacity="0" />
+              <stop offset="100%" stop-color="#000000" stop-opacity="0.35" />
+            </radialGradient>
+          </defs>
+          <g clip-path="url(#ballClip_${teamKey})">
+            <circle cx="50" cy="50" r="48" fill="${c1}" />
+            <polygon points="50,30 69,44 62,67 38,67 31,44" fill="${c2}" stroke="#141414" stroke-width="2.5" />
+            <path d="M 50,30 L 50,0 A 50,50 0 0,0 20,9 L 31,44 Z M 69,44 L 98,35 A 50,50 0 0,0 80,9 L 50,30 Z M 62,67 L 98,65 A 50,50 0 0,1 65,98 L 38,67 Z M 31,44 L 2,35 A 50,50 0 0,1 20,9 L 50,30 Z M 38,67 L 35,98 A 50,50 0 0,1 2,65 L 31,44 Z" fill="${c2}" stroke="#141414" stroke-width="2.5" />
+            <path d="M 50,30 L 50,0 M 69,44 L 98,35 M 62,67 L 98,65 M 38,67 L 50,100 M 31,44 L 2,35" stroke="#141414" stroke-width="2" />
+            <circle cx="50" cy="50" r="48" fill="url(#ballShine_${teamKey})" />
+          </g>
+          <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="2" />
+        </svg>
+      `;
+    }
+
+    function playRefereeWhistle() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+
+        function scheduleTone(startTime, duration) {
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const peaLfo = ctx.createOscillator();
+          const peaGain = ctx.createGain();
+
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(2850, startTime);
+
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(2920, startTime);
+
+          peaLfo.type = 'sine';
+          peaLfo.frequency.setValueAtTime(34, startTime);
+          peaGain.gain.setValueAtTime(0.35, startTime);
+          peaLfo.connect(peaGain);
+
+          gain.gain.setValueAtTime(0.001, startTime);
+          gain.gain.linearRampToValueAtTime(0.42, startTime + 0.015);
+          gain.gain.setValueAtTime(0.38, startTime + duration - 0.03);
+          gain.gain.linearRampToValueAtTime(0.001, startTime + duration);
+
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc1.start(startTime);
+          osc2.start(startTime);
+          peaLfo.start(startTime);
+
+          osc1.stop(startTime + duration);
+          osc2.stop(startTime + duration);
+          peaLfo.stop(startTime + duration);
+        }
+
+        const t0 = ctx.currentTime + 0.05;
+        // Kısa düdük (160ms)
+        scheduleTone(t0, 0.16);
+        // Uzun düdük (720ms)
+        scheduleTone(t0 + 0.28, 0.72);
+      } catch (e) {
+        console.warn("Düdük çalınamadı:", e);
+      }
+    }
+
+    function getActiveTeamKeyForAlert() {
+      if (localStorage.getItem('widget_track_ts') === 'true') return 'trabzonspor';
+      if (localStorage.getItem('widget_track_gs') === 'true') return 'galatasaray';
+      if (localStorage.getItem('widget_track_fb') === 'true') return 'fenerbahce';
+      if (localStorage.getItem('widget_track_bjk') === 'true') return 'besiktas';
+      if (localStorage.getItem('widget_track_turkey') !== 'false') return 'turkiye';
+      return 'galatasaray';
+    }
+
+    function showMatchAlertBanner(match, detail, kickoff, teamKey, isTest) {
+      if (!matchAlertBanner || !matchAlertBallBox || !matchAlertHeader || !matchAlertDetail) return;
+      const theme = getTeamAlertTheme(teamKey);
+
+      matchAlertBanner.style.background = theme.bg;
+      matchAlertBanner.style.borderColor = theme.border;
+
+      if (matchAlertBanner.getAttribute('data-team') !== teamKey) {
+        matchAlertBanner.setAttribute('data-team', teamKey);
+        matchAlertBallBox.innerHTML = `
+          <div class="bouncing-shadow"></div>
+          <div class="bouncing-ball">${getTeamBallSvg(teamKey)}</div>
+        `;
+      }
+
+      matchAlertHeader.style.color = theme.headerColor;
+
+      if (isTest) {
+        matchAlertHeader.textContent = "⚽ MAÇ BAŞLANGIÇ TESTİ (Düdük & Seken Top)";
+        matchAlertDetail.textContent = `${detail} · ${teamKey.toUpperCase()}`;
+      } else {
+        const now = new Date();
+        const diffSec = Math.floor((kickoff.getTime() - now.getTime()) / 1000);
+        if (diffSec > 0) {
+          const min = Math.floor(diffSec / 60);
+          const sec = diffSec % 60;
+          const timeText = (min > 0) ? `${min} dk ${sec} sn` : `${sec} sn`;
+          matchAlertHeader.textContent = `⚽ MAÇ BAŞLIYOR! (${timeText} kaldı)`;
+        } else {
+          matchAlertHeader.textContent = "⚽ MAÇ BAŞLADI!";
+        }
+        matchAlertDetail.textContent = `${detail} · ${kickoff.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+      }
+
+      matchAlertBanner.classList.remove('hidden');
+      if (matchBadge) matchBadge.classList.add('hidden');
+    }
+
+    function hideMatchAlertBanner() {
+      if (matchAlertBanner && !matchAlertBanner.classList.contains('hidden')) {
+        matchAlertBanner.classList.add('hidden');
+        if (matchBadge && currentTodayMatch) {
+          matchBadge.classList.remove('hidden');
+        }
+      }
+    }
+
+    function checkMatchCountdownAndWhistle() {
+      const now = new Date();
+
+      // 1. Manuel test modu aktifse
+      if (testAlertEndTime) {
+        if (now < testAlertEndTime) {
+          const testTeamKey = getActiveTeamKeyForAlert();
+          showMatchAlertBanner(null, "Test Karşılaşması (Canlı Önizleme)", testAlertEndTime, testTeamKey, true);
+          return;
+        } else {
+          testAlertEndTime = null;
+        }
+      }
+
+      if (!currentTodayMatch) {
+        hideMatchAlertBanner();
+        return;
+      }
+
+      const kickoff = new Date(currentTodayMatch.Date.replace(' ', 'T'));
+      if (isNaN(kickoff.getTime())) {
+        hideMatchAlertBanner();
+        return;
+      }
+
+      const teamKey = detectTeamKey(currentTodayMatch) || 'galatasaray';
+      const matchTitle = `${currentTodayMatch.HomeTeam} - ${currentTodayMatch.AwayTeam}`;
+
+      // KULLANICI ŞARTI:
+      // "seçili takımın maç saatinden 5 dk önce widget de yukarı aşağı seken takımın renklerine ait bir futbol topu çıksın 6 dk sonra da yok olsun"
+      // Başlangıç: kickoff - 5 dakika
+      // Bitiş: (kickoff - 5 dakika) + 6 dakika = kickoff + 1 dakika
+      const alertStart = new Date(kickoff.getTime() - 5 * 60 * 1000);
+      const alertEnd = new Date(kickoff.getTime() + 1 * 60 * 1000);
+
+      const isActive = (now >= alertStart && now < alertEnd);
+
+      if (isActive) {
+        showMatchAlertBanner(currentTodayMatch, matchTitle, kickoff, teamKey, false);
+
+        // KULLANICI ŞARTI: "maç saati geldiginde maç başlangıç düdügü çal"
+        const matchKey = matchTitle + '_' + kickoff.getTime();
+        if (now >= kickoff && lastWhistlePlayedKey !== matchKey) {
+          lastWhistlePlayedKey = matchKey;
+          playRefereeWhistle();
+        }
+      } else {
+        hideMatchAlertBanner();
+      }
+    }
+
+    const btnTestMatchAlert = document.getElementById('btnTestMatchAlert');
+    if (btnTestMatchAlert) {
+      btnTestMatchAlert.addEventListener('click', () => {
+        testAlertEndTime = new Date(Date.now() + 15000);
+        playRefereeWhistle();
+        checkMatchCountdownAndWhistle();
+      });
+    }
+
+    function isTeamMonitored(h, a) {
+      const trackTurkey = localStorage.getItem('widget_track_turkey') !== 'false';
+      const trackGS = localStorage.getItem('widget_track_gs') === 'true';
+      const trackFB = localStorage.getItem('widget_track_fb') === 'true';
+      const trackBJK = localStorage.getItem('widget_track_bjk') === 'true';
+      const trackTS = localStorage.getItem('widget_track_ts') === 'true';
+
+      if (trackTurkey && (h.includes('türkiye') || h.includes('turkiye') || a.includes('türkiye') || a.includes('turkiye'))) return true;
+      if (trackGS && (h.includes('galatasaray') || a.includes('galatasaray'))) return true;
+      if (trackFB && (h.includes('fenerbahçe') || h.includes('fenerbahce') || a.includes('fenerbahçe') || a.includes('fenerbahce'))) return true;
+      if (trackBJK && (h.includes('beşiktaş') || h.includes('besiktas') || a.includes('beşiktaş') || a.includes('besiktas'))) return true;
+      if (trackTS && (h.includes('trabzonspor') || a.includes('trabzonspor'))) return true;
+      return false;
+    }
+
+    function detectTeamKey(m) {
+      if (!m) return null;
+      const h = (m.HomeTeam || '').toLowerCase();
+      const a = (m.AwayTeam || '').toLowerCase();
+
+      const trackTurkey = localStorage.getItem('widget_track_turkey') !== 'false';
+      const trackGS = localStorage.getItem('widget_track_gs') === 'true';
+      const trackFB = localStorage.getItem('widget_track_fb') === 'true';
+      const trackBJK = localStorage.getItem('widget_track_bjk') === 'true';
+      const trackTS = localStorage.getItem('widget_track_ts') === 'true';
+
+      // 1. Milli Takım her zaman en yüksek önceliğe sahiptir
+      if (trackTurkey && (h.includes('türkiye') || h.includes('turkiye') || a.includes('türkiye') || a.includes('turkiye'))) {
+        return 'turkiye';
+      }
+
+      // 2. Kulüplerde ev sahibi takım önceliği
+      if (trackGS && h.includes('galatasaray')) return 'galatasaray';
+      if (trackTS && h.includes('trabzonspor')) return 'trabzonspor';
+      if (trackBJK && (h.includes('beşiktaş') || h.includes('besiktas'))) return 'besiktas';
+      if (trackFB && (h.includes('fenerbahçe') || h.includes('fenerbahce'))) return 'fenerbahce';
+
+      // 3. Deplasman takımı
+      if (trackGS && a.includes('galatasaray')) return 'galatasaray';
+      if (trackTS && a.includes('trabzonspor')) return 'trabzonspor';
+      if (trackBJK && (a.includes('beşiktaş') || a.includes('besiktas'))) return 'besiktas';
+      if (trackFB && (a.includes('fenerbahçe') || a.includes('fenerbahce'))) return 'fenerbahce';
+
+      return null;
+    }
+
+    function applyClockTeamTheme(teamKey) {
+      activeTodayTeamKey = teamKey;
+      if (!isMatchClockTheme || !teamKey) {
+        if (clockHour) {
+          clockHour.style.color = '';
+          clockHour.style.textShadow = '';
+        }
+        if (clockMinute) {
+          clockMinute.style.color = '';
+          clockMinute.style.textShadow = '';
+        }
+        if (clockColon) {
+          clockColon.style.color = '';
+          clockColon.style.display = 'inline';
+        }
+        if (crescentStarSep) crescentStarSep.classList.add('hidden');
+        return;
+      }
+
+      const isDark = (currentTheme === 'dark');
+
+      if (teamKey === 'galatasaray') {
+        // Galatasaray: Saat Sarı (#FDB912), Dakika Kırmızı (#C8102E)
+        if (clockHour) {
+          clockHour.style.color = '#FDB912';
+          clockHour.style.textShadow = 'none';
+        }
+        if (clockMinute) {
+          clockMinute.style.color = '#C8102E';
+          clockMinute.style.textShadow = 'none';
+        }
+        if (clockColon) {
+          clockColon.style.color = '#FDB912';
+          clockColon.style.display = 'inline';
+        }
+        if (crescentStarSep) crescentStarSep.classList.add('hidden');
+      } else if (teamKey === 'trabzonspor') {
+        // Trabzonspor: Saat Bordo (#A3002B), Dakika Mavi (#38BDF8 / #2175D9)
+        if (clockHour) {
+          clockHour.style.color = '#A3002B';
+          clockHour.style.textShadow = 'none';
+        }
+        if (clockMinute) {
+          clockMinute.style.color = isDark ? '#38BDF8' : '#2175D9';
+          clockMinute.style.textShadow = 'none';
+        }
+        if (clockColon) {
+          clockColon.style.color = '#A3002B';
+          clockColon.style.display = 'inline';
+        }
+        if (crescentStarSep) crescentStarSep.classList.add('hidden');
+      } else if (teamKey === 'besiktas') {
+        // Beşiktaş: Saat Siyah (#0F0F12), Dakika Beyaz (#FFFFFF)
+        if (clockHour) {
+          clockHour.style.color = '#0F0F12';
+          clockHour.style.textShadow = isDark ? '0 0 16px rgba(255,255,255,0.75)' : 'none';
+        }
+        if (clockMinute) {
+          clockMinute.style.color = '#FFFFFF';
+          clockMinute.style.textShadow = isDark ? 'none' : '0 1px 8px rgba(0,0,0,0.4)';
+        }
+        if (clockColon) {
+          clockColon.style.color = isDark ? '#FFFFFF' : '#0F0F12';
+          clockColon.style.display = 'inline';
+        }
+        if (crescentStarSep) crescentStarSep.classList.add('hidden');
+      } else if (teamKey === 'fenerbahce') {
+        // Fenerbahçe: Saat Sarı (#FED500), Dakika Lacivert (#1E40AF / #002D72)
+        if (clockHour) {
+          clockHour.style.color = '#FED500';
+          clockHour.style.textShadow = 'none';
+        }
+        if (clockMinute) {
+          clockMinute.style.color = isDark ? '#3B82F6' : '#002D72';
+          clockMinute.style.textShadow = 'none';
+        }
+        if (clockColon) {
+          clockColon.style.color = '#FED500';
+          clockColon.style.display = 'inline';
+        }
+        if (crescentStarSep) crescentStarSep.classList.add('hidden');
+      } else if (teamKey === 'turkiye') {
+        // Türkiye: Saat Kırmızı (#E30A17), Dakika Beyaz (#FFFFFF), Ayraç: Minimal Türk Bayrağı Ay ve Yıldız
+        if (clockHour) {
+          clockHour.style.color = '#E30A17';
+          clockHour.style.textShadow = 'none';
+        }
+        if (clockMinute) {
+          clockMinute.style.color = '#FFFFFF';
+          clockMinute.style.textShadow = isDark ? 'none' : '0 1px 8px rgba(0,0,0,0.4)';
+        }
+        if (clockColon) clockColon.style.display = 'none';
+        if (crescentStarSep) {
+          crescentStarSep.classList.remove('hidden');
+          crescentStarSep.style.color = '#FFFFFF';
+          crescentStarSep.style.filter = isDark ? 'none' : 'drop-shadow(0 1px 4px rgba(0,0,0,0.4))';
+        }
+      }
+    }
+
+    async function fetchMatches() {
+      try {
+        const res = await fetch('./matches.json');
+        if (!res.ok) return;
+        const matches = await res.json();
+        fixtureMatches = matches;
+        
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
+
+        // 1. Bugün maç var mı?
+        const todayMatch = matches.find(m => {
+          const mDate = m.Date.split(' ')[0];
+          return mDate === todayStr && isTeamMonitored(m.HomeTeam.toLowerCase(), m.AwayTeam.toLowerCase());
+        });
+
+        if (todayMatch) {
+          currentTodayMatch = todayMatch;
+          const time = todayMatch.Date.split(' ')[1] || '20:00';
+          matchText.textContent = `⚽ BUGÜN ${time} · ${todayMatch.HomeTeam} - ${todayMatch.AwayTeam} (${todayMatch.Tournament || 'Süper Lig'})`;
+          matchBadge.classList.add('today');
+          matchBadge.classList.remove('hidden');
+          const teamKey = detectTeamKey(todayMatch);
+          applyClockTeamTheme(teamKey);
+          checkMatchCountdownAndWhistle();
+          return;
+        }
+
+        currentTodayMatch = null;
+        applyClockTeamTheme(null);
+        checkMatchCountdownAndWhistle();
+
+        // 2. En yakın maçı bul
+        const upcoming = matches
+          .map(m => ({ ...m, dateObj: new Date(m.Date.replace(' ', 'T')) }))
+          .filter(m => m.dateObj >= now && isTeamMonitored(m.HomeTeam.toLowerCase(), m.AwayTeam.toLowerCase()))
+          .sort((a, b) => a.dateObj - b.dateObj);
+
+        if (upcoming.length > 0) {
+          const next = upcoming[0];
+          const diffDays = Math.ceil((next.dateObj - now) / (1000 * 60 * 60 * 24));
+          const dayLabel = diffDays <= 1 ? 'Yarın' : `${diffDays} gün kaldı`;
+          const dateStr = next.dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+          matchText.textContent = `⚽ Sonraki Maç: ${dateStr} · ${next.HomeTeam} - ${next.AwayTeam} (${dayLabel})`;
+          matchBadge.classList.remove('today');
+          matchBadge.classList.remove('hidden');
+        } else {
+          matchBadge.classList.add('hidden');
+        }
+      } catch (e) {
+        matchBadge.classList.add('hidden');
+        applyClockTeamTheme(null);
+      }
+    }
+
+    matchBadge.addEventListener('click', () => {
+      if (!fixtureMatches || fixtureMatches.length === 0) return;
+      const monitoredList = fixtureMatches.filter(m => isTeamMonitored(m.HomeTeam.toLowerCase(), m.AwayTeam.toLowerCase()));
+      if (monitoredList.length === 0) return;
+      currentMatchIndex = (currentMatchIndex + 1) % monitoredList.length;
+      const m = monitoredList[currentMatchIndex];
+      const d = new Date(m.Date.replace(' ', 'T'));
+      const dateStr = d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+      matchText.textContent = `⚽ ${dateStr} · ${m.HomeTeam} - ${m.AwayTeam} (${m.Tournament || 'Süper Lig'})`;
+    });
+
+    // Başlangıçta yerel cache'i yükle
+    const cachedFinance = localStorage.getItem('widget_finance_cache');
+    if (cachedFinance) {
+      try {
+        applyFinanceData(JSON.parse(cachedFinance), true);
+      } catch(e) {}
+    } else {
+      fetch('./finance_cache.json')
+        .then(r => r.json())
+        .then(data => {
+          applyFinanceData(data, true);
+          localStorage.setItem('widget_finance_cache', JSON.stringify(data));
+        })
+        .catch(() => {});
+    }
+
+    // Başlatma
+    applyTheme(currentTheme);
+    applyPosition(currentPosition);
+    updateLockStateUI();
+    applyWallpaperWeb();
+    applyWidgetScale(localStorage.getItem('widget_scale') || 100);
+    applyWidgetOpacity(localStorage.getItem('widget_opacity') || 100);
+    toggleFinance(isFinanceVisible);
+    updateClock();
+    setInterval(updateClock, 1000);
+    fetchWeather(currentCity);
+    fetchFinance();
+    fetchMatches();
+
+    // Zamanlayıcılar: Hava durumu 30 dk, Finans 5 dk, Maçlar 10 dk
+    setInterval(() => fetchWeather(currentCity), 30 * 60 * 1000);
+    setInterval(fetchFinance, 5 * 60 * 1000);
+    setInterval(fetchMatches, 10 * 60 * 1000);
+  </script>
+</body>
+</html>

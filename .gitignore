@@ -1,0 +1,20 @@
+# Derleme ve Geçici Dosyalar
+*.exe
+*.dll
+*.pdb
+*.zip
+
+# Önbellek ve Yerel Notlar
+*_cache.json
+notes.txt
+test_*.ps1
+copy_excel.ps1
+
+# Yedek ve Eski Arşiv Klasörleri
+Zen/
+Desktop_Zen_Portable/
+Desktop Zen (Paylaşılabilir)/
+.vs/
+.vscode/
+bin/
+obj/

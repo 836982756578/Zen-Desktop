@@ -1,0 +1,304 @@
+﻿[
+  {
+    "HomeTeam": "Gençlerbirliği",
+    "AwayTeam": "Galatasaray",
+    "Date": "2026-10-17 16:00",
+    "Tournament": "",
+    "HomeScore": 0,
+    "AwayScore": 1,
+    "IsFinished": true
+  },
+  {
+    "HomeTeam": "Fenerbahçe",
+    "AwayTeam": "Corendon Alanyaspor",
+    "Date": "2026-10-17 19:00",
+    "Tournament": "",
+    "HomeScore": 1,
+    "AwayScore": 0,
+    "Minute": "55'",
+    "IsLive": true
+  ,
+    "IsFinished": true},
+  {
+    "HomeTeam": "Trabzonspor",
+    "AwayTeam": "Beşiktaş",
+    "Date": "2026-10-19 20:00",
+    "Tournament": "Derbi",
+    "HomeScore": 2,
+    "AwayScore": 0,
+    "Minute": "90'+4'",
+    "HomeGoals": "21' Ozan Tufan, 71' Mohamed Salah",
+    "AwayGoals": "",
+    "Goals": "21' Ozan Tufan, 71' Mohamed Salah",
+    "IsLive": false,
+    "IsFinished": true
+  },
+  {
+    "HomeTeam": "Fenerbahçe",
+    "AwayTeam": "Slavia Prag",
+    "Date": "2026-10-20 19:45",
+    "Tournament": "UEFA Şampiyonlar Ligi",
+    "HomeScore": 2,
+    "AwayScore": 2,
+    "Minute": "90'+3'",
+    "IsLive": false,
+    "HomeGoals": "4' Oguz Aydin, 11' Mason Greenwood",
+    "AwayGoals": "15' Lukás Provod, 90' Pavel Kacor",
+    "Goals": "4' Oguz Aydin, 11' Mason Greenwood, 15' Lukás Provod, 90' Pavel Kacor"
+  ,
+    "IsFinished": true},
+  {
+    "HomeTeam": "Lille",
+    "AwayTeam": "Galatasaray",
+    "Date": "2026-10-21 19:45",
+    "Tournament": "UEFA Şampiyonlar Ligi"
+  ,
+    "HomeScore": 2,
+    "AwayScore": 4,
+    "Minute": "90'+4'",
+    "IsLive": false,
+    "Goals": "2' Yunus Akgün, 7' Soriba Diaoune, 39' Soriba Diaoune, 44' Alexey Batrakov, 52' Berke Özer (K.K.), 61' Victor Osimhen",
+    "AwayGoals": "2' Yunus Akgün, 44' Alexey Batrakov, 52' Berke Özer (K.K.), 61' Victor Osimhen",
+    "HomeGoals": "7' Soriba Diaoune, 39' Soriba Diaoune",
+    "IsFinished": true},
+  {
+    "HomeTeam": "Trabzonspor",
+    "AwayTeam": "Heart of Midlothian",
+    "Date": "2026-10-22 20:00",
+    "Tournament": "UEFA Konferans Ligi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Beşiktaş",
+    "AwayTeam": "Crystal Palace",
+    "Date": "2026-10-22 22:00",
+    "Tournament": "UEFA Avrupa Ligi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Beşiktaş",
+    "AwayTeam": "İstanbul Başakşehir",
+    "Date": "2026-10-26 19:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Çaykur Rizespor",
+    "AwayTeam": "Trabzonspor",
+    "Date": "2026-10-26 20:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Galatasaray",
+    "AwayTeam": "Fenerbahçe",
+    "Date": "2026-10-26 21:30",
+    "Tournament": "Derbi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Konyaspor",
+    "AwayTeam": "Galatasaray",
+    "Date": "2026-10-30 20:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Fenerbahçe",
+    "AwayTeam": "Göztepe",
+    "Date": "2026-10-31 19:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Kasımpaşa",
+    "AwayTeam": "Beşiktaş",
+    "Date": "2026-11-01 19:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Trabzonspor",
+    "AwayTeam": "Gaziantep FK",
+    "Date": "2026-11-01 19:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Galatasaray",
+    "AwayTeam": "VfB Stuttgart",
+    "Date": "2026-11-03 20:45",
+    "Tournament": "UEFA Şampiyonlar Ligi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Fenerbahçe",
+    "AwayTeam": "Liverpool",
+    "Date": "2026-11-04 20:45",
+    "Tournament": "UEFA Şampiyonlar Ligi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Trabzonspor",
+    "AwayTeam": "SC Freiburg",
+    "Date": "2026-11-05 20:00",
+    "Tournament": "UEFA Konferans Ligi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Celtic",
+    "AwayTeam": "Beşiktaş",
+    "Date": "2026-11-05 23:00",
+    "Tournament": "UEFA Avrupa Ligi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Galatasaray",
+    "AwayTeam": "Amed SK",
+    "Date": "2026-11-07 19:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Arca Çorum FK",
+    "AwayTeam": "Fenerbahçe",
+    "Date": "2026-11-08 16:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Corendon Alanyaspor",
+    "AwayTeam": "Trabzonspor",
+    "Date": "2026-11-08 19:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Beşiktaş",
+    "AwayTeam": "Gençlerbirliği",
+    "Date": "2026-11-08 21:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Türkiye",
+    "AwayTeam": "Belçika",
+    "Date": "2026-11-12 20:00",
+    "Tournament": "UEFA Uluslar Ligi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Fransa",
+    "AwayTeam": "Türkiye",
+    "Date": "2026-11-15 22:45",
+    "Tournament": "UEFA Uluslar Ligi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Galatasaray",
+    "AwayTeam": "Samsunspor",
+    "Date": "2026-11-21 16:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Kocaelispor",
+    "AwayTeam": "Fenerbahçe",
+    "Date": "2026-11-21 19:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Konyaspor",
+    "AwayTeam": "Beşiktaş",
+    "Date": "2026-11-22 16:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Trabzonspor",
+    "AwayTeam": "Eyüpspor",
+    "Date": "2026-11-22 19:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Galatasaray",
+    "AwayTeam": "Aston Villa",
+    "Date": "2026-11-24 20:45",
+    "Tournament": "UEFA Şampiyonlar Ligi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Shakhtar Donetsk",
+    "AwayTeam": "Fenerbahçe",
+    "Date": "2026-11-25 23:00",
+    "Tournament": "UEFA Şampiyonlar Ligi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "CSKA Sofia",
+    "AwayTeam": "Trabzonspor",
+    "Date": "2026-11-26 20:00",
+    "Tournament": "UEFA Konferans Ligi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Beşiktaş",
+    "AwayTeam": "Hapoel Beer-Sheva",
+    "Date": "2026-11-26 20:45",
+    "Tournament": "UEFA Avrupa Ligi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Fenerbahçe",
+    "AwayTeam": "Erzurumspor FK",
+    "Date": "2026-11-29 19:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Göztepe",
+    "AwayTeam": "Trabzonspor",
+    "Date": "2026-11-30 19:00",
+    "Tournament": ""
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0},
+  {
+    "HomeTeam": "Beşiktaş",
+    "AwayTeam": "Galatasaray",
+    "Date": "2026-11-30 21:00",
+    "Tournament": "Derbi"
+  ,
+    "HomeScore": 0,
+    "AwayScore": 0}
+]
