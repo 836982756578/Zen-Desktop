@@ -17769,6 +17769,60 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             weatherFxPanel.Children.Add(fxBtnRow);
 
             _mainContentPanel.Children.Add(CreateSettingCard("Ekrandaki Canlı Atmosferik Efektler (Yağmur, Kar, Ateş Böcekleri, Yapraklar)", "Ekranda GPU'yu hiç yormayan çok hafif, zarif yağmur damlaları, kar taneleri, parıldayan ateş böcekleri veya süzülen sonbahar yaprakları akar. Dilediğinizde tek tıkla test edebilir veya kapatabilirsiniz.", weatherFxPanel));
+
+            _mainContentPanel.Children.Add(CreateSectionTitle("🌙 ZEN DİNLENME & GİZLİLİK MODU (AMBIENT)"));
+
+            var swAmbient = new PowerToggleSwitch(_cfg.ZenAmbientModeEnabled, delegate(bool val)
+            {
+                _cfg.ZenAmbientModeEnabled = val;
+                SaveAndNotify();
+            }, _isDark);
+            _mainContentPanel.Children.Add(CreateSettingCard("Hareketsizlikte Duvar Kâğıdı ve Widget'ları Ön Plana Getir", "Bilgisayar başında hareketsiz kalındığında açık pencerelerinizi kapatmadan/küçültmeden, duvar kâğıdı ve widget'ları ekranın en üstüne çıkararak açık sayfalarınızı gizler, tam bir gizlilik ve dinlenme ortamı sunar. Fare oynatıldığında açık sayfalarınız anında geri gelir.", swAmbient));
+
+            // Ambient Bekleme Süresi Slider
+            var sliderAmbPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var sliderAmbTimeout = new Slider
+            {
+                Minimum = 5,
+                Maximum = 300,
+                Value = _cfg.ZenAmbientTimeoutSeconds,
+                Width = 140,
+                IsSnapToTickEnabled = true,
+                TickFrequency = 5,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var lblAmbTimeout = new TextBlock
+            {
+                Text = _cfg.ZenAmbientTimeoutSeconds >= 60 ? (_cfg.ZenAmbientTimeoutSeconds / 60) + " dk" + (_cfg.ZenAmbientTimeoutSeconds % 60 > 0 ? " " + (_cfg.ZenAmbientTimeoutSeconds % 60) + " sn" : "") : _cfg.ZenAmbientTimeoutSeconds.ToString() + " sn",
+                Foreground = _accentBrush,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(10, 0, 0, 0),
+                Width = 65
+            };
+            sliderAmbTimeout.ValueChanged += delegate(object s, RoutedPropertyChangedEventArgs<double> e)
+            {
+                int val = (int)sliderAmbTimeout.Value;
+                lblAmbTimeout.Text = val >= 60 ? (val / 60) + " dk" + (val % 60 > 0 ? " " + (val % 60) + " sn" : "") : val.ToString() + " sn";
+                _cfg.ZenAmbientTimeoutSeconds = val;
+                SaveAndNotify();
+            };
+            sliderAmbPanel.Children.Add(sliderAmbTimeout);
+            sliderAmbPanel.Children.Add(lblAmbTimeout);
+            _mainContentPanel.Children.Add(CreateSettingCard("Dinlenme & Gizlilik Modu Bekleme Süresi", "Duvar kâğıdı ve widget'ların ön plana gelmesi için gereken hareketsizlik süresi (5 sn - 5 dk, varsayılan 30 sn).", sliderAmbPanel));
+
+            var btnTestAmbient = new System.Windows.Controls.Button
+            {
+                Content = "🌙 Şimdi Dinlenme Modunu Başlat",
+                Height = 28,
+                Padding = new Thickness(12, 0, 12, 0),
+                Cursor = Cursors.Hand
+            };
+            btnTestAmbient.Click += delegate
+            {
+                if (_onTestAmbient != null) _onTestAmbient();
+            };
+            _mainContentPanel.Children.Add(CreateSettingCard("Hemen Dene", "Zen dinlenme ve gizlilik modunu hemen test edin (fareyi oynatarak anında çıkabilirsiniz).", btnTestAmbient));
         }
 
         // ==========================================
@@ -18922,11 +18976,11 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             }
 
             // Duvar Kağıdı ve Canlı Atmosferik Efektler eşleşmeleri
-            if (q.Contains("duvar") || q.Contains("wallpaper") || q.Contains("arka plan") || q.Contains("resim") || q.Contains("görsel") || q.Contains("yağmur") || q.Contains("kar") || q.Contains("ateş böceği") || q.Contains("sonbahar") || q.Contains("parçacık") || q.Contains("efekt"))
+            if (q.Contains("duvar") || q.Contains("wallpaper") || q.Contains("arka plan") || q.Contains("resim") || q.Contains("görsel") || q.Contains("yağmur") || q.Contains("kar") || q.Contains("ateş böceği") || q.Contains("sonbahar") || q.Contains("parçacık") || q.Contains("efekt") || q.Contains("ambient") || q.Contains("dinlenme") || q.Contains("gizlilik"))
             {
                 var btn = new System.Windows.Controls.Button { Content = "Bölüme Git", Height = 28, Padding = new Thickness(12, 0, 12, 0), Cursor = Cursors.Hand };
                 btn.Click += delegate(object s, RoutedEventArgs e) { SwitchTab("wallpaper"); };
-                _mainContentPanel.Children.Add(CreateSettingCard("🖼️ Duvar Kâğıdı & Canlı Efektler", "Özel duvar kağıdı, günün saatine göre dinamik görseller ve canlı yağmur/kar parçacıkları.", btn));
+                _mainContentPanel.Children.Add(CreateSettingCard("🖼️ Duvar Kâğıdı & Canlı Efektler", "Özel duvar kağıdı, dinamik görseller, canlı parçacıklar ve Zen Dinlenme/Gizlilik (Ambient) modu.", btn));
                 matchCount++;
             }
 
