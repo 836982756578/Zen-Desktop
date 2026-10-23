@@ -14773,7 +14773,7 @@ namespace ModernAutoHideIcons
             var tabGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
             for (int i = 0; i < 5; i++) tabGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            string[] tabTitles = new string[] { "Devralacak", "Sabah", "Akşam", "Gece", "🚉 İstasyon" };
+            string[] tabTitles = new string[] { "Devralacak", "Sabah", "Akşam", "Gece", "İstasyon" };
             for (int i = 0; i < 5; i++)
             {
                 int tabIdx = i;
