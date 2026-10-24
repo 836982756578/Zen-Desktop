@@ -14241,6 +14241,10 @@ namespace ModernAutoHideIcons
         private int _stationFilterMode = 0; // 0: Anlık, 1: Sabah, 2: Akşam, 3: Tümü
         private ShiftDayResult _currentResult = null;
         private bool _isLoading = false;
+        private bool _pendingReload = false;
+        private bool _pendingForceRefresh = false;
+        private DateTime _lastKnownToday = DateTime.Today;
+        private int _lastAutoRefreshMinute = -1;
         public Action OnOpenStationWidgetRequested;
 
         private Border _cardBorder;
@@ -14412,12 +14416,25 @@ namespace ModernAutoHideIcons
             _autoUpdateTimer.Interval = TimeSpan.FromMilliseconds(500);
             _autoUpdateTimer.Tick += delegate
             {
+                DateTime now = DateTime.Now;
+                if (now.Date != _lastKnownToday)
+                {
+                    if (_viewDate.Date == _lastKnownToday)
+                    {
+                        _viewDate = now.Date;
+                        UpdateDateDisplay();
+                    }
+                    _lastKnownToday = now.Date;
+                    LoadScheduleAsync(false);
+                }
+                else if (now.Minute != _lastAutoRefreshMinute)
+                {
+                    _lastAutoRefreshMinute = now.Minute;
+                    LoadScheduleAsync(false);
+                }
+
                 UpdateShiftBanner();
                 CheckHandoverAlarm();
-                if (DateTime.Now.Second == 0 && (_selectedTab == 0 || _selectedTab == 1))
-                {
-                    RenderStaffList();
-                }
             };
             _autoUpdateTimer.Start();
 
@@ -15600,8 +15617,15 @@ namespace ModernAutoHideIcons
 
         private void LoadScheduleAsync(bool forceRefresh)
         {
-            if (_isLoading) return;
+            if (_isLoading)
+            {
+                _pendingReload = true;
+                if (forceRefresh) _pendingForceRefresh = true;
+                return;
+            }
             _isLoading = true;
+            _pendingReload = false;
+            _pendingForceRefresh = false;
 
             try
             {
@@ -15618,7 +15642,7 @@ namespace ModernAutoHideIcons
             catch { }
             UpdateHandoverNoteVisuals();
 
-            if (_txtEmpty != null)
+            if (_txtEmpty != null && (_currentResult == null || forceRefresh))
             {
                 _txtEmpty.Text = "\u00C7izelgeler Excel'den okunuyor...";
                 _txtEmpty.Visibility = Visibility.Visible;
@@ -15638,6 +15662,14 @@ namespace ModernAutoHideIcons
                     _currentResult = result;
                     UpdateShiftBanner();
                     RenderStaffList();
+
+                    if (_pendingReload || (result != null && result.Date.Date != _viewDate.Date))
+                    {
+                        bool nextForce = _pendingForceRefresh;
+                        _pendingReload = false;
+                        _pendingForceRefresh = false;
+                        LoadScheduleAsync(nextForce);
+                    }
                 }));
             });
         }
@@ -15818,9 +15850,10 @@ namespace ModernAutoHideIcons
             if (_selectedTab == 0) // DEVRALACAK
             {
                 DateTime now = DateTime.Now;
+                DateTime contextNow = (_viewDate.Date == now.Date) ? now : _viewDate.Date.Add(now.TimeOfDay);
                 string curName, incName, handoverTime, curShiftCode, incShiftCode;
                 DateTime curDate, incDate;
-                ShiftScheduleService.GetShiftContext(now, out curName, out incName, out handoverTime, out curDate, out curShiftCode, out incDate, out incShiftCode);
+                ShiftScheduleService.GetShiftContext(contextNow, out curName, out incName, out handoverTime, out curDate, out curShiftCode, out incDate, out incShiftCode);
 
                 ShiftDayResult incResult;
                 if (incDate.Date != _currentResult.Date.Date)
@@ -16748,6 +16781,9 @@ namespace ModernAutoHideIcons
         private int _filterMode = 0; // 0: Anlık, 1: Sabah, 2: Akşam, 3: Tümü
         private StationDayResult _currentResult = null;
         private bool _isLoading = false;
+        private bool _pendingReload = false;
+        private bool _pendingForceRefresh = false;
+        private DateTime _lastKnownToday = DateTime.Today;
 
         private Border _cardBorder;
         private Grid _headerGrid;
@@ -16895,10 +16931,20 @@ namespace ModernAutoHideIcons
             };
 
             _autoUpdateTimer = new DispatcherTimer(DispatcherPriority.Normal);
-            _autoUpdateTimer.Interval = TimeSpan.FromSeconds(30);
+            _autoUpdateTimer.Interval = TimeSpan.FromSeconds(60);
             _autoUpdateTimer.Tick += delegate
             {
-                UpdateShiftBanner();
+                DateTime now = DateTime.Now;
+                if (now.Date != _lastKnownToday)
+                {
+                    if (_viewDate.Date == _lastKnownToday)
+                    {
+                        _viewDate = now.Date;
+                        UpdateDateDisplay();
+                    }
+                    _lastKnownToday = now.Date;
+                }
+                LoadScheduleAsync(false);
             };
             _autoUpdateTimer.Start();
 
@@ -17241,10 +17287,17 @@ namespace ModernAutoHideIcons
 
         public void LoadScheduleAsync(bool forceRefresh)
         {
-            if (_isLoading) return;
+            if (_isLoading)
+            {
+                _pendingReload = true;
+                if (forceRefresh) _pendingForceRefresh = true;
+                return;
+            }
             _isLoading = true;
+            _pendingReload = false;
+            _pendingForceRefresh = false;
 
-            if (_txtEmpty != null)
+            if (_txtEmpty != null && (_currentResult == null || forceRefresh))
             {
                 _txtEmpty.Text = "İstasyon çizelgesi Excel'den okunuyor...";
                 _txtEmpty.Visibility = Visibility.Visible;
@@ -17263,6 +17316,14 @@ namespace ModernAutoHideIcons
                     _currentResult = result;
                     UpdateShiftBanner();
                     RenderStationList();
+
+                    if (_pendingReload || (result != null && result.Date.Date != _viewDate.Date))
+                    {
+                        bool nextForce = _pendingForceRefresh;
+                        _pendingReload = false;
+                        _pendingForceRefresh = false;
+                        LoadScheduleAsync(nextForce);
+                    }
                 }));
             });
         }
