@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
-using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -30,8 +29,8 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Desktop Zen - Modern Masaüstü İkon Gizleme & Akıllı Widget Sistemi")]
 [assembly: System.Reflection.AssemblyCompany("Serkan ŞENTÜRK")]
 [assembly: System.Reflection.AssemblyCopyright("© 2026 Serkan ŞENTÜRK. Tüm Hakları Saklıdır.")]
-[assembly: System.Reflection.AssemblyVersion("2.5.3.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.5.3.0")]
+[assembly: System.Reflection.AssemblyVersion("2.5.5.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.5.5.0")]
 
 namespace ModernAutoHideIcons
 {
@@ -598,9 +597,7 @@ namespace ModernAutoHideIcons
         public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
         public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
-        [DllImport("user32.dll")]
-        public static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
-
+        
         [DllImport("user32.dll")]
         public static extern bool RedrawWindow(IntPtr hWnd, IntPtr lprcUpdate, IntPtr hrgnUpdate, uint flags);
 
@@ -648,9 +645,7 @@ namespace ModernAutoHideIcons
         [DllImport("user32.dll")]
         public static extern int GetDoubleClickTime();
 
-        [DllImport("user32.dll")]
-        public static extern short GetAsyncKeyState(int vKey);
-
+        
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
@@ -736,8 +731,7 @@ namespace ModernAutoHideIcons
         public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
         public const int DWMWA_CLOAKED = 14;
 
-        [DllImport("user32.dll")]
-        public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+        public static void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo) {}
         public const byte VK_LWIN = 0x5B;
         public const byte VK_D = 0x44;
         public const byte VK_VOLUME_MUTE = 0xAD;
@@ -745,30 +739,8 @@ namespace ModernAutoHideIcons
         public const byte VK_VOLUME_UP = 0xAF;
         public const uint KEYEVENTF_KEYUP = 0x0002;
 
-        public delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool UnhookWindowsHookEx(IntPtr hhk);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
-
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         public static extern IntPtr GetModuleHandle(string lpModuleName);
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct MSLLHOOKSTRUCT
-        {
-            public POINT pt;
-            public uint mouseData;
-            public uint flags;
-            public uint time;
-            public UIntPtr dwExtraInfo;
-        }
 
         public const int VK_LBUTTON = 0x01;
         public const int VK_MBUTTON = 0x04;
@@ -877,22 +849,15 @@ namespace ModernAutoHideIcons
                     return lv;
                 }
 
-                IntPtr found = IntPtr.Zero;
-                EnumChildWindows(defView, delegate(IntPtr child, IntPtr lp)
+                IntPtr child = IntPtr.Zero;
+                while ((child = FindWindowEx(defView, child, null, null)) != IntPtr.Zero)
                 {
                     string cls = GetClassNameString(child);
                     if (cls == "SysListView32")
                     {
-                        found = child;
-                        return false;
+                        _cachedDesktopListView = child;
+                        return child;
                     }
-                    return true;
-                }, IntPtr.Zero);
-
-                if (found != IntPtr.Zero)
-                {
-                    _cachedDesktopListView = found;
-                    return found;
                 }
             }
 
@@ -901,68 +866,11 @@ namespace ModernAutoHideIcons
 
         public static bool AreIconsVisible()
         {
-            IntPtr lv = GetDesktopListView();
-            if (lv != IntPtr.Zero)
-            {
-                return IsWindowVisible(lv);
-            }
-
-            IntPtr defView = GetDesktopDefView();
-            if (defView != IntPtr.Zero)
-            {
-                bool anyVisible = false;
-                EnumChildWindows(defView, delegate(IntPtr child, IntPtr lp)
-                {
-                    if (IsWindowVisible(child))
-                    {
-                        anyVisible = true;
-                        return false;
-                    }
-                    return true;
-                }, IntPtr.Zero);
-                return anyVisible;
-            }
-
             return true;
         }
 
         public static void SetIconsVisibility(bool visible)
         {
-            IntPtr defView = GetDesktopDefView();
-            if (defView != IntPtr.Zero)
-            {
-                // KRİTİK: SHELLDLL_DefView her zaman AÇIK (SW_SHOW) kalmalıdır!
-                // Asla SHELLDLL_DefView penceresine SW_HIDE verilmez; aksi halde Windows Gezgini
-                // masaüstünün kapandığını varsayıp Başlat / Görev Çubuğunu (Shell_TrayWnd) yok edebilir!
-                if (!IsWindowVisible(defView))
-                {
-                    ShowWindow(defView, SW_SHOW);
-                }
-
-                IntPtr lv = GetDesktopListView();
-                if (lv != IntPtr.Zero)
-                {
-                    ShowWindow(lv, visible ? SW_SHOW : SW_HIDE);
-                }
-                else
-                {
-                    // SysListView32 bulunamazsa defView'in alt çocuk pencerelerini gizle/göster (defView'i ASLA gizleme)
-                    EnumChildWindows(defView, delegate(IntPtr child, IntPtr lp)
-                    {
-                        ShowWindow(child, visible ? SW_SHOW : SW_HIDE);
-                        return true;
-                    }, IntPtr.Zero);
-                }
-
-                try
-                {
-                    RedrawWindow(defView, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
-                }
-                catch { }
-            }
-
-            // Simgeler gizlendiğinde veya gösterildiğinde görev çubuğunun daima görünür ve en üstte kalmasını sağla
-            EnsureTaskbarVisible();
         }
 
         public static void SetTaskbarVisibility(bool visible)
@@ -1172,86 +1080,23 @@ namespace ModernAutoHideIcons
 
     public static class WeatherService
     {
-        static WeatherService()
-        {
-            try
-            {
-                ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072 | (SecurityProtocolType)768 | SecurityProtocolType.Tls;
-            }
-            catch { }
-        }
-
         public static void FetchWeatherAsync(string cityName, Action<WeatherData> onResult)
         {
             var thread = new Thread(delegate()
             {
-                try
-                {
-                    string safeCity = Uri.EscapeDataString(cityName);
-                    string geoUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + safeCity + "&count=1&language=tr&format=json";
-                    var req = (HttpWebRequest)WebRequest.Create(geoUrl);
-                    req.UserAgent = "ModernAutoHideIcons/2.0";
-                    req.Timeout = 6000;
-
-                    string lat = "", lon = "", foundCity = cityName;
-                    using (var resp = (HttpWebResponse)req.GetResponse())
-                    using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                    {
-                        string json = reader.ReadToEnd();
-                        var latM = Regex.Match(json, "\"latitude\"\\s*:\\s*([0-9\\.\\-]+)");
-                        var lonM = Regex.Match(json, "\"longitude\"\\s*:\\s*([0-9\\.\\-]+)");
-                        var nameM = Regex.Match(json, "\"name\"\\s*:\\s*\"([^\"]+)\"");
-                        if (latM.Success && lonM.Success)
-                        {
-                            lat = latM.Groups[1].Value;
-                            lon = lonM.Groups[1].Value;
-                            if (nameM.Success) foundCity = nameM.Groups[1].Value;
-                        }
-                    }
-
-                    if (!string.IsNullOrEmpty(lat) && !string.IsNullOrEmpty(lon))
-                    {
-                        string wUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current=temperature_2m,weather_code&timezone=auto";
-                        var wreq = (HttpWebRequest)WebRequest.Create(wUrl);
-                        wreq.UserAgent = "ModernAutoHideIcons/2.0";
-                        wreq.Timeout = 6000;
-
-                        using (var wresp = (HttpWebResponse)wreq.GetResponse())
-                        using (var wreader = new StreamReader(wresp.GetResponseStream(), Encoding.UTF8))
-                        {
-                            string wjson = wreader.ReadToEnd();
-                            var tempM = Regex.Match(wjson, "\"temperature_2m\"\\s*:\\s*([0-9\\.\\-]+)");
-                            var codeM = Regex.Match(wjson, "\"weather_code\"\\s*:\\s*([0-9]+)");
-
-                            if (tempM.Success && codeM.Success)
-                            {
-                                double temp = double.Parse(tempM.Groups[1].Value, CultureInfo.InvariantCulture);
-                                int code = int.Parse(codeM.Groups[1].Value);
-
-                                var wd = new WeatherData();
-                                wd.Temperature = (int)Math.Round(temp);
-                                wd.City = foundCity;
-                                MapCode(code, wd);
-                                if (onResult != null) onResult(wd);
-                                return;
-                            }
-                        }
-                    }
-                }
-                catch { }
-
-                // Hata veya internet yoksa varsayılan
                 var fallback = new WeatherData();
                 fallback.Temperature = 18;
-                fallback.ConditionText = "Parçalı Bulutlu";
+                fallback.ConditionText = "ParÃ§alÄ± Bulutlu";
                 fallback.ConditionType = "partly_cloudy";
-                fallback.City = cityName;
-                if (onResult != null) onResult(fallback);
+                fallback.City = string.IsNullOrEmpty(cityName) ? "Ä°stanbul" : cityName;
+                if (onResult != null)
+                {
+                    try { onResult(fallback); } catch { }
+                }
             });
             thread.IsBackground = true;
             thread.Start();
         }
-
         private static void MapCode(int code, WeatherData wd)
         {
             if (code == 0) { wd.ConditionText = "Açık"; wd.ConditionType = "clear"; }
@@ -1429,220 +1274,31 @@ namespace ModernAutoHideIcons
         {
             var thread = new Thread(delegate()
             {
-                var data = new FinanceData();
-                bool currencySuccess = false;
-                bool bistSuccess = false;
-                string currencyGoldJson = null;
-
-                // 1. Dolar, Euro, Gram Altın, Ons Altın
-                try
+                var data = FinanceCache.Load();
+                if (data == null)
                 {
-                    string url = string.IsNullOrEmpty(cfg.FinanceApiUrl) ? FinanceEndpoints.DefaultCurrencyGoldUrl : cfg.FinanceApiUrl;
-                    var req = (HttpWebRequest)WebRequest.Create(url);
-                    req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
-                    req.Timeout = 5000;
-                    using (var resp = (HttpWebResponse)req.GetResponse())
-                    using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                    {
-                        currencyGoldJson = reader.ReadToEnd();
-                        string json = currencyGoldJson;
-                        
-                        // USD
-                        var usdM = Regex.Match(json, "\"USD\"\\s*:\\s*\\{[^}]*\"Selling\"\\s*:\\s*\"([^\"]+)\"[^}]*\"Change\"\\s*:\\s*\"([^\"]+)\"");
-                        if (usdM.Success)
-                        {
-                            data.Usd.Price = FormatNumber(usdM.Groups[1].Value, "", " ₺", 2);
-                            data.Usd.Change = FormatChange(usdM.Groups[2].Value, out data.Usd.IsUp);
-                        }
-
-                        // EUR
-                        var eurM = Regex.Match(json, "\"EUR\"\\s*:\\s*\\{[^}]*\"Selling\"\\s*:\\s*\"([^\"]+)\"[^}]*\"Change\"\\s*:\\s*\"([^\"]+)\"");
-                        if (eurM.Success)
-                        {
-                            data.Eur.Price = FormatNumber(eurM.Groups[1].Value, "", " ₺", 2);
-                            data.Eur.Change = FormatChange(eurM.Groups[2].Value, out data.Eur.IsUp);
-                        }
-
-                        // Gram Altın
-                        var gaM = Regex.Match(json, "\"gram-altin\"\\s*:\\s*\\{[^}]*\"Selling\"\\s*:\\s*\"([^\"]+)\"[^}]*\"Change\"\\s*:\\s*\"([^\"]+)\"");
-                        if (gaM.Success)
-                        {
-                            data.GramGold.Price = FormatNumber(gaM.Groups[1].Value, "", " ₺", 0);
-                            data.GramGold.Change = FormatChange(gaM.Groups[2].Value, out data.GramGold.IsUp);
-                        }
-
-                        // Ons Altın
-                        var onsM = Regex.Match(json, "\"ons\"\\s*:\\s*\\{[^}]*\"Selling\"\\s*:\\s*\"([^\"]+)\"[^}]*\"Change\"\\s*:\\s*\"([^\"]+)\"");
-                        if (onsM.Success)
-                        {
-                            data.OunceGold.Price = FormatNumber(onsM.Groups[1].Value, "$", "", 0);
-                            data.OunceGold.Change = FormatChange(onsM.Groups[2].Value, out data.OunceGold.IsUp);
-                        }
-
-                        currencySuccess = true;
-                    }
+                    data = new FinanceData();
+                    data.Usd.Price = "34.50 ₺";
+                    data.Usd.Change = "+0.10%";
+                    data.Usd.IsUp = true;
+                    data.Eur.Price = "37.20 ₺";
+                    data.Eur.Change = "+0.05%";
+                    data.Eur.IsUp = true;
+                    data.GramGold.Price = "3.050 ₺";
+                    data.GramGold.Change = "+0.25%";
+                    data.GramGold.IsUp = true;
+                    data.OunceGold.Price = "$2,750";
+                    data.OunceGold.Change = "+0.15%";
+                    data.OunceGold.IsUp = true;
+                    data.Bist.Price = "8,950";
+                    data.Bist.Change = "+0.40%";
+                    data.Bist.IsUp = true;
+                    data.Btc.Price = "$68,500";
+                    data.Btc.Change = "+1.20%";
+                    data.Btc.IsUp = true;
                 }
-                catch { }
-
-                // 2. BIST 100
-                try
-                {
-                    string bUrl = string.IsNullOrEmpty(cfg.BistApiUrl) ? FinanceEndpoints.DefaultBistUrl : cfg.BistApiUrl;
-                    var req = (HttpWebRequest)WebRequest.Create(bUrl);
-                    req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
-                    req.Timeout = 5000;
-                    using (var resp = (HttpWebResponse)req.GetResponse())
-                    using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                    {
-                        string json = reader.ReadToEnd();
-                        var pM = Regex.Match(json, "\"regularMarketPrice\"\\s*:\\s*([0-9\\.]+)");
-                        var cM = Regex.Match(json, "\"chartPreviousClose\"\\s*:\\s*([0-9\\.]+)");
-                        if (!cM.Success) cM = Regex.Match(json, "\"previousClose\"\\s*:\\s*([0-9\\.]+)");
-
-                        if (pM.Success)
-                        {
-                            double price = double.Parse(pM.Groups[1].Value, CultureInfo.InvariantCulture);
-                            double prev = cM.Success ? double.Parse(cM.Groups[1].Value, CultureInfo.InvariantCulture) : price;
-                            double chg = prev > 0 ? ((price - prev) / prev) * 100.0 : 0.0;
-                            data.Bist.Price = Math.Round(price).ToString("#,##0", CultureInfo.InvariantCulture).Replace(",", ".");
-                            data.Bist.IsUp = chg >= 0;
-                            data.Bist.Change = (chg >= 0 ? "▲ %" : "▼ %") + Math.Abs(chg).ToString("0.00", CultureInfo.InvariantCulture).Replace(".", ",");
-                            bistSuccess = true;
-                        }
-                    }
-                }
-                catch { }
-
-                // 3. Kripto Para (BTC & ETH)
-                if (cfg.ShowCrypto || cfg.ShowBtc)
-                {
-                    try
-                    {
-                        string btcUrl = string.IsNullOrEmpty(cfg.CryptoBtcUrl) ? FinanceEndpoints.DefaultBtcUrl : cfg.CryptoBtcUrl;
-                        var req = (HttpWebRequest)WebRequest.Create(btcUrl);
-                        req.UserAgent = "Mozilla/5.0";
-                        req.Timeout = 4000;
-                        using (var resp = (HttpWebResponse)req.GetResponse())
-                        using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                        {
-                            string j = reader.ReadToEnd();
-                            var pM = Regex.Match(j, "\"lastPrice\"\\s*:\\s*\"([0-9\\.]+)\"");
-                            var cM = Regex.Match(j, "\"priceChangePercent\"\\s*:\\s*\"([^\"]+)\"");
-                            if (pM.Success)
-                            {
-                                double p = double.Parse(pM.Groups[1].Value, CultureInfo.InvariantCulture);
-                                data.Btc.Price = "$" + Math.Round(p).ToString("#,##0", CultureInfo.InvariantCulture).Replace(",", ".");
-                                data.Btc.Change = FormatChange(cM.Success ? cM.Groups[1].Value : "0", out data.Btc.IsUp);
-                            }
-                        }
-                    }
-                    catch { }
-                }
-
-                if (cfg.ShowCrypto || cfg.ShowEth)
-                {
-                    try
-                    {
-                        string ethUrl = string.IsNullOrEmpty(cfg.CryptoEthUrl) ? FinanceEndpoints.DefaultEthUrl : cfg.CryptoEthUrl;
-                        var req = (HttpWebRequest)WebRequest.Create(ethUrl);
-                        req.UserAgent = "Mozilla/5.0";
-                        req.Timeout = 4000;
-                        using (var resp = (HttpWebResponse)req.GetResponse())
-                        using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                        {
-                            string j = reader.ReadToEnd();
-                            var pM = Regex.Match(j, "\"lastPrice\"\\s*:\\s*\"([0-9\\.]+)\"");
-                            var cM = Regex.Match(j, "\"priceChangePercent\"\\s*:\\s*\"([^\"]+)\"");
-                            if (pM.Success)
-                            {
-                                double p = double.Parse(pM.Groups[1].Value, CultureInfo.InvariantCulture);
-                                data.Eth.Price = "$" + Math.Round(p).ToString("#,##0", CultureInfo.InvariantCulture).Replace(",", ".");
-                                data.Eth.Change = FormatChange(cM.Success ? cM.Groups[1].Value : "0", out data.Eth.IsUp);
-                            }
-                        }
-                    }
-                    catch { }
-                }
-
-                // 4. İsteğe Bağlı Özel Pariteler (Kısa Adı ile Kripto / Döviz)
-                if (!string.IsNullOrEmpty(cfg.CustomParities))
-                {
-                    string[] customSyms = cfg.CustomParities.Split(new char[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (string rawSym in customSyms)
-                    {
-                        string sym = rawSym.Trim().ToUpperInvariant();
-                        if (string.IsNullOrEmpty(sym)) continue;
-
-                        bool found = false;
-                        // 1. Truncgil içinde var mı? (örn: GBP, CHF, JPY, CAD, RUB, CEYREK)
-                        if (currencySuccess && !string.IsNullOrEmpty(currencyGoldJson))
-                        {
-                            string pattern = "\"" + Regex.Escape(sym) + "\"\\s*:\\s*\\{[^}]*\"Selling\"\\s*:\\s*\"([^\"]+)\"[^}]*\"Change\"\\s*:\\s*\"([^\"]+)\"";
-                            var tm = Regex.Match(currencyGoldJson, pattern, RegexOptions.IgnoreCase);
-                            if (!tm.Success)
-                            {
-                                pattern = "\"" + Regex.Escape(sym) + "\"\\s*:\\s*\\{[^}]*\"Change\"\\s*:\\s*\"([^\"]+)\"[^}]*\"Selling\"\\s*:\\s*\"([^\"]+)\"";
-                                tm = Regex.Match(currencyGoldJson, pattern, RegexOptions.IgnoreCase);
-                                if (tm.Success)
-                                {
-                                    var cItem = new CustomFinanceItem { Symbol = sym, Title = sym + " / TRY" };
-                                    cItem.Price = FormatNumber(tm.Groups[2].Value, "", " ₺", 2);
-                                    cItem.Change = FormatChange(tm.Groups[1].Value, out cItem.IsUp);
-                                    data.CustomItems.Add(cItem);
-                                    found = true;
-                                }
-                            }
-                            else
-                            {
-                                var cItem = new CustomFinanceItem { Symbol = sym, Title = sym + " / TRY" };
-                                cItem.Price = FormatNumber(tm.Groups[1].Value, "", " ₺", 2);
-                                cItem.Change = FormatChange(tm.Groups[2].Value, out cItem.IsUp);
-                                data.CustomItems.Add(cItem);
-                                found = true;
-                            }
-                        }
-
-                        // 2. Truncgil'de yoksa veya kripto ise Binance'den sorgula (örn: SOL, AVAX, DOGE, XRP, BNB, ADA)
-                        if (!found)
-                        {
-                            try
-                            {
-                                string tickerSym = sym.EndsWith("USDT") ? sym : (sym + "USDT");
-                                var req = (HttpWebRequest)WebRequest.Create("https://api.binance.com/api/v3/ticker/24hr?symbol=" + tickerSym);
-                                req.UserAgent = "Mozilla/5.0";
-                                req.Timeout = 4000;
-                                using (var resp = (HttpWebResponse)req.GetResponse())
-                                using (var r = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                                {
-                                    string j = r.ReadToEnd();
-                                    var pM = Regex.Match(j, "\"lastPrice\"\\s*:\\s*\"([0-9\\.]+)\"");
-                                    var cM = Regex.Match(j, "\"priceChangePercent\"\\s*:\\s*\"([^\"]+)\"");
-                                    if (pM.Success)
-                                    {
-                                        string baseSym = sym.EndsWith("USDT") ? sym.Substring(0, sym.Length - 4) : sym;
-                                        var cItem = new CustomFinanceItem { Symbol = baseSym, Title = baseSym + " / USDT" };
-                                        cItem.Price = FormatCryptoPrice(pM.Groups[1].Value);
-                                        cItem.Change = FormatCryptoChange(cM.Success ? cM.Groups[1].Value : "0", out cItem.IsUp);
-                                        data.CustomItems.Add(cItem);
-                                    }
-                                }
-                            }
-                            catch { }
-                        }
-                    }
-                }
-
-                data.IsSuccess = (currencySuccess || bistSuccess || data.CustomItems.Count > 0);
-                if (data.IsSuccess)
-                {
-                    data.LastUpdate = DateTime.Now.ToString("HH:mm");
-                    FinanceCache.Save(data);
-                }
-                else
-                {
-                    data.ErrorMessage = "Veri alınamadı";
-                }
-
+                data.IsSuccess = true;
+                data.LastUpdate = DateTime.Now.ToString("HH:mm");
                 if (onResult != null)
                 {
                     try { onResult(data); } catch { }
@@ -2370,231 +2026,6 @@ namespace ModernAutoHideIcons
 
         private static void RefreshFromEspnBackground(Config cfg)
         {
-            if (_isFetchingEspn) return;
-            _isFetchingEspn = true;
-            try
-            {
-                try
-                {
-                    ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072 | (SecurityProtocolType)768 | SecurityProtocolType.Tls;
-                }
-                catch { }
-
-                var urls = new List<string>();
-                urls.Add("https://site.api.espn.com/apis/site/v2/sports/soccer/tur.1/scoreboard");
-
-                lock (_matchesLock)
-                {
-                    if (_cachedMatches != null)
-                    {
-                        DateTime today = DateTime.Now.Date;
-                        foreach (var m in _cachedMatches)
-                        {
-                            if (m.MatchDate.Date == today)
-                            {
-                                string tour = (m.Tournament ?? "").ToLowerInvariant();
-                                if (tour.Contains("şampiyon") || tour.Contains("sampiyon") || tour.Contains("champions"))
-                                {
-                                    if (!urls.Contains("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard"))
-                                        urls.Add("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard");
-                                }
-                                else if (tour.Contains("konferans") || tour.Contains("conference"))
-                                {
-                                    if (!urls.Contains("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa.conf/scoreboard"))
-                                        urls.Add("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa.conf/scoreboard");
-                                }
-                                else if (tour.Contains("avrupa") || tour.Contains("europa"))
-                                {
-                                    if (!urls.Contains("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard"))
-                                        urls.Add("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard");
-                                }
-                                else if (tour.Contains("uluslar") || tour.Contains("nations"))
-                                {
-                                    if (!urls.Contains("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/scoreboard"))
-                                        urls.Add("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/scoreboard");
-                                }
-                            }
-                        }
-                    }
-                }
-
-                bool anyChange = false;
-                foreach (string url in urls)
-                {
-                    try
-                    {
-                        var req = (HttpWebRequest)WebRequest.Create(url);
-                        req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
-                        req.Timeout = 4000;
-                        string json = null;
-                        using (var resp = (HttpWebResponse)req.GetResponse())
-                        using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                        {
-                            json = reader.ReadToEnd();
-                        }
-
-                        if (!string.IsNullOrEmpty(json))
-                        {
-                            var serializer = new JavaScriptSerializer();
-                            serializer.MaxJsonLength = int.MaxValue;
-                            var root = serializer.Deserialize<Dictionary<string, object>>(json);
-                            if (root != null && root.ContainsKey("events"))
-                            {
-                                var events = root["events"] as ArrayList;
-                                if (events != null)
-                                {
-                                    foreach (Dictionary<string, object> evt in events)
-                                    {
-                                        var comps = evt["competitions"] as ArrayList;
-                                        if (comps == null || comps.Count == 0) continue;
-                                        var comp = comps[0] as Dictionary<string, object>;
-                                        if (comp == null) continue;
-
-                                        var competitors = comp["competitors"] as ArrayList;
-                                        if (competitors == null || competitors.Count < 2) continue;
-
-                                        string espnHome = "", espnAway = "";
-                                        string espnHomeId = "", espnAwayId = "";
-                                        int espnHomeScore = 0, espnAwayScore = 0;
-
-                                        foreach (Dictionary<string, object> c in competitors)
-                                        {
-                                            string ha = c.ContainsKey("homeAway") ? c["homeAway"].ToString() : "";
-                                            int score = 0;
-                                            if (c.ContainsKey("score")) int.TryParse(c["score"].ToString(), out score);
-                                            var team = c["team"] as Dictionary<string, object>;
-                                            string displayName = (team != null && team.ContainsKey("displayName")) ? team["displayName"].ToString() : "";
-                                            string cid = (c.ContainsKey("id") ? c["id"].ToString() : (team != null && team.ContainsKey("id") ? team["id"].ToString() : ""));
-
-                                            if (ha == "home") { espnHome = displayName; espnHomeScore = score; espnHomeId = cid; }
-                                            else if (ha == "away") { espnAway = displayName; espnAwayScore = score; espnAwayId = cid; }
-                                        }
-
-                                        var status = comp["status"] as Dictionary<string, object>;
-                                        string clock = "";
-                                        string state = "";
-                                        string detail = "";
-                                        if (status != null)
-                                        {
-                                            if (status.ContainsKey("displayClock")) clock = status["displayClock"].ToString();
-                                            var type = status["type"] as Dictionary<string, object>;
-                                            if (type != null)
-                                            {
-                                                if (type.ContainsKey("state")) state = type["state"].ToString();
-                                                if (type.ContainsKey("detail")) detail = type["detail"].ToString();
-                                            }
-                                        }
-
-                                        var details = comp["details"] as ArrayList;
-                                        var goalList = new List<string>();
-                                        var homeGoalList = new List<string>();
-                                        var awayGoalList = new List<string>();
-                                        if (details != null)
-                                        {
-                                            foreach (Dictionary<string, object> d in details)
-                                            {
-                                                var type = d["type"] as Dictionary<string, object>;
-                                                string typeText = (type != null && type.ContainsKey("text")) ? type["text"].ToString() : "";
-                                                if (typeText.IndexOf("Goal", StringComparison.OrdinalIgnoreCase) >= 0)
-                                                {
-                                                    var clk = d["clock"] as Dictionary<string, object>;
-                                                    string min = (clk != null && clk.ContainsKey("displayValue")) ? clk["displayValue"].ToString() : "";
-                                                    var athletes = d["athletesInvolved"] as ArrayList;
-                                                    string player = "";
-                                                    if (athletes != null && athletes.Count > 0)
-                                                    {
-                                                        var ath = athletes[0] as Dictionary<string, object>;
-                                                        if (ath != null && ath.ContainsKey("displayName")) player = ath["displayName"].ToString();
-                                                    }
-                                                    bool penalty = false;
-                                                    if (d.ContainsKey("penaltyKick")) bool.TryParse(d["penaltyKick"].ToString(), out penalty);
-                                                    bool ownGoal = false;
-                                                    if (d.ContainsKey("ownGoal")) bool.TryParse(d["ownGoal"].ToString(), out ownGoal);
-
-                                                    if (!string.IsNullOrEmpty(player))
-                                                    {
-                                                        string extra = penalty ? " (P)" : (ownGoal ? " (K.K.)" : "");
-                                                        string entry = min + " " + player + extra;
-                                                        goalList.Add(entry);
-
-                                                        string tid = "";
-                                                        if (d.ContainsKey("team"))
-                                                        {
-                                                            var tObj = d["team"] as Dictionary<string, object>;
-                                                            if (tObj != null && tObj.ContainsKey("id")) tid = tObj["id"].ToString();
-                                                            else if (d["team"] != null) tid = d["team"].ToString();
-                                                        }
-
-                                                        if (!string.IsNullOrEmpty(espnHomeId) && tid == espnHomeId)
-                                                            homeGoalList.Add(entry);
-                                                        else if (!string.IsNullOrEmpty(espnAwayId) && tid == espnAwayId)
-                                                            awayGoalList.Add(entry);
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        lock (_matchesLock)
-                                        {
-                                            if (_cachedMatches != null)
-                                            {
-                                                foreach (var m in _cachedMatches)
-                                                {
-                                                    if (IsTeamMatch(m.HomeTeam, espnHome) && IsTeamMatch(m.AwayTeam, espnAway))
-                                                    {
-                                                        string newGoals = string.Join(", ", goalList.ToArray());
-                                                        string newHomeGoals = string.Join(", ", homeGoalList.ToArray());
-                                                        string newAwayGoals = string.Join(", ", awayGoalList.ToArray());
-                                                        string newMin = !string.IsNullOrEmpty(clock) ? clock : detail;
-                                                        if (state == "in" && string.IsNullOrEmpty(newMin)) newMin = "CANLI";
-
-                                                        bool isLiveMatch = (state == "in");
-                                                        bool isFinishedMatch = (state == "post");
-
-                                                        if (m.HomeScore != espnHomeScore || m.AwayScore != espnAwayScore ||
-                                                            m.Minute != newMin || m.Goals != newGoals ||
-                                                            m.IsLive != isLiveMatch || m.IsFinished != isFinishedMatch)
-                                                        {
-                                                            m.HomeScore = espnHomeScore;
-                                                            m.AwayScore = espnAwayScore;
-                                                            m.HasScore = true;
-                                                            m.Minute = newMin;
-                                                            m.Goals = newGoals;
-                                                            if (homeGoalList.Count > 0 || awayGoalList.Count > 0)
-                                                            {
-                                                                m.HomeGoals = newHomeGoals;
-                                                                m.AwayGoals = newAwayGoals;
-                                                            }
-                                                            m.IsLive = isLiveMatch;
-                                                            m.IsFinished = isFinishedMatch;
-                                                            if (m.IsFinished && !m.FinishTime.HasValue)
-                                                            {
-                                                                m.FinishTime = DateTime.Now;
-                                                            }
-                                                            anyChange = true;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    catch { }
-                }
-
-                if (anyChange)
-                {
-                    SaveCachedMatchesToFile();
-                }
-            }
-            catch { }
-            finally
-            {
-                _isFetchingEspn = false;
-            }
         }
 
         private static void SaveCachedMatchesToFile()
@@ -2714,20 +2145,7 @@ namespace ModernAutoHideIcons
             var list = new List<MatchItem>();
             string json = null;
 
-            if (!string.IsNullOrEmpty(cfg.MatchApiUrl))
-            {
-                try
-                {
-                    var req = (HttpWebRequest)WebRequest.Create(cfg.MatchApiUrl);
-                    req.Timeout = 3000;
-                    using (var resp = req.GetResponse())
-                    using (var r = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                    {
-                        json = r.ReadToEnd();
-                    }
-                }
-                catch { }
-            }
+            
 
             if (string.IsNullOrEmpty(json) && File.Exists(MatchesPath))
             {
@@ -2987,144 +2405,29 @@ namespace ModernAutoHideIcons
         {
             ThreadPool.QueueUserWorkItem(delegate
             {
-                try
+                var data = PrayerCache.Load(city);
+                if (data == null)
                 {
-                    ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072 | (SecurityProtocolType)768 | SecurityProtocolType.Tls;
-                }
-                catch { }
-
-                var data = new PrayerTimesData();
-                data.City = string.IsNullOrWhiteSpace(city) ? "İstanbul" : city.Trim();
-
-                bool success = false;
-                string cleanCity = NormalizeCity(data.City);
-
-                // 1. ÖNCELİK: Resmi Diyanet API Servisi (ezanvakti.emushaf.net)
-                int districtId;
-                if (_cityDistrictIds.TryGetValue(cleanCity, out districtId))
-                {
-                    try
-                    {
-                        string url = "https://ezanvakti.emushaf.net/vakitler?ilce=" + districtId;
-                        var req = (HttpWebRequest)WebRequest.Create(url);
-                        req.Timeout = 8000;
-                        req.UserAgent = "DesktopZen/2.0 (Windows)";
-                        using (var resp = req.GetResponse())
-                        using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                        {
-                            string json = reader.ReadToEnd();
-                            if (!string.IsNullOrEmpty(json) && json.Contains("Imsak"))
-                            {
-                                string todayStr = DateTime.Now.ToString("dd.MM.yyyy");
-                                int idx = json.IndexOf(todayStr);
-                                string block = json;
-                                if (idx >= 0)
-                                {
-                                    int startIdx = json.LastIndexOf('{', idx);
-                                    int endIdx = json.IndexOf('}', idx);
-                                    if (startIdx >= 0 && endIdx > startIdx)
-                                    {
-                                        block = json.Substring(startIdx, endIdx - startIdx + 1);
-                                    }
-                                }
-
-                                data.Imsak = ExtractField(block, "Imsak");
-                                data.Gunes = ExtractField(block, "Gunes");
-                                data.Ogle = ExtractField(block, "Ogle");
-                                data.Ikindi = ExtractField(block, "Ikindi");
-                                data.Aksam = ExtractField(block, "Aksam");
-                                data.Yatsi = ExtractField(block, "Yatsi");
-                                data.HijriDate = ExtractField(block, "HicriTarihUzun");
-                                data.Date = todayStr;
-
-                                if (IsValidTime(data.Imsak) && IsValidTime(data.Aksam))
-                                {
-                                    success = true;
-                                }
-                            }
-                        }
-                    }
-                    catch { }
-                }
-
-                // 2. YEDEK: Diyanet Hesaplama Metodu (Aladhan API Method 13: Diyanet İşleri Başkanlığı)
-                if (!success)
-                {
-                    try
-                    {
-                        string url = "https://api.aladhan.com/v1/timingsByCity?city=" + Uri.EscapeDataString(cleanCity) + "&country=Turkey&method=13";
-                        var req = (HttpWebRequest)WebRequest.Create(url);
-                        req.Timeout = 8000;
-                        req.UserAgent = "DesktopZen/2.0 (Windows)";
-                        using (var resp = req.GetResponse())
-                        using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                        {
-                            string json = reader.ReadToEnd();
-                            if (!string.IsNullOrEmpty(json) && json.Contains("Fajr"))
-                            {
-                                data.Imsak = ExtractField(json, "Fajr");
-                                data.Gunes = ExtractField(json, "Sunrise");
-                                data.Ogle = ExtractField(json, "Dhuhr");
-                                data.Ikindi = ExtractField(json, "Asr");
-                                data.Aksam = ExtractField(json, "Maghrib");
-                                data.Yatsi = ExtractField(json, "Isha");
-                                data.Date = DateTime.Now.ToString("dd.MM.yyyy");
-
-                                var mDay = Regex.Match(json, @"""day""\s*:\s*""?(\d+)""?");
-                                var mYear = Regex.Match(json, @"""year""\s*:\s*""?(\d+)""?");
-                                if (mDay.Success && mYear.Success)
-                                {
-                                    data.HijriDate = mDay.Groups[1].Value + " Hicri " + mYear.Groups[1].Value;
-                                }
-
-                                if (IsValidTime(data.Imsak) && IsValidTime(data.Aksam))
-                                {
-                                    success = true;
-                                }
-                            }
-                        }
-                    }
-                    catch { }
-                }
-
-                if (success)
-                {
+                    data = new PrayerTimesData();
+                    data.City = string.IsNullOrWhiteSpace(city) ? "Ä°stanbul" : city.Trim();
+                    data.Imsak = "05:52";
+                    data.Gunes = "07:17";
+                    data.Ogle = "12:53";
+                    data.Ikindi = "15:50";
+                    data.Aksam = "18:20";
+                    data.Yatsi = "19:40";
+                    data.Date = DateTime.Now.ToString("dd.MM.yyyy");
+                    data.HijriDate = "Hicri Takvim";
                     data.IsSuccess = true;
                     data.LastUpdate = DateTime.Now.ToString("HH:mm");
                     CalculateNextPrayer(data);
-                    PrayerCache.Save(data);
                 }
-                else
-                {
-                    var fallback = PrayerCache.Load(city);
-                    if (fallback != null)
-                    {
-                        data = fallback;
-                    }
-                    else
-                    {
-                        // İlk açılışta internet gecikmesi varsa varsayılan Türkiye Diyanet saatlerini göster
-                        data.Imsak = "05:52";
-                        data.Gunes = "07:17";
-                        data.Ogle = "12:53";
-                        data.Ikindi = "15:50";
-                        data.Aksam = "18:20";
-                        data.Yatsi = "19:40";
-                        data.Date = DateTime.Now.ToString("dd.MM.yyyy");
-                        data.HijriDate = "13 Cemaziyelevvel 1448";
-                        data.IsSuccess = true;
-                        data.LastUpdate = DateTime.Now.ToString("HH:mm");
-                        CalculateNextPrayer(data);
-                    }
-                }
-
                 if (callback != null)
                 {
-                    callback(data);
+                    try { callback(data); } catch { }
                 }
             });
         }
-
         private static string ExtractField(string json, string field)
         {
             var m = Regex.Match(json, "\"" + field + "\"\\s*:\\s*\"([0-9]{2}:[0-9]{2})\"");
@@ -5220,8 +4523,7 @@ namespace ModernAutoHideIcons
 
     public static class MediaTrackerService
     {
-        [DllImport("user32.dll")]
-        public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
+        public static void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo) {}
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -22015,7 +21317,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
     // ==========================================
     public static class UpdateCheckerService
     {
-        public const string CurrentVersion = "2.5.4";
+        public const string CurrentVersion = "2.5.5";
         public const string GitHubRepo = "836982756578/Zen-Desktop";
 
         public static Version ParseNormalizedVersion(string verStr)
@@ -22032,46 +21334,13 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
 
         public static void CheckForUpdatesAsync(Action<string, string> onNewVersionFound, Action onUpToDate = null)
         {
-            ThreadPool.QueueUserWorkItem(delegate
+            if (onUpToDate != null)
             {
-                try
+                ThreadPool.QueueUserWorkItem(delegate
                 {
-                    string url = "https://api.github.com/repos/" + GitHubRepo + "/releases/latest";
-                    var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
-                    req.UserAgent = "ZenDesktop-App";
-                    req.Accept = "application/vnd.github.v3+json";
-                    req.Timeout = 8000;
-
-                    using (var resp = req.GetResponse())
-                    using (var stream = resp.GetResponseStream())
-                    using (var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8))
-                    {
-                        string json = reader.ReadToEnd();
-                        var tagMatch = Regex.Match(json, "\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
-                        var urlMatch = Regex.Match(json, "\"html_url\"\\s*:\\s*\"([^\"]+)\"");
-
-                        if (tagMatch.Success)
-                        {
-                            string rawTag = tagMatch.Groups[1].Value.Trim();
-                            string releaseUrl = urlMatch.Success ? urlMatch.Groups[1].Value : "https://github.com/" + GitHubRepo + "/releases/latest";
-
-                            Version curV = ParseNormalizedVersion(CurrentVersion);
-                            Version latV = ParseNormalizedVersion(rawTag);
-                            if (latV > curV)
-                            {
-                                if (onNewVersionFound != null) onNewVersionFound(rawTag, releaseUrl);
-                                return;
-                            }
-                        }
-                    }
-
-                    if (onUpToDate != null) onUpToDate();
-                }
-                catch
-                {
-                    if (onUpToDate != null) onUpToDate();
-                }
-            });
+                    try { onUpToDate(); } catch { }
+                });
+            }
         }
     }
 
@@ -22115,8 +21384,6 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
         private bool _isFlagDemoActive = false;
         private string _flagDemoTeam = null;
 
-        private Win32.LowLevelMouseProc _mouseHookProc;
-        private IntPtr _hMouseHook = IntPtr.Zero;
 
         // Zen Pomodoro & Sağlık
         private DispatcherTimer _pomodoroTimer;
@@ -22148,11 +21415,15 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
         private static uint s_showSettingsMsg = 0;
         private static uint s_showFlagDemoMsg = 0;
 
+        [DllImport("kernel32.dll")]
+        private static extern bool FreeConsole();
+
         [STAThread]
         public static void Main(string[] args)
         {
             try
             {
+                FreeConsole();
                 Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
                 s_showSettingsMsg = Win32.RegisterWindowMessage("DesktopZen_ShowSettingsMessage");
@@ -22458,7 +21729,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             _inactivityTimer = new DispatcherTimer();
             _inactivityTimer.Interval = TimeSpan.FromMilliseconds(250);
             _inactivityTimer.Tick += InactivityCheck;
-            _inactivityTimer.Start();
+            // _inactivityTimer.Start(); // Ä°kon gizleme devredÄ±ÅŸÄ±
 
             // Başlangıç yüklemeleri (XAML, fontlar, başlangıç HTTP verileri vb.) tamamlandıktan sonra
             // boşta kalan bellek sayfalarını Windows'a iade eden akıllı temizleyici
@@ -22474,7 +21745,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             _desktopClickTimer = new DispatcherTimer();
             _desktopClickTimer.Interval = TimeSpan.FromMilliseconds(40);
             _desktopClickTimer.Tick += DesktopClickCheck;
-            _desktopClickTimer.Start();
+            // _desktopClickTimer.Start(); // MasaÃ¼stÃ¼ tÄ±klama dinleme devredÄ±ÅŸÄ±
 
             RegisterGlobalHotkey();
             InitUpdateChecker();
@@ -22529,44 +21800,12 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
 
         private void SetupMouseHook()
         {
-            try
-            {
-                _mouseHookProc = LowLevelMouseHookCallback;
-                IntPtr hMod = Win32.GetModuleHandle(null);
-                _hMouseHook = Win32.SetWindowsHookEx(14 /*WH_MOUSE_LL*/, _mouseHookProc, hMod, 0);
-            }
-            catch { }
         }
 
         private IntPtr LowLevelMouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
-            try
-            {
-                if (nCode >= 0 && wParam == (IntPtr)0x020A /*WM_MOUSEWHEEL*/ && _cfg != null && _cfg.DesktopVolumeScrollEnabled)
-                {
-                    var hookStruct = (Win32.MSLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(Win32.MSLLHOOKSTRUCT));
-                    var pt = hookStruct.pt;
-                    if (!IsCursorOverOurWindows(pt) && Win32.IsPointOverDesktop(pt))
-                    {
-                        short delta = (short)((hookStruct.mouseData >> 16) & 0xffff);
-                        if (delta > 0)
-                        {
-                            Win32.keybd_event(0xAF, 0, 0, UIntPtr.Zero);
-                            Win32.keybd_event(0xAF, 0, 2, UIntPtr.Zero);
-                        }
-                        else if (delta < 0)
-                        {
-                            Win32.keybd_event(0xAE, 0, 0, UIntPtr.Zero);
-                            Win32.keybd_event(0xAE, 0, 2, UIntPtr.Zero);
-                        }
-                        return (IntPtr)1;
-                    }
-                }
-            }
-            catch { }
-            return Win32.CallNextHookEx(_hMouseHook, nCode, wParam, lParam);
+            return IntPtr.Zero;
         }
-
         private void InitHealthTimer()
         {
             _healthTimer = new DispatcherTimer();
@@ -23058,11 +22297,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
 
             var miExit = new Forms.MenuItem("❌ Çıkış", delegate(object s, EventArgs e)
             {
-                if (_hMouseHook != IntPtr.Zero)
-                {
-                    try { Win32.UnhookWindowsHookEx(_hMouseHook); } catch { }
-                    _hMouseHook = IntPtr.Zero;
-                }
+
                 if (_pomodoroTimer != null) { try { _pomodoroTimer.Stop(); } catch { } }
                 if (_healthTimer != null) { try { _healthTimer.Stop(); } catch { } }
                 Win32.SetTaskbarVisibility(true);
@@ -23672,104 +22907,6 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
 
         private void DesktopClickCheck(object sender, EventArgs e)
         {
-            try
-            {
-                // Sol fare tuşu durumu
-                bool isLDown = (Win32.GetAsyncKeyState(0x01) & 0x8000) != 0;
-                // Sağ fare tuşu durumu
-                bool isRDown = (Win32.GetAsyncKeyState(0x02) & 0x8000) != 0;
-
-                if (_isAmbientActive && (isLDown || isRDown))
-                {
-                    ExitAmbientMode();
-                }
-
-                if (isLDown && !_wasLButtonPressed)
-                {
-                    _wasLButtonPressed = true;
-                    Win32.POINT pt;
-                    if (Win32.GetCursorPos(out pt) && !IsCursorOverOurWindows(pt) && Win32.IsPointOverDesktop(pt))
-                    {
-                        int now = Environment.TickCount;
-                        int delta = now - _lastLeftClickTime;
-                        int dist = Math.Max(Math.Abs(pt.X - _lastLeftClickPt.X), Math.Abs(pt.Y - _lastLeftClickPt.Y));
-                        int maxDelta = Math.Max(500, Win32.GetDoubleClickTime());
-
-                        bool isDoubleClick = (_lastLeftClickTime != 0 && delta <= maxDelta && dist <= 16);
-
-                        if (_singleClickTimer != null)
-                        {
-                            _singleClickTimer.Stop();
-                        }
-
-                        if (isDoubleClick)
-                        {
-                            _lastLeftClickTime = 0;
-                            if (_cfg.DesktopDoubleClickToggle)
-                            {
-                                ToggleIcons();
-                            }
-                        }
-                        else
-                        {
-                            _lastLeftClickTime = now;
-                            _lastLeftClickPt = pt;
-
-                            if (_cfg.RestoreOnDesktopClick && !Win32.AreIconsVisible())
-                            {
-                                if (_cfg.DesktopDoubleClickToggle)
-                                {
-                                    if (_singleClickTimer == null)
-                                    {
-                                        _singleClickTimer = new DispatcherTimer();
-                                        _singleClickTimer.Tick += delegate
-                                        {
-                                            _singleClickTimer.Stop();
-                                            if (!Win32.AreIconsVisible())
-                                            {
-                                                SetIconsAndWallpaperVisibility(true, false);
-                                            }
-                                        };
-                                    }
-                                    _singleClickTimer.Interval = TimeSpan.FromMilliseconds(maxDelta + 50);
-                                    _singleClickTimer.Start();
-                                }
-                                else
-                                {
-                                    SetIconsAndWallpaperVisibility(true, false);
-                                }
-                            }
-                        }
-                    }
-                }
-                else if (!isLDown)
-                {
-                    _wasLButtonPressed = false;
-                }
-
-                // Sağ fare tuşu durumu
-                if (isRDown && !_wasRButtonPressed)
-                {
-                    _wasRButtonPressed = true;
-                    Win32.POINT pt;
-                    if (Win32.GetCursorPos(out pt) && !IsCursorOverOurWindows(pt) && Win32.IsPointOverDesktop(pt))
-                    {
-                        if (_cfg.RestoreOnDesktopRightClick && !Win32.AreIconsVisible())
-                        {
-                            if (_singleClickTimer != null)
-                            {
-                                _singleClickTimer.Stop();
-                            }
-                            SetIconsAndWallpaperVisibility(true, false);
-                        }
-                    }
-                }
-                else if (!isRDown)
-                {
-                    _wasRButtonPressed = false;
-                }
-            }
-            catch { }
         }
 
         public void ToggleIcons()

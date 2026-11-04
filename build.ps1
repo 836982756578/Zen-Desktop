@@ -38,7 +38,7 @@ $sx = "C:\Windows\Microsoft.NET\assembly\GAC_MSIL\System.Xaml\v4.0_4.0.0.0__b77a
 Write-Host "Derleniyor: Desktop Zen.exe ..." -ForegroundColor Yellow
 
 $iconFlag = if (Test-Path ".\zen_icon.ico") { "/win32icon:`"zen_icon.ico`"" } else { "" }
-$proc = Start-Process -FilePath $csc -ArgumentList "/nologo /target:winexe /optimize+ /codepage:65001 /utf8output $iconFlag /out:`"Desktop Zen.exe`" /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Web.Extensions.dll /r:`"$pf`" /r:`"$pc`" /r:`"$wb`" /r:`"$sx`" ModernAutoHideIcons.cs" -NoNewWindow -PassThru -Wait
+$proc = Start-Process -FilePath $csc -ArgumentList "/nologo /target:exe /optimize+ /codepage:65001 /utf8output $iconFlag /out:`"Desktop Zen.exe`" /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Web.Extensions.dll /r:`"$pf`" /r:`"$pc`" /r:`"$wb`" /r:`"$sx`" ModernAutoHideIcons.cs" -NoNewWindow -PassThru -Wait
 
 if ($proc.ExitCode -eq 0) {
     Write-Host ""
