@@ -8577,6 +8577,202 @@ namespace ModernAutoHideIcons
     }
 
     // ==========================================
+    // 20-20-20 GÖZ VE DİNLENME HATIRLATICI PENCERESİ
+    // ==========================================
+    public class EyeRestToastWindow : Window
+    {
+        private static EyeRestToastWindow _instance = null;
+        private DispatcherTimer _countdownTimer;
+        private int _secondsRemaining = 20;
+        private TextBlock _txtDetail;
+        private Border _countdownBar;
+        private double _barMaxWidth = 340;
+
+        public static void ShowReminder(bool isLight = false)
+        {
+            try
+            {
+                if (_instance != null)
+                {
+                    _instance.Close();
+                    _instance = null;
+                }
+                _instance = new EyeRestToastWindow(isLight);
+                _instance.Show();
+            }
+            catch { }
+        }
+
+        public EyeRestToastWindow(bool isLight = false)
+        {
+            WindowStyle = WindowStyle.None;
+            AllowsTransparency = true;
+            Background = System.Windows.Media.Brushes.Transparent;
+            Topmost = true;
+            ShowInTaskbar = false;
+            ShowActivated = false;
+            Focusable = false;
+            Width = 380;
+            Height = 64;
+
+            var wa = Forms.Screen.PrimaryScreen.WorkingArea;
+            Left = wa.Left + (wa.Width - Width) / 2.0;
+            Top = wa.Top + 24;
+
+            SourceInitialized += delegate
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    int exStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+                    Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, exStyle | Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE);
+                }
+            };
+
+            var mainBorder = new Border
+            {
+                CornerRadius = new CornerRadius(14),
+                Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(242, 255, 255, 255) : System.Windows.Media.Color.FromArgb(242, 15, 23, 42)),
+                BorderBrush = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(160, 2, 132, 199) : System.Windows.Media.Color.FromArgb(180, 56, 189, 248)),
+                BorderThickness = new Thickness(1.5),
+                Padding = new Thickness(14, 8, 12, 6),
+                Effect = new DropShadowEffect
+                {
+                    BlurRadius = 20,
+                    ShadowDepth = 4,
+                    Direction = 270,
+                    Opacity = 0.35,
+                    Color = System.Windows.Media.Colors.Black
+                }
+            };
+
+            var rootStack = new StackPanel { Orientation = Orientation.Vertical };
+
+            var topGrid = new Grid();
+            topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var iconTxt = new TextBlock
+            {
+                Text = "👁️",
+                FontSize = 18,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+            Grid.SetColumn(iconTxt, 0);
+            topGrid.Children.Add(iconTxt);
+
+            var textStack = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
+            var txtTitle = new TextBlock
+            {
+                Text = "20-20-20 Göz & Mola Vakti",
+                FontSize = 12.5,
+                FontWeight = FontWeights.Bold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(56, 189, 248))
+            };
+            _txtDetail = new TextBlock
+            {
+                Text = "20 saniye uzağa bakın ve bir yudum su için. (20 sn)",
+                FontSize = 11.0,
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(51, 65, 85) : System.Windows.Media.Color.FromRgb(226, 232, 240)),
+                Margin = new Thickness(0, 1, 0, 0)
+            };
+            textStack.Children.Add(txtTitle);
+            textStack.Children.Add(_txtDetail);
+            Grid.SetColumn(textStack, 1);
+            topGrid.Children.Add(textStack);
+
+            var btnClose = new Border
+            {
+                Width = 20,
+                Height = 20,
+                CornerRadius = new CornerRadius(10),
+                Cursor = Cursors.Hand,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(25, 128, 128, 128)),
+                Child = new TextBlock
+                {
+                    Text = "✕",
+                    FontSize = 10,
+                    FontWeight = FontWeights.Bold,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Foreground = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(100, 116, 139) : System.Windows.Media.Color.FromRgb(148, 163, 184))
+                }
+            };
+            btnClose.MouseLeftButtonUp += delegate { CloseReminder(); };
+            Grid.SetColumn(btnClose, 2);
+            topGrid.Children.Add(btnClose);
+            rootStack.Children.Add(topGrid);
+
+            var track = new Border
+            {
+                Height = 3,
+                CornerRadius = new CornerRadius(1.5),
+                Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(40, 0, 0, 0) : System.Windows.Media.Color.FromArgb(40, 255, 255, 255)),
+                Margin = new Thickness(0, 6, 0, 0)
+            };
+            _countdownBar = new Border
+            {
+                Height = 3,
+                CornerRadius = new CornerRadius(1.5),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Width = _barMaxWidth,
+                Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(56, 189, 248))
+            };
+            track.Child = _countdownBar;
+            rootStack.Children.Add(track);
+
+            mainBorder.Child = rootStack;
+            Content = mainBorder;
+
+            _secondsRemaining = 20;
+            _countdownTimer = new DispatcherTimer();
+            _countdownTimer.Interval = TimeSpan.FromSeconds(1);
+            _countdownTimer.Tick += delegate
+            {
+                _secondsRemaining--;
+                if (_secondsRemaining <= 0)
+                {
+                    CloseReminder();
+                }
+                else
+                {
+                    if (_txtDetail != null)
+                    {
+                        _txtDetail.Text = string.Format("20 saniye uzağa bakın ve bir yudum su için. ({0} sn)", _secondsRemaining);
+                    }
+                    if (_countdownBar != null)
+                    {
+                        _countdownBar.Width = Math.Max(2, (_secondsRemaining / 20.0) * _barMaxWidth);
+                    }
+                }
+            };
+            _countdownTimer.Start();
+        }
+
+        private void CloseReminder()
+        {
+            try
+            {
+                if (_countdownTimer != null)
+                {
+                    _countdownTimer.Stop();
+                    _countdownTimer = null;
+                }
+                Close();
+                _instance = null;
+            }
+            catch { }
+        }
+    }
+
+    // ==========================================
     // MODERN MASAÜSTÜ WIDGET PENCERESİ
     // ==========================================
     public class WidgetWindow : Window
@@ -13714,6 +13910,8 @@ namespace ModernAutoHideIcons
         private Border _footerDivider;
         private TextBlock _txtTitle;
         private TextBlock _txtSubtitle;
+        private Border _btnSearch;
+        private TextBlock _txtSearchIcon;
         private Border _btnFolder;
         private TextBlock _txtFolderIcon;
         private Border _btnRefresh;
@@ -13723,6 +13921,11 @@ namespace ModernAutoHideIcons
         private Border _btnClose;
         private TextBlock _txtCloseIcon;
 
+        private Border _searchContainer;
+        private TextBox _txtSearchBox;
+        private Border _btnClearSearch;
+        private bool _isSearching = false;
+
         private Border _dateStrip;
         private TextBlock _txtDateDisplay;
         private Border _btnPrevDay;
@@ -13731,28 +13934,28 @@ namespace ModernAutoHideIcons
         private TextBlock _txtNextDay;
         private Border _btnToday;
         private TextBlock _txtToday;
+        private Border _btnCalendar;
+        private TextBlock _txtCalIcon;
+        private Border _calendarDropdown;
+        private TextBlock _txtCalMonthYear;
+        private DateTime _calNavDate;
 
         private Border _statusBanner;
         private TextBlock _txtCurrentShift;
         private TextBlock _txtIncomingShift;
         private Border _borderCountdownPill;
         private TextBlock _txtHandoverCountdown;
+        private StackPanel _shiftProgressContainer;
+        private TextBlock _txtShiftProgress;
+        private TextBlock _txtShiftRemaining;
+        private Border _progressTrack;
+        private Border _progressBarFill;
         private Border _supervisorDivider;
         private Border _borderSupervisorCard;
         private TextBlock _txtSupervisorShift;
 
         private Border[] _tabBorders = new Border[5];
         private TextBlock[] _tabTexts = new TextBlock[5];
-
-        private Border _noteDivider;
-        private StackPanel _notesContainer;
-        private TextBlock _txtNoteTitle;
-        private Border _btnEditNote;
-        private TextBlock _txtEditNoteIcon;
-        private Border _cardNoteView;
-        private TextBlock _txtNoteContent;
-        private StackPanel _panelNoteEdit;
-        private TextBox _txtNoteEdit;
 
         private int _lastHandoverAlarmHour = -1;
         private int _lastHandoverAlarmMinutes = -1;
@@ -14052,6 +14255,12 @@ namespace ModernAutoHideIcons
 
             var btnStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
 
+            _btnSearch = CreateToolButton("🔍", "Personel veya İstasyon Ara", out _txtSearchIcon, delegate
+            {
+                ToggleSearchBar();
+            });
+            btnStack.Children.Add(_btnSearch);
+
             _btnFolder = CreateToolButton("📁", "Çizelge Hedefini Seç / Değiştir", out _txtFolderIcon, delegate
             {
                 OpenShiftTargetMenu(_btnFolder);
@@ -14102,6 +14311,87 @@ namespace ModernAutoHideIcons
             Grid.SetColumn(btnStack, 1);
             _headerGrid.Children.Add(btnStack);
             rootStack.Children.Add(_headerGrid);
+
+            // 1.1 HIZLI ARAMA ÇUBUĞU
+            _searchContainer = new Border
+            {
+                Visibility = Visibility.Collapsed,
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(10, 5, 10, 5),
+                Margin = new Thickness(0, 0, 0, 8),
+                BorderThickness = new Thickness(1)
+            };
+            var searchGrid = new Grid();
+            searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var searchIcon = new TextBlock
+            {
+                Text = "🔍",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0)
+            };
+            Grid.SetColumn(searchIcon, 0);
+            searchGrid.Children.Add(searchIcon);
+
+            _txtSearchBox = new TextBox
+            {
+                Background = System.Windows.Media.Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                FontSize = 12.0,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _txtSearchBox.TextChanged += delegate
+            {
+                string q = (_txtSearchBox.Text ?? "").Trim();
+                if (string.IsNullOrEmpty(q))
+                {
+                    _isSearching = false;
+                    if (_btnClearSearch != null) _btnClearSearch.Visibility = Visibility.Collapsed;
+                    RenderStaffList();
+                }
+                else
+                {
+                    _isSearching = true;
+                    if (_btnClearSearch != null) _btnClearSearch.Visibility = Visibility.Visible;
+                    PerformSearch(q);
+                }
+            };
+            Grid.SetColumn(_txtSearchBox, 1);
+            searchGrid.Children.Add(_txtSearchBox);
+
+            _btnClearSearch = new Border
+            {
+                Width = 20,
+                Height = 20,
+                CornerRadius = new CornerRadius(10),
+                Cursor = Cursors.Hand,
+                Visibility = Visibility.Collapsed,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 128, 128, 128)),
+                Child = new TextBlock
+                {
+                    Text = "✕",
+                    FontSize = 10,
+                    FontWeight = FontWeights.Bold,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+            };
+            _btnClearSearch.MouseLeftButtonUp += delegate
+            {
+                _txtSearchBox.Text = "";
+                _txtSearchBox.Focus();
+            };
+            Grid.SetColumn(_btnClearSearch, 2);
+            searchGrid.Children.Add(_btnClearSearch);
+
+            _searchContainer.Child = searchGrid;
+            rootStack.Children.Add(_searchContainer);
 
             _headerDivider = new Border
             {
@@ -14171,7 +14461,7 @@ namespace ModernAutoHideIcons
                 CornerRadius = new CornerRadius(6),
                 Padding = new Thickness(8, 3, 8, 3),
                 HorizontalAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(0, 0, 0, 7)
+                Margin = new Thickness(0, 0, 0, 5)
             };
             _txtHandoverCountdown = new TextBlock
             {
@@ -14182,6 +14472,52 @@ namespace ModernAutoHideIcons
             };
             _borderCountdownPill.Child = _txtHandoverCountdown;
             statusStack.Children.Add(_borderCountdownPill);
+
+            // 2.1 VARDİYA / MESAİ İLERLEME ÇUBUĞU
+            _shiftProgressContainer = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 0, 7) };
+            var prgHeaderRow = new Grid();
+            prgHeaderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            prgHeaderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            _txtShiftProgress = new TextBlock
+            {
+                Text = "⏳ %0 Tamamlandı",
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 11.5
+            };
+            Grid.SetColumn(_txtShiftProgress, 0);
+            prgHeaderRow.Children.Add(_txtShiftProgress);
+
+            _txtShiftRemaining = new TextBlock
+            {
+                Text = "Kalan: --",
+                FontWeight = FontWeights.Medium,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 11.0,
+                Opacity = 0.8
+            };
+            Grid.SetColumn(_txtShiftRemaining, 1);
+            prgHeaderRow.Children.Add(_txtShiftRemaining);
+            _shiftProgressContainer.Children.Add(prgHeaderRow);
+
+            _progressTrack = new Border
+            {
+                Height = 6,
+                CornerRadius = new CornerRadius(3),
+                Margin = new Thickness(0, 3, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            _progressBarFill = new Border
+            {
+                Height = 6,
+                CornerRadius = new CornerRadius(3),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Width = 0
+            };
+            _progressTrack.Child = _progressBarFill;
+            _shiftProgressContainer.Children.Add(_progressTrack);
+            statusStack.Children.Add(_shiftProgressContainer);
 
             _supervisorDivider = new Border { Height = 0, Visibility = Visibility.Collapsed };
             statusStack.Children.Add(_supervisorDivider);
@@ -14219,6 +14555,7 @@ namespace ModernAutoHideIcons
             dateGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             dateGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             dateGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            dateGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             _btnPrevDay = CreateNavButton("◀", "Önceki Gün", out _txtPrevDay, delegate
             {
@@ -14235,8 +14572,14 @@ namespace ModernAutoHideIcons
                 FontWeight = FontWeights.Bold,
                 FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
                 FontSize = 12.5,
+                Cursor = Cursors.Hand,
+                ToolTip = "Aylık Takvimi Aç / Kapat",
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
+            };
+            _txtDateDisplay.MouseLeftButtonUp += delegate
+            {
+                ToggleCalendarDropdown();
             };
             Grid.SetColumn(_txtDateDisplay, 1);
             dateGrid.Children.Add(_txtDateDisplay);
@@ -14272,17 +14615,36 @@ namespace ModernAutoHideIcons
             Grid.SetColumn(_btnToday, 2);
             dateGrid.Children.Add(_btnToday);
 
+            _btnCalendar = CreateNavButton("📅", "Aylık Takvimi Aç / Kapat", out _txtCalIcon, delegate
+            {
+                ToggleCalendarDropdown();
+            });
+            _btnCalendar.Margin = new Thickness(0, 0, 4, 0);
+            Grid.SetColumn(_btnCalendar, 3);
+            dateGrid.Children.Add(_btnCalendar);
+
             _btnNextDay = CreateNavButton("▶", "Sonraki Gün", out _txtNextDay, delegate
             {
                 _viewDate = _viewDate.AddDays(1);
                 UpdateDateDisplay();
                 LoadScheduleAsync(false);
             });
-            Grid.SetColumn(_btnNextDay, 3);
+            Grid.SetColumn(_btnNextDay, 4);
             dateGrid.Children.Add(_btnNextDay);
 
             _dateStrip.Child = dateGrid;
             rootStack.Children.Add(_dateStrip);
+
+            // 3.1 AÇILIR AYLIK MİNİ TAKVİM
+            _calendarDropdown = new Border
+            {
+                Visibility = Visibility.Collapsed,
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(10, 8, 10, 8),
+                Margin = new Thickness(0, 0, 0, 8),
+                BorderThickness = new Thickness(1)
+            };
+            rootStack.Children.Add(_calendarDropdown);
 
             // 4. SEKME BUTONLARI (Devralacak, Sabah, Aksam, Gece, İstasyon)
             var tabGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
@@ -14661,6 +15023,42 @@ namespace ModernAutoHideIcons
                                 : System.Windows.Media.Color.FromArgb(40, 255, 255, 255));
                         }
                     }
+
+                    // Mesai / Vardiya İlerleme Çubuğu
+                    DateTime shiftStart;
+                    if (now.Hour >= 7 && now.Hour < 15)
+                    {
+                        shiftStart = new DateTime(now.Year, now.Month, now.Day, 7, 0, 0);
+                    }
+                    else if (now.Hour >= 15 && now.Hour < 23)
+                    {
+                        shiftStart = new DateTime(now.Year, now.Month, now.Day, 15, 0, 0);
+                    }
+                    else
+                    {
+                        shiftStart = (now.Hour >= 23) ? now.Date.AddHours(23) : now.Date.AddDays(-1).AddHours(23);
+                    }
+
+                    double totalMinutes = (targetHandover - shiftStart).TotalMinutes;
+                    if (totalMinutes <= 0) totalMinutes = 480.0;
+                    double elapsed = (now - shiftStart).TotalMinutes;
+                    if (elapsed < 0) elapsed = 0;
+                    if (elapsed > totalMinutes) elapsed = totalMinutes;
+                    double pct = (elapsed / totalMinutes) * 100.0;
+
+                    if (_txtShiftProgress != null)
+                    {
+                        _txtShiftProgress.Text = string.Format("\u23F3 %{0:0} Tamamland\u0131", pct);
+                    }
+                    if (_txtShiftRemaining != null)
+                    {
+                        _txtShiftRemaining.Text = string.Format("Kalan: {0} sa {1:D2} dk", (int)rem.TotalHours, rem.Minutes);
+                    }
+                    if (_progressBarFill != null)
+                    {
+                        double trackW = (_progressTrack != null && _progressTrack.ActualWidth > 20) ? _progressTrack.ActualWidth : 312.0;
+                        _progressBarFill.Width = Math.Max(4, Math.Min(trackW, (pct / 100.0) * trackW));
+                    }
                 }
             }
 
@@ -14818,6 +15216,9 @@ namespace ModernAutoHideIcons
                 : System.Windows.Media.Color.FromArgb(25, 255, 255, 255));
             var btnFg = new SolidColorBrush(textPrimary);
 
+            if (_btnSearch != null) _btnSearch.Background = btnBg;
+            if (_txtSearchIcon != null) _txtSearchIcon.Foreground = btnFg;
+
             if (_btnFolder != null) _btnFolder.Background = btnBg;
             if (_txtFolderIcon != null) _txtFolderIcon.Foreground = btnFg;
 
@@ -14829,6 +15230,18 @@ namespace ModernAutoHideIcons
 
             if (_btnClose != null) _btnClose.Background = btnBg;
             if (_txtCloseIcon != null) _txtCloseIcon.Foreground = btnFg;
+
+            if (_searchContainer != null)
+            {
+                _searchContainer.Background = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromArgb(240, 255, 255, 255) 
+                    : System.Windows.Media.Color.FromArgb(35, 255, 255, 255));
+                _searchContainer.BorderBrush = divBrush;
+            }
+            if (_txtSearchBox != null)
+            {
+                _txtSearchBox.Foreground = new SolidColorBrush(textPrimary);
+            }
 
             if (_statusBanner != null)
             {
@@ -14853,6 +15266,28 @@ namespace ModernAutoHideIcons
             {
                 _txtHandoverCountdown.Foreground = new SolidColorBrush(textPrimary);
             }
+
+            if (_progressTrack != null)
+            {
+                _progressTrack.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(25, 0, 0, 0)
+                    : System.Windows.Media.Color.FromArgb(35, 255, 255, 255));
+            }
+            if (_progressBarFill != null)
+            {
+                _progressBarFill.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromRgb(2, 132, 199)
+                    : System.Windows.Media.Color.FromRgb(56, 189, 248));
+            }
+            if (_txtShiftProgress != null)
+            {
+                _txtShiftProgress.Foreground = new SolidColorBrush(textSecondary);
+            }
+            if (_txtShiftRemaining != null)
+            {
+                _txtShiftRemaining.Foreground = new SolidColorBrush(textSecondary);
+            }
+
             if (_supervisorDivider != null) _supervisorDivider.Background = divBrush;
             if (_borderSupervisorCard != null)
             {
@@ -14901,90 +15336,454 @@ namespace ModernAutoHideIcons
                     : new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
             }
 
+            if (_btnCalendar != null) _btnCalendar.Background = navBtnBg;
+            if (_txtCalIcon != null) _txtCalIcon.Foreground = navBtnFg;
+
+            if (_calendarDropdown != null)
+            {
+                _calendarDropdown.Background = new SolidColorBrush(isLight
+                    ? System.Windows.Media.Color.FromArgb(250, 248, 250, 252)
+                    : System.Windows.Media.Color.FromArgb(245, 24, 28, 38));
+                _calendarDropdown.BorderBrush = divBrush;
+            }
+
             UpdateTabStyles();
 
             if (_txtFooterCount != null) _txtFooterCount.Foreground = new SolidColorBrush(textSecondary);
             if (_txtFooterSheet != null) _txtFooterSheet.Foreground = new SolidColorBrush(textSecondary);
 
-            if (_noteDivider != null) _noteDivider.Background = divBrush;
-            if (_txtNoteTitle != null) _txtNoteTitle.Foreground = new SolidColorBrush(textPrimary);
-            if (_btnEditNote != null)
-            {
-                _btnEditNote.Background = new SolidColorBrush(isLight 
-                    ? System.Windows.Media.Color.FromArgb(25, 2, 132, 199) 
-                    : System.Windows.Media.Color.FromArgb(35, 14, 165, 233));
-            }
-            if (_txtEditNoteIcon != null)
-            {
-                _txtEditNoteIcon.Foreground = new SolidColorBrush(isLight 
-                    ? System.Windows.Media.Color.FromRgb(2, 132, 199) 
-                    : System.Windows.Media.Color.FromRgb(56, 189, 248));
-            }
-            if (_cardNoteView != null)
-            {
-                _cardNoteView.Background = new SolidColorBrush(isLight 
-                    ? System.Windows.Media.Color.FromArgb(18, 0, 0, 0) 
-                    : System.Windows.Media.Color.FromArgb(25, 255, 255, 255));
-                _cardNoteView.BorderBrush = new SolidColorBrush(isLight 
-                    ? System.Windows.Media.Color.FromArgb(28, 0, 0, 0) 
-                    : System.Windows.Media.Color.FromArgb(35, 255, 255, 255));
-            }
-            if (_txtNoteContent != null) _txtNoteContent.Foreground = new SolidColorBrush(textPrimary);
-            if (_txtNoteEdit != null)
-            {
-                _txtNoteEdit.Background = new SolidColorBrush(isLight 
-                    ? System.Windows.Media.Color.FromRgb(255, 255, 255) 
-                    : System.Windows.Media.Color.FromRgb(30, 34, 48));
-                _txtNoteEdit.Foreground = new SolidColorBrush(textPrimary);
-                _txtNoteEdit.BorderBrush = divBrush;
-            }
-
-            UpdateHandoverNoteVisuals();
             UpdateLockStateVisuals();
             RenderStaffList();
         }
 
-        private void ToggleEditNote(bool editing)
+        private void ToggleSearchBar()
         {
-            if (editing)
+            if (_searchContainer == null) return;
+            if (_searchContainer.Visibility == Visibility.Visible)
             {
-                if (_txtNoteEdit != null) _txtNoteEdit.Text = _cfg.ShiftHandoverNotes ?? "";
-                if (_cardNoteView != null) _cardNoteView.Visibility = Visibility.Collapsed;
-                if (_panelNoteEdit != null) _panelNoteEdit.Visibility = Visibility.Visible;
-                if (_btnEditNote != null) _btnEditNote.Visibility = Visibility.Collapsed;
-                if (_txtNoteEdit != null) _txtNoteEdit.Focus();
+                _searchContainer.Visibility = Visibility.Collapsed;
+                _isSearching = false;
+                if (_txtSearchBox != null) _txtSearchBox.Text = "";
+                RenderStaffList();
             }
             else
             {
-                if (_cardNoteView != null) _cardNoteView.Visibility = Visibility.Visible;
-                if (_panelNoteEdit != null) _panelNoteEdit.Visibility = Visibility.Collapsed;
-                if (_btnEditNote != null) _btnEditNote.Visibility = Visibility.Visible;
+                _searchContainer.Visibility = Visibility.Visible;
+                if (_calendarDropdown != null) _calendarDropdown.Visibility = Visibility.Collapsed;
+                if (_txtSearchBox != null)
+                {
+                    _txtSearchBox.Focus();
+                }
             }
         }
 
-        private void SaveHandoverNote(string text)
+        private void PerformSearch(string query)
         {
-            _cfg.ShiftHandoverNotes = (text ?? "").Trim();
-            _cfg.Save();
-            UpdateHandoverNoteVisuals();
+            if (_listPanel == null) return;
+            _listPanel.Children.Clear();
 
-            try
+            bool isLight = (_cfg.Theme == "light");
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            string nq = NormalizeSearch(query);
+            if (string.IsNullOrEmpty(nq))
             {
-                string noteFile = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vardiya_notu.txt");
-                File.WriteAllText(noteFile, _cfg.ShiftHandoverNotes, Encoding.UTF8);
+                RenderStaffList();
+                return;
             }
-            catch { }
+
+            if (_scrollViewer != null) _scrollViewer.MaxHeight = 520;
+
+            var matchedPersons = new List<Tuple<ShiftPerson, string>>();
+            var matchedStations = new List<StationDutyItem>();
+
+            if (_currentResult != null)
+            {
+                // 1. Vardiya Personelleri
+                if (_currentResult.Morning != null)
+                {
+                    foreach (var p in _currentResult.Morning)
+                    {
+                        if (MatchesPerson(p, nq)) matchedPersons.Add(new Tuple<ShiftPerson, string>(p, "Sabah (07:00 - 15:00)"));
+                    }
+                }
+                if (_currentResult.Evening != null)
+                {
+                    foreach (var p in _currentResult.Evening)
+                    {
+                        if (MatchesPerson(p, nq)) matchedPersons.Add(new Tuple<ShiftPerson, string>(p, "Akşam (15:00 - 23:00)"));
+                    }
+                }
+                if (_currentResult.Night != null)
+                {
+                    foreach (var p in _currentResult.Night)
+                    {
+                        if (MatchesPerson(p, nq)) matchedPersons.Add(new Tuple<ShiftPerson, string>(p, "Gece (23:00 - 07:00)"));
+                    }
+                }
+                if (_currentResult.Supervisors != null)
+                {
+                    foreach (var p in _currentResult.Supervisors)
+                    {
+                        if (MatchesPerson(p, nq)) matchedPersons.Add(new Tuple<ShiftPerson, string>(p, "İstasyon Vardiya Amiri"));
+                    }
+                }
+
+                // 2. İstasyonlar ve İstasyon Personelleri
+                if (_currentResult.StationResult != null && _currentResult.StationResult.Stations != null)
+                {
+                    foreach (var st in _currentResult.StationResult.Stations)
+                    {
+                        if (MatchesStation(st, nq))
+                        {
+                            matchedStations.Add(st);
+                        }
+                    }
+                }
+            }
+
+            int totalFound = matchedPersons.Count + matchedStations.Count;
+
+            // Arama Başlığı Kartı
+            var searchHeader = new Border
+            {
+                Background = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromArgb(240, 240, 249, 255) 
+                    : System.Windows.Media.Color.FromArgb(220, 15, 23, 42)),
+                BorderBrush = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromRgb(186, 230, 253) 
+                    : System.Windows.Media.Color.FromArgb(140, 14, 165, 233)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(8, 7, 8, 7),
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var searchHeaderText = new TextBlock
+            {
+                Text = string.Format("🔍 \"{0}\" için {1} sonuç bulundu", query, totalFound),
+                FontSize = 11.8,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                Foreground = new SolidColorBrush(isLight 
+                    ? System.Windows.Media.Color.FromRgb(3, 105, 161) 
+                    : System.Windows.Media.Color.FromRgb(240, 249, 255)),
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            searchHeader.Child = searchHeaderText;
+            _listPanel.Children.Add(searchHeader);
+
+            if (totalFound == 0)
+            {
+                _listPanel.Children.Add(new TextBlock
+                {
+                    Text = "Aramanızla eşleşen personel veya istasyon bulunamadı.",
+                    FontSize = 12,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    Foreground = new SolidColorBrush(textMuted),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 20, 0, 20)
+                });
+                if (_txtFooterCount != null) _txtFooterCount.Text = "0 Sonuç";
+                return;
+            }
+
+            if (_txtFooterCount != null) _txtFooterCount.Text = string.Format("{0} Sonuç Bulundu", totalFound);
+
+            // Eşleşen Personeller
+            if (matchedPersons.Count > 0)
+            {
+                _listPanel.Children.Add(CreateSearchSectionHeader(string.Format("Vardiya Kadrosu ({0})", matchedPersons.Count), isLight));
+                foreach (var pair in matchedPersons)
+                {
+                    _listPanel.Children.Add(CreatePersonCard(pair.Item1, pair.Item2));
+                }
+            }
+
+            // Eşleşen İstasyonlar
+            if (matchedStations.Count > 0)
+            {
+                _listPanel.Children.Add(CreateSearchSectionHeader(string.Format("İstasyonlar & Görevliler ({0})", matchedStations.Count), isLight));
+                foreach (var st in matchedStations)
+                {
+                    var singleGrp = new List<StationDutyItem>();
+                    singleGrp.Add(st);
+                    _listPanel.Children.Add(CreateStationGroupCard(singleGrp, 3, "S"));
+                }
+            }
         }
 
-        private void UpdateHandoverNoteVisuals()
+        private static bool MatchesPerson(ShiftPerson p, string nq)
         {
-            if (_txtNoteContent != null)
+            if (p == null) return false;
+            if (!string.IsNullOrEmpty(p.Name) && NormalizeSearch(p.Name).Contains(nq)) return true;
+            if (!string.IsNullOrEmpty(p.Role) && NormalizeSearch(p.Role).Contains(nq)) return true;
+            if (!string.IsNullOrEmpty(p.ShiftCode) && NormalizeSearch(p.ShiftCode).Contains(nq)) return true;
+            return false;
+        }
+
+        private static bool MatchesStation(StationDutyItem st, string nq)
+        {
+            if (st == null) return false;
+            if (!string.IsNullOrEmpty(st.DisplayName) && NormalizeSearch(st.DisplayName).Contains(nq)) return true;
+            if (!string.IsNullOrEmpty(st.CoveredStations) && NormalizeSearch(st.CoveredStations).Contains(nq)) return true;
+            if (!string.IsNullOrEmpty(st.MorningName) && NormalizeSearch(st.MorningName).Contains(nq)) return true;
+            if (!string.IsNullOrEmpty(st.MorningRole) && NormalizeSearch(st.MorningRole).Contains(nq)) return true;
+            if (!string.IsNullOrEmpty(st.EveningName) && NormalizeSearch(st.EveningName).Contains(nq)) return true;
+            if (!string.IsNullOrEmpty(st.EveningRole) && NormalizeSearch(st.EveningRole).Contains(nq)) return true;
+            return false;
+        }
+
+        private static string NormalizeSearch(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            return s.Trim().ToLower(new CultureInfo("tr-TR"))
+                .Replace('ı', 'i')
+                .Replace('ğ', 'g')
+                .Replace('ü', 'u')
+                .Replace('ş', 's')
+                .Replace('ö', 'o')
+                .Replace('ç', 'c');
+        }
+
+        private Border CreateSearchSectionHeader(string title, bool isLight)
+        {
+            return new Border
             {
-                bool hasText = !string.IsNullOrEmpty(_cfg.ShiftHandoverNotes);
-                _txtNoteContent.Text = hasText ? _cfg.ShiftHandoverNotes : "Henüz bir devir notu eklenmedi. Eklemek için tıklayın...";
-                _txtNoteContent.FontStyle = hasText ? FontStyles.Normal : FontStyles.Italic;
-                _txtNoteContent.Opacity = hasText ? 1.0 : 0.7;
+                Margin = new Thickness(2, 6, 2, 4),
+                Child = new TextBlock
+                {
+                    Text = title,
+                    FontSize = 11.0,
+                    FontWeight = FontWeights.Bold,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    Foreground = isLight ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(100, 116, 139)) : new SolidColorBrush(System.Windows.Media.Color.FromRgb(148, 163, 184))
+                }
+            };
+        }
+
+        private void ToggleCalendarDropdown()
+        {
+            if (_calendarDropdown == null) return;
+            if (_calendarDropdown.Visibility == Visibility.Visible)
+            {
+                _calendarDropdown.Visibility = Visibility.Collapsed;
             }
+            else
+            {
+                _calendarDropdown.Visibility = Visibility.Visible;
+                if (_searchContainer != null) _searchContainer.Visibility = Visibility.Collapsed;
+                _calNavDate = _viewDate;
+                RenderCalendarGrid();
+            }
+        }
+
+        private void RenderCalendarGrid()
+        {
+            if (_calendarDropdown == null) return;
+            bool isLight = (_cfg.Theme == "light");
+            System.Windows.Media.Color textPrimary, textSecondary, textMuted;
+            WidgetWindow.ResolveTextColors(_cfg.TextColor, isLight, out textPrimary, out textSecondary, out textMuted);
+
+            var panel = new StackPanel { Orientation = Orientation.Vertical };
+
+            // Header: ◀   Kasım 2026   ▶
+            var navGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var btnPrev = new Border
+            {
+                Width = 26,
+                Height = 26,
+                CornerRadius = new CornerRadius(6),
+                Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(20, 0, 0, 0) : System.Windows.Media.Color.FromArgb(25, 255, 255, 255)),
+                Cursor = Cursors.Hand,
+                ToolTip = "Önceki Ay",
+                Child = new TextBlock
+                {
+                    Text = "◀",
+                    FontSize = 10,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = new SolidColorBrush(textPrimary),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+            };
+            btnPrev.MouseLeftButtonUp += delegate
+            {
+                _calNavDate = _calNavDate.AddMonths(-1);
+                RenderCalendarGrid();
+            };
+            Grid.SetColumn(btnPrev, 0);
+            navGrid.Children.Add(btnPrev);
+
+            _txtCalMonthYear = new TextBlock
+            {
+                Text = _calNavDate.ToString("MMMM yyyy", new CultureInfo("tr-TR")).ToUpper(new CultureInfo("tr-TR")),
+                FontWeight = FontWeights.Bold,
+                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                FontSize = 12.5,
+                Foreground = new SolidColorBrush(textPrimary),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(_txtCalMonthYear, 1);
+            navGrid.Children.Add(_txtCalMonthYear);
+
+            var btnNext = new Border
+            {
+                Width = 26,
+                Height = 26,
+                CornerRadius = new CornerRadius(6),
+                Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(20, 0, 0, 0) : System.Windows.Media.Color.FromArgb(25, 255, 255, 255)),
+                Cursor = Cursors.Hand,
+                ToolTip = "Sonraki Ay",
+                Child = new TextBlock
+                {
+                    Text = "▶",
+                    FontSize = 10,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = new SolidColorBrush(textPrimary),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+            };
+            btnNext.MouseLeftButtonUp += delegate
+            {
+                _calNavDate = _calNavDate.AddMonths(1);
+                RenderCalendarGrid();
+            };
+            Grid.SetColumn(btnNext, 2);
+            navGrid.Children.Add(btnNext);
+
+            panel.Children.Add(navGrid);
+
+            // Hafta günleri başlığı (Pt Sa Ça Pe Cu Ct Pz)
+            var daysGrid = new Grid();
+            for (int c = 0; c < 7; c++)
+            {
+                daysGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            }
+
+            string[] dayHeaders = new string[] { "Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pz" };
+            for (int d = 0; d < 7; d++)
+            {
+                bool isWeekend = (d >= 5);
+                var headerTxt = new TextBlock
+                {
+                    Text = dayHeaders[d],
+                    FontSize = 10.5,
+                    FontWeight = FontWeights.SemiBold,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    Foreground = isWeekend 
+                        ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11))
+                        : new SolidColorBrush(textMuted),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 0, 0, 5)
+                };
+                Grid.SetColumn(headerTxt, d);
+                daysGrid.Children.Add(headerTxt);
+            }
+            panel.Children.Add(daysGrid);
+
+            // Günler Izgarası
+            var gridDays = new Grid();
+            for (int c = 0; c < 7; c++)
+            {
+                gridDays.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            }
+
+            DateTime firstOfMonth = new DateTime(_calNavDate.Year, _calNavDate.Month, 1);
+            int daysInMonth = DateTime.DaysInMonth(_calNavDate.Year, _calNavDate.Month);
+
+            int startOffset = ((int)firstOfMonth.DayOfWeek + 6) % 7; // Monday = 0, Sunday = 6
+            int totalCells = startOffset + daysInMonth;
+            int numRows = (int)Math.Ceiling(totalCells / 7.0);
+
+            for (int r = 0; r < numRows; r++)
+            {
+                gridDays.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            }
+
+            DateTime today = DateTime.Today;
+
+            for (int day = 1; day <= daysInMonth; day++)
+            {
+                int cellIndex = startOffset + (day - 1);
+                int row = cellIndex / 7;
+                int col = cellIndex % 7;
+
+                DateTime cellDate = new DateTime(_calNavDate.Year, _calNavDate.Month, day);
+                bool isToday = (cellDate == today);
+                bool isSelected = (cellDate == _viewDate.Date);
+
+                var cellBorder = new Border
+                {
+                    Height = 26,
+                    Margin = new Thickness(1.5),
+                    CornerRadius = new CornerRadius(6),
+                    Cursor = Cursors.Hand
+                };
+
+                if (isSelected)
+                {
+                    cellBorder.Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(2, 132, 199) : System.Windows.Media.Color.FromRgb(2, 132, 199));
+                }
+                else if (isToday)
+                {
+                    cellBorder.Background = new SolidColorBrush(isLight ? System.Windows.Media.Color.FromArgb(40, 34, 197, 94) : System.Windows.Media.Color.FromArgb(50, 34, 197, 94));
+                    cellBorder.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(34, 197, 94));
+                    cellBorder.BorderThickness = new Thickness(1);
+                }
+                else
+                {
+                    cellBorder.Background = System.Windows.Media.Brushes.Transparent;
+                }
+
+                var cellText = new TextBlock
+                {
+                    Text = day.ToString(),
+                    FontSize = 11.0,
+                    FontWeight = (isSelected || isToday) ? FontWeights.Bold : FontWeights.Normal,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                if (isSelected)
+                {
+                    cellText.Foreground = System.Windows.Media.Brushes.White;
+                }
+                else if (isToday)
+                {
+                    cellText.Foreground = isLight ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(22, 101, 52)) : new SolidColorBrush(System.Windows.Media.Color.FromRgb(74, 222, 128));
+                }
+                else
+                {
+                    bool isWeekend = (col >= 5);
+                    cellText.Foreground = isWeekend ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : new SolidColorBrush(textPrimary);
+                }
+
+                cellBorder.Child = cellText;
+
+                DateTime targetDay = cellDate;
+                cellBorder.MouseLeftButtonUp += delegate
+                {
+                    _viewDate = targetDay;
+                    UpdateDateDisplay();
+                    LoadScheduleAsync(false);
+                    _calendarDropdown.Visibility = Visibility.Collapsed;
+                };
+
+                Grid.SetRow(cellBorder, row);
+                Grid.SetColumn(cellBorder, col);
+                gridDays.Children.Add(cellBorder);
+            }
+
+            panel.Children.Add(gridDays);
+            _calendarDropdown.Child = panel;
         }
 
         private void CheckHandoverAlarm()
@@ -15072,7 +15871,6 @@ namespace ModernAutoHideIcons
                 }
             }
             catch { }
-            UpdateHandoverNoteVisuals();
 
             if (_txtEmpty != null && (_currentResult == null || forceRefresh))
             {
@@ -15108,6 +15906,12 @@ namespace ModernAutoHideIcons
 
         private void RenderStaffList()
         {
+            if (_isSearching && _txtSearchBox != null && !string.IsNullOrWhiteSpace(_txtSearchBox.Text))
+            {
+                PerformSearch(_txtSearchBox.Text);
+                return;
+            }
+
             _listPanel.Children.Clear();
             bool isLight = (_cfg.Theme == "light");
 
@@ -20588,12 +21392,29 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             pomoRow.Children.Add(btnPomoToggle);
             _mainContentPanel.Children.Add(CreateSettingCard("🍅 Zen Pomodoro Odak Sayacı (25 Dk Odak / 5 Dk Mola)", "Dikkat dağılmasını önlemek için 25 dakikalık derin odaklanma ve ardından 5 dakikalık dinlenme döngüsü. Sağ alt tepsi simgesine sağ tıklayarak da yönetebilirsiniz.", pomoRow));
 
+            var healthRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             var swHealth = new PowerToggleSwitch(_cfg.HealthRemindersEnabled, delegate(bool val)
             {
                 _cfg.HealthRemindersEnabled = val;
                 SaveAndNotify();
             }, _isDark);
-            _mainContentPanel.Children.Add(CreateSettingCard("💧 Sağlık & Ergonomi Hatırlatıcısı (Su & Göz Dinlendirme)", "Her 60 dakikalık kesintisiz çalışma sonunda ekranda su içme, omurga esnetme ve 20 saniye uzağa bakma (20-20-20 kuralı) nazik hatırlatması gösterir.", swHealth));
+            healthRow.Children.Add(swHealth);
+
+            var btnTestEye = new System.Windows.Controls.Button
+            {
+                Content = "👁️ Şimdi Test Et",
+                Height = 28,
+                Padding = new Thickness(10, 0, 10, 0),
+                Margin = new Thickness(12, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "20-20-20 Göz ve Dinlenme Hatırlatıcısını ekranda hemen önizleyin"
+            };
+            btnTestEye.Click += delegate
+            {
+                EyeRestToastWindow.ShowReminder(_cfg.Theme == "light");
+            };
+            healthRow.Children.Add(btnTestEye);
+            _mainContentPanel.Children.Add(CreateSettingCard("💧 20-20-20 Göz & Dinlenme Hatırlatıcısı", "Her 50 dakikalık kesintisiz çalışma sonunda ekranda su içme ve 20 saniye uzağa bakma (20-20-20 kuralı) nazik hatırlatması gösterir.", healthRow));
         }
 
         // ==========================================
@@ -21947,6 +22768,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
                     {
                         _activeWorkMinutes = 0;
                         try { System.Media.SystemSounds.Asterisk.Play(); } catch { }
+                        EyeRestToastWindow.ShowReminder(_cfg.Theme == "light");
                         if (_trayIcon != null)
                         {
                             _trayIcon.ShowBalloonTip(
