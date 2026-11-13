@@ -15312,17 +15312,18 @@ namespace ModernAutoHideIcons
 
             var card = new Border
             {
-                CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(10, 6, 10, 6),
-                Margin = new Thickness(0, 2, 0, 3),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(9, 4, 9, 4),
+                Margin = new Thickness(0, 1.5, 0, 1.5),
                 Background = cardBg,
                 BorderThickness = new Thickness(p.IsSupervisor ? 1.5 : 1),
                 BorderBrush = cardBorder
             };
 
             var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // İsim
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                      // Ünvan (Karşısında)
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                      // Rozet (Varsa)
 
             string personHours = null;
             if (p.IsSupervisor)
@@ -15347,48 +15348,48 @@ namespace ModernAutoHideIcons
 
             bool showBadge = p.IsOvertime || (commonHours == null) || (personHours != commonHours);
 
-            var nameStack = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
             string displayName = p.IsSupervisor ? ("👮 " + p.Name) : p.Name;
             var nameTxt = new TextBlock
             {
                 Text = displayName,
                 FontWeight = p.IsSupervisor ? FontWeights.Bold : FontWeights.SemiBold,
                 FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
-                FontSize = 13.2,
+                FontSize = 12.5,
                 Foreground = new SolidColorBrush(textPrimary),
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxWidth = showBadge ? 220 : 310
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0)
             };
-            var roleTxt = new TextBlock
+            Grid.SetColumn(nameTxt, 0);
+            grid.Children.Add(nameTxt);
+
+            if (!string.IsNullOrEmpty(p.Role))
             {
-                Text = p.Role,
-                FontWeight = p.IsSupervisor ? FontWeights.SemiBold : FontWeights.Normal,
-                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
-                FontSize = 11.2,
-                Margin = new Thickness(0, 1, 0, 0),
-                Foreground = p.IsSupervisor
-                    ? new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(180, 83, 9) : System.Windows.Media.Color.FromRgb(251, 191, 36))
-                    : new SolidColorBrush(textMuted),
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxWidth = showBadge ? 220 : 310
-            };
-            nameStack.Children.Add(nameTxt);
-            nameStack.Children.Add(roleTxt);
+                var roleTxt = new TextBlock
+                {
+                    Text = p.Role,
+                    FontWeight = p.IsSupervisor ? FontWeights.SemiBold : FontWeights.Normal,
+                    FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
+                    FontSize = 11.0,
+                    Foreground = p.IsSupervisor
+                        ? new SolidColorBrush(isLight ? System.Windows.Media.Color.FromRgb(180, 83, 9) : System.Windows.Media.Color.FromRgb(251, 191, 36))
+                        : new SolidColorBrush(textMuted),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    TextAlignment = TextAlignment.Right,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, showBadge ? 6 : 0, 0),
+                    MaxWidth = showBadge ? 115 : 145
+                };
+                Grid.SetColumn(roleTxt, 1);
+                grid.Children.Add(roleTxt);
+            }
 
             if (showBadge)
             {
-                Grid.SetColumn(nameStack, 0);
-                grid.Children.Add(nameStack);
-
                 var badge = CreateShiftBadge(p.ShiftCode, p.ShiftType, p.IsOvertime, p.IsSupervisor, p.ShiftHours);
-                Grid.SetColumn(badge, 1);
+                Grid.SetColumn(badge, 2);
                 grid.Children.Add(badge);
-            }
-            else
-            {
-                Grid.SetColumn(nameStack, 0);
-                Grid.SetColumnSpan(nameStack, 2);
-                grid.Children.Add(nameStack);
             }
 
             card.Child = grid;
