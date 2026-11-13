@@ -14190,39 +14190,10 @@ namespace ModernAutoHideIcons
             };
             rootStack.Children.Add(_scrollViewer);
 
-            _footerDivider = new Border
-            {
-                Height = 1,
-                Margin = new Thickness(0, 10, 0, 8)
-            };
-            rootStack.Children.Add(_footerDivider);
-
-            // 6. FOOTER
-            var footerGrid = new Grid { Margin = new Thickness(0, 0, 0, 0) };
-            footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            _txtFooterCount = new TextBlock
-            {
-                Text = "0 Personel",
-                FontSize = 12.0,
-                FontWeight = FontWeights.SemiBold,
-                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI")
-            };
-            Grid.SetColumn(_txtFooterCount, 0);
-            footerGrid.Children.Add(_txtFooterCount);
-
-            _txtFooterSheet = new TextBlock
-            {
-                Text = "ÇİZELGE",
-                FontSize = 12.0,
-                FontWeight = FontWeights.SemiBold,
-                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI")
-            };
-            Grid.SetColumn(_txtFooterSheet, 1);
-            footerGrid.Children.Add(_txtFooterSheet);
-
-            rootStack.Children.Add(footerGrid);
+            // Alt bilgi şeridi (footer) ve ayırıcı çizgi kullanıcı isteğiyle kaldırıldı (yükseklik optimizasyonu)
+            _footerDivider = null;
+            _txtFooterCount = null;
+            _txtFooterSheet = null;
 
             _cardBorder.Child = rootStack;
             Content = _cardBorder;
