@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -43,9 +44,6 @@ namespace ModernAutoHideIcons
         public const string DefaultCurrencyGoldUrl = "https://finans.truncgil.com/v3/today.json";
         // Borsa Endeksi Kaynağı (BIST 100)
         public const string DefaultBistUrl = "https://query1.finance.yahoo.com/v8/finance/chart/XU100.IS?interval=1d";
-        // Kripto Para Kaynakları (Bitcoin & Ethereum)
-        public const string DefaultBtcUrl = "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT";
-        public const string DefaultEthUrl = "https://api.binance.com/api/v3/ticker/24hr?symbol=ETHUSDT";
     }
 
     // ==========================================
@@ -121,13 +119,11 @@ namespace ModernAutoHideIcons
         public bool ShowGramGold = true;
         public bool ShowOunceGold = true;
         public bool ShowBist = true;
-        public bool ShowBtc = true;
-        public bool ShowEth = true;
+        public bool ShowBtc = false;
+        public bool ShowEth = false;
         public string CustomParities = "";
         public string FinanceApiUrl = FinanceEndpoints.DefaultCurrencyGoldUrl;
         public string BistApiUrl = FinanceEndpoints.DefaultBistUrl;
-        public string CryptoBtcUrl = FinanceEndpoints.DefaultBtcUrl;
-        public string CryptoEthUrl = FinanceEndpoints.DefaultEthUrl;
 
         // Maç Takipçisi (Galatasaray, Fenerbahçe, Beşiktaş, Trabzonspor, Türkiye)
         public bool ShowMatchTracker = true;
@@ -281,13 +277,11 @@ namespace ModernAutoHideIcons
                     cfg.ShowGramGold = GetBool(json, "ShowGramGold", true);
                     cfg.ShowOunceGold = GetBool(json, "ShowOunceGold", true);
                     cfg.ShowBist = GetBool(json, "ShowBist", true);
-                    cfg.ShowBtc = GetBool(json, "ShowBtc", true);
-                    cfg.ShowEth = GetBool(json, "ShowEth", true);
+                    cfg.ShowBtc = GetBool(json, "ShowBtc", false);
+                    cfg.ShowEth = GetBool(json, "ShowEth", false);
                     cfg.CustomParities = GetString(json, "CustomParities", "");
                     cfg.FinanceApiUrl = GetString(json, "FinanceApiUrl", FinanceEndpoints.DefaultCurrencyGoldUrl);
                     cfg.BistApiUrl = GetString(json, "BistApiUrl", FinanceEndpoints.DefaultBistUrl);
-                    cfg.CryptoBtcUrl = GetString(json, "CryptoBtcUrl", FinanceEndpoints.DefaultBtcUrl);
-                    cfg.CryptoEthUrl = GetString(json, "CryptoEthUrl", FinanceEndpoints.DefaultEthUrl);
 
                     cfg.ShowMatchTracker = GetBool(json, "ShowMatchTracker", true);
                     cfg.ShowUpcomingMatch = GetBool(json, "ShowUpcomingMatch", true);
@@ -443,8 +437,6 @@ namespace ModernAutoHideIcons
                 sb.AppendLine("  \"CustomParities\": \"" + Escape(CustomParities) + "\",");
                 sb.AppendLine("  \"FinanceApiUrl\": \"" + Escape(FinanceApiUrl) + "\",");
                 sb.AppendLine("  \"BistApiUrl\": \"" + Escape(BistApiUrl) + "\",");
-                sb.AppendLine("  \"CryptoBtcUrl\": \"" + Escape(CryptoBtcUrl) + "\",");
-                sb.AppendLine("  \"CryptoEthUrl\": \"" + Escape(CryptoEthUrl) + "\",");
                 sb.AppendLine("  \"ShowMatchTracker\": " + ShowMatchTracker.ToString().ToLower() + ",");
                 sb.AppendLine("  \"ShowUpcomingMatch\": " + ShowUpcomingMatch.ToString().ToLower() + ",");
                 sb.AppendLine("  \"MatchClockThemeEnabled\": " + MatchClockThemeEnabled.ToString().ToLower() + ",");
@@ -1274,31 +1266,139 @@ namespace ModernAutoHideIcons
         {
             var thread = new Thread(delegate()
             {
-                var data = FinanceCache.Load();
+                FinanceData data = null;
+                try
+                {
+                    ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+
+                    data = new FinanceData();
+                    bool anySuccess = false;
+
+                    // 1. DÖVİZ VE ALTIN (Truncgil)
+                    try
+                    {
+                        var req = (HttpWebRequest)WebRequest.Create(FinanceEndpoints.DefaultCurrencyGoldUrl);
+                        req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
+                        req.Timeout = 5000;
+                        req.ReadWriteTimeout = 5000;
+                        using (var resp = (HttpWebResponse)req.GetResponse())
+                        using (var stream = resp.GetResponseStream())
+                        using (var reader = new StreamReader(stream, Encoding.UTF8))
+                        {
+                            string json = reader.ReadToEnd();
+                            if (!string.IsNullOrEmpty(json))
+                            {
+                                string usdSell = ExtractSubField(json, "USD", "Selling");
+                                string usdChg = ExtractSubField(json, "USD", "Change");
+                                if (!string.IsNullOrEmpty(usdSell))
+                                {
+                                    data.Usd.Price = FormatNumber(usdSell, "", " ₺", 2);
+                                    bool isUp;
+                                    data.Usd.Change = FormatChange(usdChg, out isUp);
+                                    data.Usd.IsUp = isUp;
+                                    anySuccess = true;
+                                }
+
+                                string eurSell = ExtractSubField(json, "EUR", "Selling");
+                                string eurChg = ExtractSubField(json, "EUR", "Change");
+                                if (!string.IsNullOrEmpty(eurSell))
+                                {
+                                    data.Eur.Price = FormatNumber(eurSell, "", " ₺", 2);
+                                    bool isUp;
+                                    data.Eur.Change = FormatChange(eurChg, out isUp);
+                                    data.Eur.IsUp = isUp;
+                                    anySuccess = true;
+                                }
+
+                                string gramSell = ExtractSubField(json, "gram-altin", "Selling");
+                                string gramChg = ExtractSubField(json, "gram-altin", "Change");
+                                if (!string.IsNullOrEmpty(gramSell))
+                                {
+                                    data.GramGold.Price = FormatNumber(gramSell, "", " ₺", 0);
+                                    bool isUp;
+                                    data.GramGold.Change = FormatChange(gramChg, out isUp);
+                                    data.GramGold.IsUp = isUp;
+                                    anySuccess = true;
+                                }
+
+                                string onsSell = ExtractSubField(json, "ons", "Selling");
+                                string onsChg = ExtractSubField(json, "ons", "Change");
+                                if (!string.IsNullOrEmpty(onsSell))
+                                {
+                                    data.OunceGold.Price = FormatNumber(onsSell, "$", "", 0);
+                                    bool isUp;
+                                    data.OunceGold.Change = FormatChange(onsChg, out isUp);
+                                    data.OunceGold.IsUp = isUp;
+                                    anySuccess = true;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+
+                    // 2. BORSA İSTANBUL (BIST 100 - Yahoo Finance)
+                    try
+                    {
+                        var req = (HttpWebRequest)WebRequest.Create(FinanceEndpoints.DefaultBistUrl);
+                        req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
+                        req.Timeout = 5000;
+                        req.ReadWriteTimeout = 5000;
+                        using (var resp = (HttpWebResponse)req.GetResponse())
+                        using (var stream = resp.GetResponseStream())
+                        using (var reader = new StreamReader(stream, Encoding.UTF8))
+                        {
+                            string json = reader.ReadToEnd();
+                            if (!string.IsNullOrEmpty(json))
+                            {
+                                var mPrice = Regex.Match(json, "\"regularMarketPrice\"\\s*:\\s*([0-9\\.]+)");
+                                var mClose = Regex.Match(json, "\"(?:previousClose|chartPreviousClose)\"\\s*:\\s*([0-9\\.]+)");
+                                if (mPrice.Success)
+                                {
+                                    double priceVal;
+                                    if (double.TryParse(mPrice.Groups[1].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out priceVal))
+                                    {
+                                        data.Bist.Price = FormatNumber(mPrice.Groups[1].Value, "", "", 0);
+                                        if (mClose.Success)
+                                        {
+                                            double closeVal;
+                                            if (double.TryParse(mClose.Groups[1].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out closeVal) && closeVal > 0)
+                                            {
+                                                double diff = ((priceVal - closeVal) / closeVal) * 100.0;
+                                                data.Bist.IsUp = (diff >= 0);
+                                                data.Bist.Change = (data.Bist.IsUp ? "▲ %" : "▼ %") + Math.Abs(diff).ToString("0.00", CultureInfo.InvariantCulture).Replace(".", ",");
+                                            }
+                                        }
+                                        anySuccess = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+
+                    if (anySuccess)
+                    {
+                        data.IsSuccess = true;
+                        data.LastUpdate = DateTime.Now.ToString("HH:mm");
+                        FinanceCache.Save(data);
+                    }
+                    else
+                    {
+                        var cached = FinanceCache.Load();
+                        if (cached != null) data = cached;
+                    }
+                }
+                catch
+                {
+                    var cached = FinanceCache.Load();
+                    if (cached != null) data = cached;
+                }
+
                 if (data == null)
                 {
                     data = new FinanceData();
-                    data.Usd.Price = "34.50 ₺";
-                    data.Usd.Change = "+0.10%";
-                    data.Usd.IsUp = true;
-                    data.Eur.Price = "37.20 ₺";
-                    data.Eur.Change = "+0.05%";
-                    data.Eur.IsUp = true;
-                    data.GramGold.Price = "3.050 ₺";
-                    data.GramGold.Change = "+0.25%";
-                    data.GramGold.IsUp = true;
-                    data.OunceGold.Price = "$2,750";
-                    data.OunceGold.Change = "+0.15%";
-                    data.OunceGold.IsUp = true;
-                    data.Bist.Price = "8,950";
-                    data.Bist.Change = "+0.40%";
-                    data.Bist.IsUp = true;
-                    data.Btc.Price = "$68,500";
-                    data.Btc.Change = "+1.20%";
-                    data.Btc.IsUp = true;
                 }
-                data.IsSuccess = true;
-                data.LastUpdate = DateTime.Now.ToString("HH:mm");
+
                 if (onResult != null)
                 {
                     try { onResult(data); } catch { }
@@ -1306,6 +1406,12 @@ namespace ModernAutoHideIcons
             });
             thread.IsBackground = true;
             thread.Start();
+        }
+
+        private static string ExtractSubField(string json, string section, string field)
+        {
+            var m = Regex.Match(json, "\"" + section + "\"\\s*:\\s*\\{[^}]*\"" + field + "\"\\s*:\\s*\"([^\"]+)\"");
+            return m.Success ? m.Groups[1].Value : null;
         }
 
         private static string FormatCryptoPrice(string raw)
@@ -9583,8 +9689,6 @@ namespace ModernAutoHideIcons
             if (_cfg.ShowGramGold && _colGram != null) activeItems.Add(_colGram);
             if (_cfg.ShowOunceGold && _colOunce != null) activeItems.Add(_colOunce);
             if (_cfg.ShowBist && _colBist != null) activeItems.Add(_colBist);
-            if (_cfg.ShowBtc && _colBtc != null) activeItems.Add(_colBtc);
-            if (_cfg.ShowEth && _colEth != null) activeItems.Add(_colEth);
 
             // Özel Pariteler (Kullanıcının yazdığı kısa adlar: SOL, AVAX, GBP vb.)
             if (_currentFinance != null && _currentFinance.CustomItems != null)
@@ -20607,12 +20711,6 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
 
             var swBist = new PowerToggleSwitch(_cfg.ShowBist, delegate(bool val) { _cfg.ShowBist = val; SaveAndNotify(); }, _isDark);
             _mainContentPanel.Children.Add(CreateSettingCard("📈 BIST 100 Endeksi", "Borsa İstanbul BIST 100 puanı ve seans durumu (Açık/Kapalı).", swBist));
-
-            var swBtc = new PowerToggleSwitch(_cfg.ShowBtc, delegate(bool val) { _cfg.ShowBtc = val; SaveAndNotify(); }, _isDark);
-            _mainContentPanel.Children.Add(CreateSettingCard("₿ Bitcoin (BTC / USDT)", "Bitcoin anlık dolar fiyatı ve 24 saatlik değişim oranı.", swBtc));
-
-            var swEth = new PowerToggleSwitch(_cfg.ShowEth, delegate(bool val) { _cfg.ShowEth = val; SaveAndNotify(); }, _isDark);
-            _mainContentPanel.Children.Add(CreateSettingCard("🔷 Ethereum (ETH / USDT)", "Ethereum anlık dolar fiyatı ve 24 saatlik değişim oranı.", swEth));
 
             _mainContentPanel.Children.Add(CreateSectionTitle("ÖZEL PARİTE EKLEME"));
 
