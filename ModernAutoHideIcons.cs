@@ -21812,6 +21812,24 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             _mainContentPanel.Children.Add(CreateSettingCard("Akıllı RAM Optimizasyonu", "5K/8K duvar kağıtlarını ekran çözünürlüğüne optimize eder ve boşta kalan belleği otomatik olarak Windows'a iade eder.", ramStack));
         }
 
+        private Border CreateAppShowcaseCard(string title, string description, string url)
+        {
+            var btn = new System.Windows.Controls.Button
+            {
+                Content = "🌐 GitHub'da Aç",
+                Height = 28,
+                Padding = new Thickness(12, 0, 12, 0),
+                Cursor = Cursors.Hand,
+                FontWeight = FontWeights.SemiBold
+            };
+            string targetUrl = url;
+            btn.Click += delegate
+            {
+                try { Process.Start(new ProcessStartInfo(targetUrl) { UseShellExecute = true }); } catch { }
+            };
+            return CreateSettingCard(title, description, btn);
+        }
+
         // ==========================================
         // SEKME 8: HAKKINDA & GELİŞTİRİCİ (SERKAN ŞENTÜRK)
         // ==========================================
@@ -21874,6 +21892,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             specGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             specGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             specGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            specGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             // Satır 0: Developer
             var l1 = new TextBlock { Text = "Developer:", FontWeight = FontWeights.SemiBold, Foreground = _textSecondaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
@@ -21882,29 +21901,52 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             Grid.SetRow(v1, 0); Grid.SetColumn(v1, 1);
             specGrid.Children.Add(l1); specGrid.Children.Add(v1);
 
-            // Satır 1: Sürüm
+            // Satır 1: GitHub Profili
+            var lgh = new TextBlock { Text = "GitHub Profili:", FontWeight = FontWeights.SemiBold, Foreground = _textSecondaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
+            var vgh = new TextBlock { Text = "github.com/836982756578", FontWeight = FontWeights.SemiBold, Foreground = _accentBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3), Cursor = Cursors.Hand, ToolTip = "GitHub profilini tarayıcıda aç" };
+            vgh.MouseDown += delegate { try { Process.Start(new ProcessStartInfo("https://github.com/836982756578") { UseShellExecute = true }); } catch { } };
+            Grid.SetRow(lgh, 1); Grid.SetColumn(lgh, 0);
+            Grid.SetRow(vgh, 1); Grid.SetColumn(vgh, 1);
+            specGrid.Children.Add(lgh); specGrid.Children.Add(vgh);
+
+            // Satır 2: Sürüm
             var l2 = new TextBlock { Text = "Uygulama Sürümü:", FontWeight = FontWeights.SemiBold, Foreground = _textSecondaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
-            var v2 = new TextBlock { Text = "v2.5 (Modern Zen Edition)", Foreground = _textPrimaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
-            Grid.SetRow(l2, 1); Grid.SetColumn(l2, 0);
-            Grid.SetRow(v2, 1); Grid.SetColumn(v2, 1);
+            var v2 = new TextBlock { Text = "v2.5.6 (Modern Zen Edition)", Foreground = _textPrimaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
+            Grid.SetRow(l2, 2); Grid.SetColumn(l2, 0);
+            Grid.SetRow(v2, 2); Grid.SetColumn(v2, 1);
             specGrid.Children.Add(l2); specGrid.Children.Add(v2);
 
-            // Satır 2: Teknoloji
+            // Satır 3: Teknoloji
             var l3 = new TextBlock { Text = "Teknoloji Altyapısı:", FontWeight = FontWeights.SemiBold, Foreground = _textSecondaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
             var v3 = new TextBlock { Text = "C# WPF, Win32 Native Core, DirectX Rendering", Foreground = _textPrimaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
-            Grid.SetRow(l3, 2); Grid.SetColumn(l3, 0);
-            Grid.SetRow(v3, 2); Grid.SetColumn(v3, 1);
+            Grid.SetRow(l3, 3); Grid.SetColumn(l3, 0);
+            Grid.SetRow(v3, 3); Grid.SetColumn(v3, 1);
             specGrid.Children.Add(l3); specGrid.Children.Add(v3);
 
-            // Satır 3: Telif Hakkı
+            // Satır 4: Telif Hakkı
             var l4 = new TextBlock { Text = "Telif Hakkı:", FontWeight = FontWeights.SemiBold, Foreground = _textSecondaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
             var v4 = new TextBlock { Text = "© 2026 Serkan ŞENTÜRK. Tüm Hakları Saklıdır.", Foreground = _textPrimaryBrush, FontSize = 12, Margin = new Thickness(0, 3, 0, 3) };
-            Grid.SetRow(l4, 3); Grid.SetColumn(l4, 0);
-            Grid.SetRow(v4, 3); Grid.SetColumn(v4, 1);
+            Grid.SetRow(l4, 4); Grid.SetColumn(l4, 0);
+            Grid.SetRow(v4, 4); Grid.SetColumn(v4, 1);
             specGrid.Children.Add(l4); specGrid.Children.Add(v4);
 
             specBorder.Child = specGrid;
             devStack.Children.Add(specBorder);
+
+            var btnGithubProfile = new System.Windows.Controls.Button
+            {
+                Content = "🌐 GitHub Profilimi Aç (github.com/836982756578)",
+                Height = 34,
+                Margin = new Thickness(0, 12, 0, 0),
+                FontWeight = FontWeights.Bold,
+                Cursor = Cursors.Hand
+            };
+            btnGithubProfile.Click += delegate
+            {
+                try { Process.Start(new ProcessStartInfo("https://github.com/836982756578") { UseShellExecute = true }); } catch { }
+            };
+            devStack.Children.Add(btnGithubProfile);
+
             devCard.Child = devStack;
             _mainContentPanel.Children.Add(devCard);
 
@@ -21948,7 +21990,75 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             };
             _mainContentPanel.Children.Add(CreateSettingCard("Zen Desktop Güncelleme Denetleyicisi", "GitHub üzerindeki yeni sürümleri ve hata düzeltmelerini anlık olarak denetler, yeni sürüm çıktığında bildirim verir.", btnCheckUpdates));
 
-            // 2. Kısayollar ve İpuçları
+            // 2. ZEN SUITE — DİĞER UYGULAMALARIM
+            _mainContentPanel.Children.Add(CreateSectionTitle("🚀 ZEN SUITE — DİĞER UYGULAMALARIM (SERKAN ŞENTÜRK)"));
+
+            _mainContentPanel.Children.Add(CreateAppShowcaseCard(
+                "🔊 Zen Audio — Görev Çubuğu Ses Yöneticisi & Karıştırıcı",
+                "Görev çubuğu üzerinde fare tekerleğiyle akıcı ses ayarı ve arka plandaki tüm uygulamalar için bağımsız ses karıştırıcısı.",
+                "https://github.com/836982756578/Zen-Audio"));
+
+            _mainContentPanel.Children.Add(CreateAppShowcaseCard(
+                "🧹 Zen Cleaner — Sistem & Disk Temizleyici",
+                "Taşınabilir, ultra hafif Windows sistem temizleyici; gereksiz geçici dosyaları ve logları tek tıkla temizleyip diskte yer açar.",
+                "https://github.com/836982756578/Zen-Cleaner"));
+
+            _mainContentPanel.Children.Add(CreateAppShowcaseCard(
+                "📋 Zen Clip — Akıllı Pano Yöneticisi",
+                "Windows için hafif, taşınabilir ve akıllı pano (clipboard) geçmiş yöneticisi; metin ve görselleri saklar.",
+                "https://github.com/836982756578/Zen-Clip"));
+
+            _mainContentPanel.Children.Add(CreateAppShowcaseCard(
+                "🪟 Zen Edge — Akıllı Masaüstü Kenar Çubuğu",
+                "Windows 10/11 için Mica cam efektli, yerel klasör gezginli, Spotify mini barlı ve Split-View kenar çubuğu.",
+                "https://github.com/836982756578/Zen-Edge"));
+
+            _mainContentPanel.Children.Add(CreateAppShowcaseCard(
+                "📦 Zen Fence — Masaüstü Düzenleyici & Çit Yöneticisi",
+                "Masaüstü simgelerini şık yarı saydam gruplara ayıran ultra hafif düzenleyici (Fences alternatifi).",
+                "https://github.com/836982756578/Zen-Fence"));
+
+            _mainContentPanel.Children.Add(CreateAppShowcaseCard(
+                "⏱️ Zen Focus — Pomodoro & Odaklanma Sayacı",
+                "Masaüstünde dikkatinizi dağıtmayan, mini moda geçebilen minimalist Pomodoro odak sayacı.",
+                "https://github.com/836982756578/Zen-Focus"));
+
+            _mainContentPanel.Children.Add(CreateAppShowcaseCard(
+                "🎬 Zen Media Saver — 4K Video & MP3 İndirici",
+                "YouTube, Instagram, TikTok ve 1000+ siteden tamamen reklamsız ve hızlı 4K video & ses indirici.",
+                "https://github.com/836982756578/Zen-MediaSaver"));
+
+            _mainContentPanel.Children.Add(CreateAppShowcaseCard(
+                "📝 Zen Notes — Kenara Katlanabilir Masaüstü Notları",
+                "Masaüstünüzde yüzen, kenara katlanabilen (roll-up) ultra hafif akıllı not ve to-do kartları.",
+                "https://github.com/836982756578/Zen-Notes"));
+
+            _mainContentPanel.Children.Add(CreateAppShowcaseCard(
+                "👁️ Zen Peek — Boşluk Tuşuyla Hızlı Dosya Önizleme",
+                "macOS QuickLook özelliğini Windows'a getiren, boşluk (Space) tuşuyla anında dosya ve görsel önizleyici.",
+                "https://github.com/836982756578/Zen-Peek"));
+
+            _mainContentPanel.Children.Add(CreateAppShowcaseCard(
+                "📌 Zen Pin — Pencere Sabitleyici & PiP (Always on Top)",
+                "İstediğiniz herhangi bir pencereyi en üstte sabitleme ve Picture-in-Picture (PiP) izleme aracı.",
+                "https://github.com/836982756578/Zen-Pin"));
+
+            _mainContentPanel.Children.Add(CreateAppShowcaseCard(
+                "🏷️ Zen Renamer — Akıllı Toplu Dosya Yeniden Adlandırıcı",
+                "Yüzlerce dosyayı saniyeler içinde önizlemeli ve güvenli şekilde yeniden adlandırın; geri alma (undo) destekli.",
+                "https://github.com/836982756578/Zen-Renamer"));
+
+            _mainContentPanel.Children.Add(CreateAppShowcaseCard(
+                "🖼️ Zen Shrink — Görsel Sıkıştırıcı & Format Dönüştürücü",
+                "Görsellerinizi %60-%90 oranında kayıpsız sıkıştırın ve dönüştürün; %100 çevrimdışı ve taşınabilir.",
+                "https://github.com/836982756578/Zen-Shrink"));
+
+            _mainContentPanel.Children.Add(CreateAppShowcaseCard(
+                "✂️ Zen Snip & OCR — Ekrandan Metin Kopyalama & Damlalık",
+                "Windows için çevrimdışı OCR ile ekrandan anında yazı kopyalama ve piksel renk damlalığı aracı.",
+                "https://github.com/836982756578/Zen-SnipOCR"));
+
+            // 3. Kısayollar ve İpuçları
             _mainContentPanel.Children.Add(CreateSectionTitle("KISAYOLLAR VE KULLANIM İPUÇLARI"));
             _mainContentPanel.Children.Add(CreateSettingCard("Win + Ctrl + D", "Masaüstü ikonlarını anında gizler veya geri getirir.", null));
             _mainContentPanel.Children.Add(CreateSettingCard("Masaüstüne Çift Tık", "Masaüstü ikonlarını manuel olarak açıp kapatır.", null));
@@ -22199,7 +22309,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
     // ==========================================
     public static class UpdateCheckerService
     {
-        public const string CurrentVersion = "2.5.5";
+        public const string CurrentVersion = "2.5.6";
         public const string GitHubRepo = "836982756578/Zen-Desktop";
 
         public static Version ParseNormalizedVersion(string verStr)
