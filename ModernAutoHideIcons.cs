@@ -13943,8 +13943,6 @@ namespace ModernAutoHideIcons
         private Border _statusBanner;
         private TextBlock _txtCurrentShift;
         private TextBlock _txtIncomingShift;
-        private Border _borderCountdownPill;
-        private TextBlock _txtHandoverCountdown;
         private StackPanel _shiftProgressContainer;
         private TextBlock _txtShiftProgress;
         private TextBlock _txtShiftRemaining;
@@ -14456,25 +14454,8 @@ namespace ModernAutoHideIcons
             incRow.Children.Add(_txtIncomingShift);
             statusStack.Children.Add(incRow);
 
-            _borderCountdownPill = new Border
-            {
-                CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(8, 3, 8, 3),
-                HorizontalAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(0, 0, 0, 5)
-            };
-            _txtHandoverCountdown = new TextBlock
-            {
-                Text = "",
-                FontWeight = FontWeights.SemiBold,
-                FontFamily = new System.Windows.Media.FontFamily("Inter, Segoe UI"),
-                FontSize = 12.5
-            };
-            _borderCountdownPill.Child = _txtHandoverCountdown;
-            statusStack.Children.Add(_borderCountdownPill);
-
             // 2.1 VARDİYA / MESAİ İLERLEME ÇUBUĞU
-            _shiftProgressContainer = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 0, 7) };
+            _shiftProgressContainer = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 2, 0, 7) };
             var prgHeaderRow = new Grid();
             prgHeaderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             prgHeaderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -14963,103 +14944,72 @@ namespace ModernAutoHideIcons
                 _txtIncomingShift.Foreground = new SolidColorBrush(textPrimary);
             }
 
-            if (_txtHandoverCountdown != null)
+            DateTime targetHandover;
+            if (now.Hour >= 7 && now.Hour < 15)
             {
-                if (_cfg != null && !_cfg.ShiftHandoverCountdown)
+                targetHandover = new DateTime(now.Year, now.Month, now.Day, 15, 0, 0);
+            }
+            else if (now.Hour >= 15 && now.Hour < 23)
+            {
+                targetHandover = new DateTime(now.Year, now.Month, now.Day, 23, 0, 0);
+            }
+            else
+            {
+                if (now.Hour >= 23)
                 {
-                    if (_borderCountdownPill != null) _borderCountdownPill.Visibility = Visibility.Collapsed;
-                    _txtHandoverCountdown.Visibility = Visibility.Collapsed;
+                    targetHandover = now.Date.AddDays(1).AddHours(7);
                 }
                 else
                 {
-                    if (_borderCountdownPill != null) _borderCountdownPill.Visibility = Visibility.Visible;
-                    _txtHandoverCountdown.Visibility = Visibility.Visible;
-
-                    DateTime targetHandover;
-                    if (now.Hour >= 7 && now.Hour < 15)
-                    {
-                        targetHandover = new DateTime(now.Year, now.Month, now.Day, 15, 0, 0);
-                    }
-                    else if (now.Hour >= 15 && now.Hour < 23)
-                    {
-                        targetHandover = new DateTime(now.Year, now.Month, now.Day, 23, 0, 0);
-                    }
-                    else
-                    {
-                        if (now.Hour >= 23)
-                        {
-                            targetHandover = now.Date.AddDays(1).AddHours(7);
-                        }
-                        else
-                        {
-                            targetHandover = now.Date.AddHours(7);
-                        }
-                    }
-
-                    TimeSpan rem = targetHandover - now;
-                    if (rem.TotalSeconds < 0) rem = TimeSpan.Zero;
-
-                    if (rem.TotalMinutes <= 15)
-                    {
-                        _txtHandoverCountdown.Text = string.Format("\u26A0\uFE0F DEV\u0130R VAKT\u0130 YAKLA\u015ETI! ({0} dk {1:D2} sn)", (int)rem.TotalMinutes, rem.Seconds);
-                        _txtHandoverCountdown.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11));
-                        if (_borderCountdownPill != null)
-                        {
-                            _borderCountdownPill.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(45, 245, 158, 11));
-                            _borderCountdownPill.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(140, 245, 158, 11));
-                        }
-                    }
-                    else
-                    {
-                        _txtHandoverCountdown.Text = string.Format("\u23F3 Devre Kalan S\u00FCre: {0:D2}:{1:D2}:{2:D2}", (int)rem.TotalHours, rem.Minutes, rem.Seconds);
-                        _txtHandoverCountdown.Foreground = new SolidColorBrush(textPrimary);
-                        if (_borderCountdownPill != null)
-                        {
-                            _borderCountdownPill.Background = new SolidColorBrush(isLight 
-                                ? System.Windows.Media.Color.FromArgb(20, 0, 0, 0) 
-                                : System.Windows.Media.Color.FromArgb(30, 255, 255, 255));
-                            _borderCountdownPill.BorderBrush = new SolidColorBrush(isLight 
-                                ? System.Windows.Media.Color.FromArgb(35, 0, 0, 0) 
-                                : System.Windows.Media.Color.FromArgb(40, 255, 255, 255));
-                        }
-                    }
-
-                    // Mesai / Vardiya İlerleme Çubuğu
-                    DateTime shiftStart;
-                    if (now.Hour >= 7 && now.Hour < 15)
-                    {
-                        shiftStart = new DateTime(now.Year, now.Month, now.Day, 7, 0, 0);
-                    }
-                    else if (now.Hour >= 15 && now.Hour < 23)
-                    {
-                        shiftStart = new DateTime(now.Year, now.Month, now.Day, 15, 0, 0);
-                    }
-                    else
-                    {
-                        shiftStart = (now.Hour >= 23) ? now.Date.AddHours(23) : now.Date.AddDays(-1).AddHours(23);
-                    }
-
-                    double totalMinutes = (targetHandover - shiftStart).TotalMinutes;
-                    if (totalMinutes <= 0) totalMinutes = 480.0;
-                    double elapsed = (now - shiftStart).TotalMinutes;
-                    if (elapsed < 0) elapsed = 0;
-                    if (elapsed > totalMinutes) elapsed = totalMinutes;
-                    double pct = (elapsed / totalMinutes) * 100.0;
-
-                    if (_txtShiftProgress != null)
-                    {
-                        _txtShiftProgress.Text = string.Format("\u23F3 %{0:0} Tamamland\u0131", pct);
-                    }
-                    if (_txtShiftRemaining != null)
-                    {
-                        _txtShiftRemaining.Text = string.Format("Kalan: {0} sa {1:D2} dk", (int)rem.TotalHours, rem.Minutes);
-                    }
-                    if (_progressBarFill != null)
-                    {
-                        double trackW = (_progressTrack != null && _progressTrack.ActualWidth > 20) ? _progressTrack.ActualWidth : 312.0;
-                        _progressBarFill.Width = Math.Max(4, Math.Min(trackW, (pct / 100.0) * trackW));
-                    }
+                    targetHandover = now.Date.AddHours(7);
                 }
+            }
+
+            TimeSpan rem = targetHandover - now;
+            if (rem.TotalSeconds < 0) rem = TimeSpan.Zero;
+
+            DateTime shiftStart;
+            if (now.Hour >= 7 && now.Hour < 15)
+            {
+                shiftStart = new DateTime(now.Year, now.Month, now.Day, 7, 0, 0);
+            }
+            else if (now.Hour >= 15 && now.Hour < 23)
+            {
+                shiftStart = new DateTime(now.Year, now.Month, now.Day, 15, 0, 0);
+            }
+            else
+            {
+                shiftStart = (now.Hour >= 23) ? now.Date.AddHours(23) : now.Date.AddDays(-1).AddHours(23);
+            }
+
+            double totalMinutes = (targetHandover - shiftStart).TotalMinutes;
+            if (totalMinutes <= 0) totalMinutes = 480.0;
+            double elapsed = (now - shiftStart).TotalMinutes;
+            if (elapsed < 0) elapsed = 0;
+            if (elapsed > totalMinutes) elapsed = totalMinutes;
+            double pct = (elapsed / totalMinutes) * 100.0;
+
+            if (_txtShiftProgress != null)
+            {
+                _txtShiftProgress.Text = string.Format("\u23F3 %{0:0} Tamamland\u0131", pct);
+            }
+            if (_txtShiftRemaining != null)
+            {
+                if (rem.TotalMinutes <= 15)
+                {
+                    _txtShiftRemaining.Text = string.Format("\u26A0\uFE0F DEV\u0130R VAKT\u0130! ({0} dk {1:D2} sn)", (int)rem.TotalMinutes, rem.Seconds);
+                    _txtShiftRemaining.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11));
+                }
+                else
+                {
+                    _txtShiftRemaining.Text = string.Format("Kalan: {0} sa {1:D2} dk", (int)rem.TotalHours, rem.Minutes);
+                    _txtShiftRemaining.Foreground = new SolidColorBrush(textSecondary);
+                }
+            }
+            if (_progressBarFill != null)
+            {
+                double trackW = (_progressTrack != null && _progressTrack.ActualWidth > 20) ? _progressTrack.ActualWidth : 312.0;
+                _progressBarFill.Width = Math.Max(4, Math.Min(trackW, (pct / 100.0) * trackW));
             }
 
             if (_txtSupervisorShift != null)
@@ -15252,20 +15202,6 @@ namespace ModernAutoHideIcons
             }
             if (_txtCurrentShift != null) _txtCurrentShift.Foreground = new SolidColorBrush(textPrimary);
             if (_txtIncomingShift != null) _txtIncomingShift.Foreground = new SolidColorBrush(textPrimary);
-            if (_borderCountdownPill != null)
-            {
-                _borderCountdownPill.Background = new SolidColorBrush(isLight
-                    ? System.Windows.Media.Color.FromArgb(20, 0, 0, 0)
-                    : System.Windows.Media.Color.FromArgb(30, 255, 255, 255));
-                _borderCountdownPill.BorderBrush = new SolidColorBrush(isLight
-                    ? System.Windows.Media.Color.FromArgb(35, 0, 0, 0)
-                    : System.Windows.Media.Color.FromArgb(40, 255, 255, 255));
-                _borderCountdownPill.BorderThickness = new Thickness(1);
-            }
-            if (_txtHandoverCountdown != null && !_txtHandoverCountdown.Text.StartsWith("\u26A0\uFE0F"))
-            {
-                _txtHandoverCountdown.Foreground = new SolidColorBrush(textPrimary);
-            }
 
             if (_progressTrack != null)
             {
