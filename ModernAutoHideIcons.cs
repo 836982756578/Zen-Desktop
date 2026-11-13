@@ -1076,14 +1076,69 @@ namespace ModernAutoHideIcons
         {
             var thread = new Thread(delegate()
             {
-                var fallback = new WeatherData();
-                fallback.Temperature = 18;
-                fallback.ConditionText = "ParÃ§alÄ± Bulutlu";
-                fallback.ConditionType = "partly_cloudy";
-                fallback.City = string.IsNullOrEmpty(cityName) ? "Ä°stanbul" : cityName;
+                var wd = new WeatherData();
+                wd.City = string.IsNullOrEmpty(cityName) ? "İstanbul" : cityName;
+                wd.Temperature = 19;
+                wd.ConditionText = "Parçalı Bulutlu";
+                wd.ConditionType = "partly_cloudy";
+
+                try
+                {
+                    ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+                    double lat = 41.01;
+                    double lon = 28.97; // İstanbul varsayılan
+
+                    string cityNorm = (cityName ?? "").Trim().ToLowerInvariant()
+                        .Replace("ı", "i").Replace("İ", "i")
+                        .Replace("ğ", "g").Replace("ü", "u")
+                        .Replace("ş", "s").Replace("ö", "o")
+                        .Replace("ç", "c");
+
+                    if (cityNorm.Contains("ankara")) { lat = 39.93; lon = 32.85; }
+                    else if (cityNorm.Contains("izmir")) { lat = 38.42; lon = 27.14; }
+                    else if (cityNorm.Contains("bursa")) { lat = 40.18; lon = 29.06; }
+                    else if (cityNorm.Contains("antalya")) { lat = 36.89; lon = 30.71; }
+                    else if (cityNorm.Contains("adana")) { lat = 37.00; lon = 35.32; }
+                    else if (cityNorm.Contains("konya")) { lat = 37.87; lon = 32.48; }
+                    else if (cityNorm.Contains("trabzon")) { lat = 41.00; lon = 39.72; }
+                    else if (cityNorm.Contains("samsun")) { lat = 41.29; lon = 36.33; }
+                    else if (cityNorm.Contains("gaziantep")) { lat = 37.06; lon = 37.38; }
+
+                    string url = string.Format(CultureInfo.InvariantCulture, "https://api.open-meteo.com/v1/forecast?latitude={0:0.00}&longitude={1:0.00}&current_weather=true", lat, lon);
+                    var req = (HttpWebRequest)WebRequest.Create(url);
+                    req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
+                    req.Timeout = 4000;
+                    req.ReadWriteTimeout = 4000;
+                    using (var resp = (HttpWebResponse)req.GetResponse())
+                    using (var stream = resp.GetResponseStream())
+                    using (var reader = new StreamReader(stream, Encoding.UTF8))
+                    {
+                        string json = reader.ReadToEnd();
+                        var mTemp = Regex.Match(json, "\"temperature\"\\s*:\\s*([0-9\\.\\-]+)");
+                        var mCode = Regex.Match(json, "\"weathercode\"\\s*:\\s*([0-9]+)");
+                        if (mTemp.Success)
+                        {
+                            double tVal;
+                            if (double.TryParse(mTemp.Groups[1].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out tVal))
+                            {
+                                wd.Temperature = (int)Math.Round(tVal);
+                            }
+                        }
+                        if (mCode.Success)
+                        {
+                            int cVal;
+                            if (int.TryParse(mCode.Groups[1].Value, out cVal))
+                            {
+                                MapCode(cVal, wd);
+                            }
+                        }
+                    }
+                }
+                catch { }
+
                 if (onResult != null)
                 {
-                    try { onResult(fallback); } catch { }
+                    try { onResult(wd); } catch { }
                 }
             });
             thread.IsBackground = true;
@@ -2515,7 +2570,7 @@ namespace ModernAutoHideIcons
                 if (data == null)
                 {
                     data = new PrayerTimesData();
-                    data.City = string.IsNullOrWhiteSpace(city) ? "Ä°stanbul" : city.Trim();
+                    data.City = string.IsNullOrWhiteSpace(city) ? "İstanbul" : city.Trim();
                     data.Imsak = "05:52";
                     data.Gunes = "07:17";
                     data.Ogle = "12:53";
@@ -21799,7 +21854,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             _inactivityTimer = new DispatcherTimer();
             _inactivityTimer.Interval = TimeSpan.FromMilliseconds(250);
             _inactivityTimer.Tick += InactivityCheck;
-            // _inactivityTimer.Start(); // Ä°kon gizleme devredÄ±ÅŸÄ±
+            // _inactivityTimer.Start(); // İkon gizleme devredışı
 
             // Başlangıç yüklemeleri (XAML, fontlar, başlangıç HTTP verileri vb.) tamamlandıktan sonra
             // boşta kalan bellek sayfalarını Windows'a iade eden akıllı temizleyici
@@ -21815,7 +21870,7 @@ _mainContentPanel.Children.Add(CreateSettingCard("Web Tabanlı Widget", "Uygulam
             _desktopClickTimer = new DispatcherTimer();
             _desktopClickTimer.Interval = TimeSpan.FromMilliseconds(40);
             _desktopClickTimer.Tick += DesktopClickCheck;
-            // _desktopClickTimer.Start(); // MasaÃ¼stÃ¼ tÄ±klama dinleme devredÄ±ÅŸÄ±
+            // _desktopClickTimer.Start(); // Masaüstü tıklama dinleme devredışı
 
             RegisterGlobalHotkey();
             InitUpdateChecker();
