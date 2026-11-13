@@ -1,3 +1,33 @@
+# ☯️ Zen Desktop - Minimalist Desktop Suite & Smart Shift Manager
+
+**Developer:** [Serkan ŞENTÜRK](https://github.com/836982756578)  
+**Copyright:** © 2026 Serkan ŞENTÜRK. All Rights Reserved.  
+**License:** MIT  
+**Platform:** Windows 10 / 11 (64-bit & 32-bit Portable)  
+
+> An ultra-lightweight, high-performance desktop widget suite and productivity booster for Windows. Designed for multi-shift professionals, power users, and minimalists.
+
+---
+
+## 🇬🇧 English Documentation
+
+### ✨ Key Features
+* 🕒 **Minimalist Desktop Clock & Live Status Banner:** Real-time shift handover countdowns, live progress bar, and active duty supervisor badges.
+* 🔍 **Instant Staff & Station Search:** Filter roster members and metro/facility stations with live search.
+* 📅 **Interactive Mini Monthly Calendar:** Browse schedules for any day in the month instantly.
+* 📈 **Live Finance & Weather Tickers:** Real-time market rates (USD, EUR, Gold, BIST 100) and localized weather with zero background bloat.
+* 👁️ **20-20-20 Eye Rest & Health Reminders:** Gentle 20-second break alerts every 50 minutes for screen-focused workers.
+* 🛡️ **Enterprise Antivirus Safe:** 100% clean portable executable with zero intrusive system hooks.
+
+### 📥 Download & Usage
+1. Download the latest portable .exe from the [Releases](https://github.com/836982756578/Zen-Desktop/releases) section.
+2. Run directly — no installer or administrative privileges required.
+3. Enjoy an ultra-lightweight, native Windows experience!
+
+---
+
+## 🇹🇷 Türkçe Açıklama
+
 # Modern AutoHide Desktop Icons & Minimalist Masaüstü Widget'ı
 
 > **⭐ Geliştirici:** **Serkan ŞENTÜRK**  
